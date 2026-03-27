@@ -475,8 +475,8 @@ body::before {
 // FIREBASE / LOCAL SYNC 引擎 (改用動態載入提高相容性)
 // ════════════════════════════════════════════
 let db = null;
-let fsDoc = null, fsSet = null, fsOnSnap = null;
-let appId = typeof __app_id !== 'undefined' ? __app_id : 'game-king';
+let fsDoc = null, fsSet = null, fsOnSnap = null, fsCollection = null, fsDelete = null;
+let appId = 'game-king';
 let isFirebase = true;
 let isFirebaseAuthComplete = false;
 
@@ -499,9 +499,11 @@ let isFirebaseAuthComplete = false;
         const auth = authModule.getAuth(app);
         db = fsModule.getFirestore(app);
 
-        fsDoc    = fsModule.doc;
-        fsSet    = fsModule.setDoc;
-        fsOnSnap = fsModule.onSnapshot;
+        fsDoc        = fsModule.doc;
+        fsSet        = fsModule.setDoc;
+        fsOnSnap     = fsModule.onSnapshot;
+        fsCollection = fsModule.collection;
+        fsDelete     = fsModule.deleteDoc;
 
         await authModule.signInAnonymously(auth);
 
@@ -509,6 +511,9 @@ let isFirebaseAuthComplete = false;
             if (user) {
                 isFirebaseAuthComplete = true;
                 console.log("✅ Firebase 雲端連線成功！");
+                // 頁面一登入就開始監聽所有房間（學生可以看到房間列表）
+                startAllRoomsListener();
+                // 如果已有房間代碼，再開始監聽單一房間
                 if (window.state && window.state.roomCode) startSyncListener();
             } else {
                 isFirebaseAuthComplete = false;
@@ -520,52 +525,83 @@ let isFirebaseAuthComplete = false;
     }
 })();
 
-window.getRooms = function() { 
-    let r = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-    return r; 
+// ── localStorage 讀寫（本地快取）──
+window.getRooms = function() {
+    return JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
 };
-window.saveRooms = function(r) { 
-    localStorage.setItem('playroom_rooms', JSON.stringify(r)); 
-    if (isFirebase && db && isFirebaseAuthComplete && window.state && window.state.roomCode && r[window.state.roomCode]) {
-        const ref = fsDoc(db, 'rooms', window.state.roomCode);
-        fsSet(ref, r[window.state.roomCode], {merge: true}).catch(e => console.error("Firebase Save Error:", e));
+window.saveRooms = function(r) {
+    localStorage.setItem('playroom_rooms', JSON.stringify(r));
+    // 同步寫入 Firebase（只寫當前房間）
+    if (isFirebase && db && isFirebaseAuthComplete && window.state && window.state.roomCode) {
+        const data = r[window.state.roomCode];
+        if (data) {
+            const ref = fsDoc(db, 'rooms', window.state.roomCode);
+            fsSet(ref, data).catch(e => console.error("Firebase Save Error:", e));
+        }
+    }
+};
+
+// ── 刪除單一房間（Firebase + localStorage）──
+window.deleteRoom = function(code) {
+    const rooms = window.getRooms();
+    delete rooms[code];
+    localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+    if (isFirebase && db && isFirebaseAuthComplete) {
+        fsDelete(fsDoc(db, 'rooms', code)).catch(e => console.error("Firebase Delete Error:", e));
     }
 };
 
 let roomSyncUnsubscribe = null;
+let allRoomsUnsubscribe = null;
 
-// ══════════════════════════════════════════
-// Firebase 即時同步監聽
-// 讓不同裝置透過 Firestore onSnapshot 接收更新
-// ══════════════════════════════════════════
+// ── 監聽所有房間（讓學生看到房間列表）──
+function startAllRoomsListener() {
+    if (!isFirebase || !db) return;
+    if (allRoomsUnsubscribe) { allRoomsUnsubscribe(); allRoomsUnsubscribe = null; }
+    const colRef = fsCollection(db, 'rooms');
+    allRoomsUnsubscribe = fsOnSnap(colRef, (snapshot) => {
+        const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        snapshot.forEach(doc => {
+            rooms[doc.id] = doc.data();
+        });
+        // 移除 Firebase 上已不存在的房間
+        snapshot.docChanges && snapshot.docChanges().forEach(change => {
+            if (change.type === 'removed') delete rooms[change.doc.id];
+        });
+        localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+    }, err => console.error('All rooms sync error:', err));
+}
+
+// ── 監聽單一房間（遊戲中即時同步）──
 function startSyncListener() {
     if (!isFirebase || !db || !window.state || !window.state.roomCode) return;
-    // 停止舊的監聽
     if (roomSyncUnsubscribe) { roomSyncUnsubscribe(); roomSyncUnsubscribe = null; }
-
     const roomCode = window.state.roomCode;
     const ref = fsDoc(db, 'rooms', roomCode);
-
     roomSyncUnsubscribe = fsOnSnap(ref, (snap) => {
         if (!snap.exists()) return;
-        const data = snap.data();
-        // 把 Firebase 的資料同步回 localStorage
         const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-        rooms[roomCode] = data;
+        rooms[roomCode] = snap.data();
         localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
-    }, (err) => {
-        console.error('Firestore sync error:', err);
-    });
-    console.log('✅ 開始監聽房間:', roomCode);
+    }, err => console.error('Room sync error:', err));
+    console.log('✅ 監聽房間:', roomCode);
 }
 
 function stopSyncListener() {
     if (roomSyncUnsubscribe) { roomSyncUnsubscribe(); roomSyncUnsubscribe = null; }
 }
 function initReset() {
-    // 真正清空所有房間 (已取消自動清空，以免蓋掉其他老師的房間)
-    // localStorage.removeItem('playroom_rooms');
-    // localStorage.removeItem('playroom_counter');
+    // 清除本機 localStorage 中超過 6 小時的舊房間
+    const rooms = window.getRooms();
+    const now = Date.now();
+    let changed = false;
+    Object.keys(rooms).forEach(code => {
+        const r = rooms[code];
+        if (r.createdAt && (now - r.createdAt) > 6 * 60 * 60 * 1000) {
+            delete rooms[code]; changed = true;
+        }
+    });
+    if (changed) localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
 }
 initReset();
 
@@ -1278,7 +1314,7 @@ function teacherLogin() {
   localStorage.setItem('playroom_counter', roomNum);
 
   rooms[code] = { 
-      open: true, teacherName: tName, roomNum: roomNum, 
+      open: true, teacherName: tName, roomNum: roomNum, createdAt: Date.now(),
       playerCount: window.state.players.length, status: 'lobby', 
       finishedGroups: [], scores: {}, selectedGame: window.state.selectedGame 
   };
@@ -1306,19 +1342,23 @@ function teacherLogin() {
 }
 
 function doCloseRoom() {
-  const rooms = window.getRooms();
-  if (rooms[window.state.roomCode]) rooms[window.state.roomCode].open = false;
-  window.saveRooms(rooms); 
-  
+  const code = window.state.roomCode;
+  if (code) {
+      // 通知學生房間關閉（先設 open:false 讓學生 poll 偵測到）
+      const rooms = window.getRooms();
+      if (rooms[code]) { rooms[code].open = false; window.saveRooms(rooms); }
+      // 稍後真正刪除
+      setTimeout(() => window.deleteRoom(code), 2000);
+  }
+  stopSyncListener();
   window.state.roomCode = ''; window.state.players = []; window.state.takenSymbols = [];
   Object.keys(window.pStates).forEach(k => {
-      if (k !== 'teacher' && k !== 'guest') { 
-          window.pStates[k].joined = false; 
-          window.pStates[k].screen = 'screen-home'; 
-          window.pStates[k].joinStep = 1; 
+      if (k !== 'teacher' && k !== 'guest') {
+          window.pStates[k].joined = false;
+          window.pStates[k].screen = 'screen-home';
+          window.pStates[k].joinStep = 1;
       }
   });
-  
   window.goTo('screen-home');
 }
 
