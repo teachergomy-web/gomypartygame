@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎉 派對大冒險！</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --red:    #FF3B3B;
+            --blue:   #2D8FFF;
+            --yellow: #FFD600;
+            --green:  #2ECC40;
+            --purple: #A855F7;
+            --orange: #FF7A00;
+            --white:  #FFFDE7;
+            --bg:     #1A0A4A;
+            --panel:  #2D1A6E;
+            --border: #FFD600;
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg);
+            font-family: 'Fredoka One', 'Nunito', sans-serif;
+            color: #fff;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        /* ===== STARS BACKGROUND ===== */
+        #stars {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            overflow: hidden;
+        }
+        .star {
+            position: absolute;
+            border-radius: 50%;
+            background: #fff;
+            animation: twinkle var(--d, 2s) infinite alternate;
+        }
+        @keyframes twinkle { from { opacity: 0.2; transform: scale(0.8); } to { opacity: 1; transform: scale(1.2); } }
+
+        /* ===== OVERLAY BASE ===== */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 300; text-align: center;
+        }
+
+        /* ===== LOBBY ===== */
+        #level-select-menu {
+            padding: 20px;
+            background: radial-gradient(ellipse at top, #3D1F8A 0%, #1A0A4A 70%);
+        }
+
+        .lobby-title {
+            font-size: clamp(22px, 5vw, 36px);
+            line-height: 1.2;
+            text-shadow: 4px 4px 0 var(--purple), 8px 8px 0 rgba(0,0,0,0.4);
+            margin-bottom: 4px;
+            animation: titleBounce 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes titleBounce { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+
+        .lobby-sub {
+            font-size: clamp(9px, 2vw, 13px);
+            color: var(--yellow);
+            margin-bottom: 16px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+        }
+
+        /* ===== PAGE DOTS ===== */
+        .page-dots {
+            display: flex; gap: 10px; justify-content: center; margin-bottom: 14px;
+        }
+        .dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            border: 2px solid rgba(255,255,255,0.4);
+            cursor: pointer; transition: all 0.2s;
+        }
+        .dot.active {
+            background: var(--yellow);
+            border-color: var(--yellow);
+            transform: scale(1.4);
+            box-shadow: 0 0 8px var(--yellow);
+        }
+
+        /* ===== LEVEL GRID ===== */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            width: 92%;
+            max-width: 480px;
+            margin: 0 auto 14px;
+        }
+
+        .level-btn {
+            aspect-ratio: 1;
+            border-radius: 14px;
+            border: 4px solid transparent;
+            background: var(--panel);
+            color: #fff;
+            font-family: 'Fredoka One', sans-serif;
+            font-size: clamp(14px, 3vw, 20px);
+            cursor: pointer;
+            transition: transform 0.12s, box-shadow 0.12s;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column;
+            gap: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+        .level-btn::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .level-btn:active { transform: scale(0.88); }
+        .level-btn:hover  { transform: scale(1.08); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+
+        .lvl-p1 { border-color: var(--green);  background: linear-gradient(145deg, #1a5c2a, #0d3317); box-shadow: 0 4px 0 #0a2010, inset 0 1px 0 rgba(255,255,255,0.2); }
+        .lvl-p2 { border-color: var(--yellow); background: linear-gradient(145deg, #6b4c00, #3d2b00); box-shadow: 0 4px 0 #2a1d00, inset 0 1px 0 rgba(255,255,255,0.2); }
+        .lvl-p3 { border-color: var(--red);    background: linear-gradient(145deg, #6b0f0f, #3d0707); box-shadow: 0 4px 0 #2a0404, inset 0 1px 0 rgba(255,255,255,0.2); }
+
+        .lvl-emoji { font-size: 14px; line-height: 1; }
+
+        /* ===== PAGE ARROWS ===== */
+        .page-nav {
+            display: flex; gap: 20px; justify-content: center; align-items: center; margin-bottom: 12px;
+        }
+        .arrow-btn {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            border: 4px solid var(--yellow);
+            background: var(--panel);
+            color: var(--yellow);
+            font-size: 22px;
+            cursor: pointer;
+            transition: transform 0.12s, background 0.12s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .arrow-btn:hover  { background: var(--yellow); color: #000; transform: scale(1.1); }
+        .arrow-btn:active { transform: scale(0.9); }
+        .arrow-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+        .page-label {
+            font-size: 14px; color: var(--yellow);
+            min-width: 80px;
+        }
+
+        .legend-row {
+            display: flex; gap: 16px; justify-content: center; font-size: clamp(8px, 2vw, 11px);
+            color: rgba(255,255,255,0.7); font-family: 'Nunito', sans-serif;
+        }
+        .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+        /* ===== UI HEADER ===== */
+        #ui-header {
+            position: absolute; top: 0; left: 0; width: 100%; height: 70px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 14px; z-index: 100;
+            background: linear-gradient(to bottom, rgba(26,10,74,0.97), rgba(26,10,74,0.7));
+            border-bottom: 4px solid var(--yellow);
+        }
+
+        .hud-box {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+            background: rgba(255,255,255,0.07);
+            padding: 4px 10px; border-radius: 12px;
+            border: 2px solid rgba(255,214,0,0.3);
+        }
+        .hud-label { font-size: 8px; color: rgba(255,255,255,0.6); font-family: 'Nunito', sans-serif; }
+        .hud-val   { font-size: 18px; font-family: 'Fredoka One', sans-serif; color: var(--yellow); line-height: 1; }
+        #time-txt  { color: var(--green); }
+        #time-txt.urgent { color: var(--red); animation: pulseRed 0.4s infinite alternate; }
+        @keyframes pulseRed { from { opacity: 1; } to { opacity: 0.5; } }
+
+        .home-btn {
+            background: linear-gradient(to bottom, var(--red), #b02020);
+            border: 3px solid #fff;
+            border-bottom: 5px solid #7a0000;
+            border-radius: 12px;
+            padding: 6px 12px;
+            font-family: 'Fredoka One', sans-serif;
+            font-size: 13px;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .home-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+
+        /* ===== PHASE NOTICE ===== */
+        #phase-notice {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 200; text-align: center; pointer-events: none; display: none;
+            background: linear-gradient(135deg, #2D1A6E, #1A0A4A);
+            padding: 30px 40px;
+            border: 5px solid var(--yellow);
+            border-radius: 24px;
+            box-shadow: 0 0 0 3px rgba(255,214,0,0.3), 0 20px 60px rgba(0,0,0,0.6);
+            width: 85%; max-width: 380px;
+        }
+        #notice-content { font-size: 13px; line-height: 2.2; font-family: 'Nunito', sans-serif; font-weight: 700; }
+
+        /* ===== GAME OVER ===== */
+        #game-over {
+            background: radial-gradient(ellipse at center, #3D1F8A 0%, #1A0A4A 100%);
+        }
+
+        .result-card {
+            background: linear-gradient(135deg, #2D1A6E, #1A0A4A);
+            border: 5px solid var(--yellow);
+            border-radius: 28px;
+            padding: 30px 40px;
+            box-shadow: 0 0 0 4px rgba(255,214,0,0.2), 0 20px 60px rgba(0,0,0,0.7);
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+        }
+
+        .result-title {
+            font-size: clamp(28px, 7vw, 48px);
+            background: linear-gradient(to bottom, #FFD600, #FF7A00);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: none;
+            filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.5));
+            animation: resultPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes resultPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .result-sub { font-size: 13px; color: rgba(255,255,255,0.7); font-family: 'Nunito', sans-serif; font-weight: 700; }
+
+        .result-score {
+            font-size: clamp(40px, 10vw, 64px);
+            color: var(--white);
+            text-shadow: 4px 4px 0 var(--purple), 8px 8px 0 rgba(0,0,0,0.4);
+            animation: scorePop 0.5s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+        @keyframes scorePop { from { transform: scale(0.3) rotate(-10deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+
+        .result-stars { font-size: 28px; letter-spacing: 4px; }
+
+        .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+        .mp-btn {
+            border: none; border-radius: 16px;
+            padding: 12px 22px;
+            font-family: 'Fredoka One', sans-serif;
+            font-size: 15px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            border-bottom: 5px solid rgba(0,0,0,0.3);
+            color: #fff;
+        }
+        .mp-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+        .mp-btn-blue   { background: linear-gradient(to bottom, var(--blue), #1a5fcc); }
+        .mp-btn-green  { background: linear-gradient(to bottom, var(--green), #1a8a2a); }
+        .mp-btn-yellow { background: linear-gradient(to bottom, var(--orange), #cc5500); }
+
+        /* ===== CANVAS ===== */
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .hidden { display: none !important; }
+
+        /* ===== SCORE POP ===== */
+        .score-pop {
+            position: absolute;
+            font-family: 'Fredoka One', sans-serif;
+            font-size: 22px;
+            pointer-events: none;
+            animation: popUp 0.7s ease-out forwards;
+            z-index: 500;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+        }
+        @keyframes popUp { 0% { opacity: 1; transform: translateY(0) scale(1.2); } 100% { opacity: 0; transform: translateY(-60px) scale(0.9); } }
+
+        /* ===== SHAKE ===== */
+        .shake { animation: shake 0.35s both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-3px, 0, 0); }
+            30%, 70% { transform: translate3d(-8px, 0, 0); }
+            40%, 60% { transform: translate3d(8px, 0, 0); }
+        }
+
+        /* ===== CONFETTI ===== */
+        .confetti-piece {
+            position: absolute; width: 10px; height: 10px; pointer-events: none; z-index: 400;
+            animation: confettiFall var(--fall, 2s) var(--delay, 0s) linear both;
+        }
+        @keyframes confettiFall {
+            0%   { opacity: 1; transform: translateY(-20px) rotate(0deg); }
+            100% { opacity: 0; transform: translateY(300px) rotate(720deg); }
+        }
+    </style>
+</head>
+<body id="game-body">
+
+<!-- Stars -->
+<div id="stars"></div>
+
+<!-- LOBBY -->
+<div id="level-select-menu" class="overlay hidden">
+    <div class="lobby-title">🎉 派對大冒險！</div>
+    <div class="lobby-sub">⭐ 採礦派對 · 點擊礦石得分 ⭐</div>
+
+    <div class="page-nav">
+        <button class="arrow-btn" id="prev-btn" onclick="changePage(-1)">◀</button>
+        <div class="page-label" id="page-label">第 1 頁 / 3</div>
+        <button class="arrow-btn" id="next-btn" onclick="changePage(1)">▶</button>
+    </div>
+
+    <div class="page-dots" id="page-dots"></div>
+
+    <div class="level-grid" id="level-grid"></div>
+
+    <div class="legend-row">
+        <span><span class="legend-dot" style="background:var(--green)"></span>初級 (1–10)</span>
+        <span><span class="legend-dot" style="background:var(--yellow)"></span>中級 (11–20)</span>
+        <span><span class="legend-dot" style="background:var(--red)"></span>高級 (21–30)</span>
+    </div>
+</div>
+
+<!-- HUD -->
+<div id="ui-header" class="hidden">
+    <div class="hud-box">
+        <div class="hud-label" id="phase-label">初級階段</div>
+        <div class="hud-val" id="lvl-txt">LV 1</div>
+    </div>
+    <div class="hud-box" style="align-items:center;">
+        <div class="hud-label">⏱ 剩餘時間</div>
+        <div class="hud-val" id="time-txt">60</div>
+    </div>
+    <div class="hud-box" style="align-items:flex-end;">
+        <div class="hud-label">🏆 團隊分數</div>
+        <div class="hud-val" id="score-txt">0</div>
+    </div>
+</div>
+
+<!-- PHASE NOTICE -->
+<div id="phase-notice">
+    <div id="notice-content"></div>
+</div>
+
+<!-- GAME OVER -->
+<div id="game-over" class="overlay hidden">
+    <div class="result-card">
+        <div class="result-title">⏰ 時間到！</div>
+        <div class="result-sub">小組開採成績</div>
+        <div class="result-score" id="final-score">0</div>
+        <div class="result-stars" id="result-stars">⭐⭐⭐</div>
+        <div class="btn-row">
+            <button class="mp-btn mp-btn-blue" onclick="backToLobby()">🏠 回大廳</button>
+            <button id="next-lvl-btn" class="mp-btn mp-btn-green" onclick="startNextLevel()">▶ 下一關</button>
+        </div>
+    </div>
+</div>
+
+<!-- CANVAS -->
+<div id="canvas-container">
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+// ===== STARS =====
+(function(){
+    const c = document.getElementById('stars');
+    for(let i=0;i<60;i++){
+        const s = document.createElement('div');
+        s.className='star';
+        const sz = 1 + Math.random()*3;
+        s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${1+Math.random()*3}s;animation-delay:${Math.random()*3}s`;
+        c.appendChild(s);
+    }
+})();
+
+// ===== CANVAS =====
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// ===== PAGE STATE =====
+const LEVELS_PER_PAGE = 10;
+const TOTAL_LEVELS = 30;
+const TOTAL_PAGES = Math.ceil(TOTAL_LEVELS / LEVELS_PER_PAGE);
+let currentPage = 0;
+
+function buildPageDots() {
+    const dots = document.getElementById('page-dots');
+    dots.innerHTML = '';
+    for(let i=0;i<TOTAL_PAGES;i++){
+        const d = document.createElement('div');
+        d.className = 'dot' + (i===currentPage?' active':'');
+        d.onclick = ()=>{ currentPage=i; renderLobbyPage(); };
+        dots.appendChild(d);
+    }
+}
+
+function changePage(dir) {
+    currentPage = Math.max(0, Math.min(TOTAL_PAGES-1, currentPage+dir));
+    renderLobbyPage();
+}
+
+function renderLobbyPage() {
+    const grid = document.getElementById('level-grid');
+    grid.innerHTML = '';
+    const start = currentPage * LEVELS_PER_PAGE + 1;
+    const end   = Math.min(start + LEVELS_PER_PAGE - 1, TOTAL_LEVELS);
+
+    for(let i=start; i<=end; i++){
+        const btn = document.createElement('button');
+        let phase = i>20?3:(i>10?2:1);
+        let cls = phase===1?'lvl-p1':(phase===2?'lvl-p2':'lvl-p3');
+        let emoji = phase===1?'🌿':(phase===2?'⚡':'🔥');
+        btn.className = `level-btn ${cls}`;
+        btn.innerHTML = `<span class="lvl-emoji">${emoji}</span>${i}`;
+        btn.onclick = ()=> startGame(i);
+        grid.appendChild(btn);
+    }
+
+    document.getElementById('page-label').textContent = `第 ${currentPage+1} 頁 / ${TOTAL_PAGES}`;
+    document.getElementById('prev-btn').disabled = currentPage===0;
+    document.getElementById('next-btn').disabled = currentPage===TOTAL_PAGES-1;
+    buildPageDots();
+}
+
+renderLobbyPage();
+
+// ===== GAME STATE =====
+let state = {
+    active: false, score: 0, level: 1, phase: 1,
+    timeLeft: 60, lastFrameTime: 0,
+    spawnTimer: 0, spawnCount: 0,
+    entities: [], particles: [], seed: 1234
+};
+
+const GRAVITY = 0.1;
+const APEX_THRESHOLD = 1.8;
+const HIT_COOLDOWN = 150;
+
+const MINERAL_TYPES = [
+    { color: '#00e5ff', pts: 200, scale: 0.55, speedMod: 1.3 },
+    { color: '#2ECC40', pts: 100, scale: 0.85, speedMod: 1.0 },
+    { color: '#CC44FF', pts: 50,  scale: 1.25, speedMod: 0.8 }
+];
+
+// ===== LOBBY / BACK =====
+function backToLobby() {
+    state.active = false;
+    document.getElementById('level-select-menu').classList.remove('hidden');
+    document.getElementById('ui-header').classList.add('hidden');
+    document.getElementById('game-over').classList.add('hidden');
+    document.getElementById('phase-notice').style.display='none';
+}
+
+// ===== START GAME =====
+function startGame(lvl) {
+    document.getElementById('level-select-menu').classList.add('hidden');
+    document.getElementById('game-over').classList.add('hidden');
+    document.getElementById('ui-header').classList.remove('hidden');
+    state.active = true;
+    state.score = 0;
+    state.spawnCount = 0;
+    resize();
+    setupLevel(lvl);
+    state.lastFrameTime = performance.now();
+    requestAnimationFrame(gameLoop);
+}
+
+function startNextLevel() {
+    if (state.level < TOTAL_LEVELS) startGame(state.level + 1);
+    else backToLobby();
+}
+
+function seededRandom() {
+    state.seed = (state.seed * 9301 + 49297) % 233280;
+    return state.seed / 233280;
+}
+
+function setupLevel(lvl) {
+    state.level = lvl;
+    state.timeLeft = 60;
+    state.entities = [];
+    state.spawnTimer = 0;
+    state.seed = 4000 + lvl;
+    let oldPhase = state.phase;
+    if (lvl>20) state.phase=3;
+    else if (lvl>10) state.phase=2;
+    else state.phase=1;
+
+    const phaseNames = ['','🌿 初級','⚡ 中級','🔥 高級'];
+    document.getElementById('lvl-txt').innerText = `LV ${lvl}`;
+    document.getElementById('phase-label').innerText = phaseNames[state.phase];
+    document.getElementById('score-txt').innerText = state.score;
+
+    if (lvl===1 || state.phase!==oldPhase || lvl%5===0) showPhaseNotice();
+}
+
+function showPhaseNotice() {
+    const notice = document.getElementById('phase-notice');
+    const content = document.getElementById('notice-content');
+    notice.style.display='block';
+    const msgs = [
+        '',
+        `<div style='font-size:24px;margin-bottom:8px'>🌿 初級：基礎探索</div>發現金框礦石了嗎？<br>確實點擊 <span style='color:#FFD600'>3次</span> 才能擊破！`,
+        `<div style='font-size:24px;margin-bottom:8px'>⚡ 中級：雙向攻勢</div>上下拋射開始！<br>多人協作，攔截高分護盾礦！`,
+        `<div style='font-size:24px;margin-bottom:8px'>🔥 高級：全域亂流</div>避開紅黑障礙物！<br>冷靜採礦，爭取最高分！`
+    ];
+    content.innerHTML = msgs[state.phase];
+    setTimeout(()=>{ notice.style.display='none'; }, 2800);
+}
+
+// ===== SPAWN =====
+function spawn() {
+    const interval = Math.max(600, 1500 - (state.level*25));
+    if (state.spawnTimer > interval) {
+        state.spawnTimer=0;
+        let maxSim = state.phase===1?2:(state.phase===2?3:4);
+        let count = 1 + Math.floor(seededRandom()*maxSim);
+        for(let i=0;i<count;i++) createEntity();
+    }
+}
+
+function createEntity() {
+    state.spawnCount++;
+    let isRareShield = (state.spawnCount%8===0);
+    let source='bottom';
+    if(state.phase===2) source=seededRandom()>0.5?'bottom':'top';
+    else if(state.phase===3){
+        let r=seededRandom();
+        if(r<0.4) source='bottom'; else if(r<0.7) source='top';
+        else if(r<0.85) source='left'; else source='right';
+    }
+    let mData=MINERAL_TYPES[Math.floor(seededRandom()*3)];
+    const baseSize=35+seededRandom()*15;
+    const e={
+        id:Math.random(), x:0, y:0, vx:0, vy:0, r:(baseSize*mData.scale)/2,
+        type:'mineral', pts:mData.pts, hp:1, color:mData.color,
+        active:true, rot:seededRandom()*Math.PI, rv:(seededRandom()-0.5)*0.1,
+        isAtApex:false, isShielded:false, lastHitTime:0
+    };
+    if(isRareShield){ e.isShielded=true; e.hp=3; e.pts=500; e.r*=1.4; e.color='#fff'; }
+    const targetHeight=canvas.height*0.45;
+    const baseLaunchVel=Math.sqrt(2*GRAVITY*targetHeight);
+    const speedMod=isRareShield?0.55:mData.speedMod;
+    if(source==='bottom'){
+        e.x=seededRandom()*(canvas.width-200)+100; e.y=canvas.height+60;
+        e.vx=(seededRandom()-0.5)*3*speedMod; e.vy=-baseLaunchVel*(0.85+seededRandom()*0.25)*speedMod;
+    } else if(source==='top'){
+        e.x=seededRandom()*(canvas.width-200)+100; e.y=-60;
+        e.vx=(seededRandom()-0.5)*3*speedMod; e.vy=baseLaunchVel*0.6*speedMod;
+    } else {
+        let isLeft=source==='left'; e.x=isLeft?-60:canvas.width+60;
+        e.y=canvas.height*0.4+(seededRandom()-0.5)*300;
+        e.vx=(isLeft?1:-1)*(7+seededRandom()*5)*speedMod;
+        e.vy=-(baseLaunchVel*0.4)*speedMod;
+    }
+    if(state.level>=8&&!isRareShield){
+        if(seededRandom()<0.08){ e.type='penalty'; e.color='#222'; e.pts=-300; e.hp=1; e.r=22; }
+        else if(state.phase===3&&seededRandom()<0.1){ e.type='bomb'; e.color='#ff0000'; e.pts=-600; e.hp=1; e.r=25; }
+    }
+    state.entities.push(e);
+}
+
+// ===== HIT =====
+function handleInput(px, py) {
+    if(!state.active) return;
+    const now=performance.now();
+    for(let i=state.entities.length-1;i>=0;i--){
+        const e=state.entities[i];
+        if(!e.active) continue;
+        if(now-e.lastHitTime<HIT_COOLDOWN) continue;
+        const dist=Math.sqrt((px-e.x)**2+(py-e.y)**2);
+        const hitRadius=e.isShielded?e.r+60:(e.isAtApex?e.r+50:e.r+30);
+        if(dist<hitRadius){
+            e.lastHitTime=now;
+            if(e.type==='mineral') processMine(e,px,py);
+            else processPenalty(e,px,py);
+            break;
+        }
+    }
+}
+
+function processMine(e,px,py){
+    e.hp--;
+    createParticles(px,py,e.hp>0?'#fff':(e.isShielded?'#FFD600':e.color),6);
+    if(e.hp<=0){
+        e.active=false;
+        let finalPts=e.pts+(e.isAtApex?50:0);
+        state.score+=finalPts;
+        createParticles(e.x,e.y,e.isShielded?'#FFD600':e.color,e.isShielded?30:12);
+        spawnScorePop(px,py,`+${finalPts}`,e.isShielded?'#FFD600':'#fff');
+        document.getElementById('score-txt').innerText=state.score;
+        reportScore();
+    } else {
+        e.r*=1.3; setTimeout(()=>{ if(e) e.r/=1.3; },60);
+    }
+}
+
+function processPenalty(e,px,py){
+    e.active=false;
+    state.score=Math.max(0,state.score+e.pts);
+    spawnScorePop(px,py,`${e.pts}`,'#FF3B3B');
+    document.getElementById('score-txt').innerText=state.score;
+    document.getElementById('game-body').classList.add('shake');
+    setTimeout(()=>document.getElementById('game-body').classList.remove('shake'),250);
+    createParticles(e.x,e.y,'#ff3333',15);
+}
+
+function spawnScorePop(x,y,text,color){
+    const el=document.createElement('div');
+    el.className='score-pop';
+    el.innerText=text; el.style.left=x+'px'; el.style.top=y+'px'; el.style.color=color;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),700);
+}
+
+// ===== DRAW =====
+function drawHexagon(cx,cy,r,color,glowColor,glowing){
+    ctx.save();
+    ctx.shadowBlur=glowing?25:0;
+    ctx.shadowColor=glowColor||color;
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    for(let j=0;j<6;j++){
+        let ang=(j/6)*Math.PI*2;
+        ctx.lineTo(cx+Math.cos(ang)*r, cy+Math.sin(ang)*r);
+    }
+    ctx.closePath(); ctx.fill();
+
+    // shiny highlight
+    ctx.globalAlpha=0.3;
+    ctx.fillStyle='#fff';
+    ctx.beginPath();
+    for(let j=0;j<6;j++){
+        let ang=(j/6)*Math.PI*2;
+        ctx.lineTo(cx+Math.cos(ang)*r*0.5, cy+Math.sin(ang)*r*0.5);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.restore();
+}
+
+function drawMarioBg(){
+    // Subtle animated cloud-like bg blobs
+    const t=performance.now()/4000;
+    ctx.save();
+    ctx.globalAlpha=0.04;
+    [[0.2,0.3,200],[0.7,0.6,160],[0.5,0.8,120],[0.85,0.2,180]].forEach(([fx,fy,r])=>{
+        const grd=ctx.createRadialGradient(
+            canvas.width*fx+Math.sin(t+fx)*30, canvas.height*fy+Math.cos(t+fy)*20, 0,
+            canvas.width*fx, canvas.height*fy, r
+        );
+        grd.addColorStop(0,'#7B2FFF');
+        grd.addColorStop(1,'transparent');
+        ctx.fillStyle=grd;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+    });
+    ctx.restore();
+}
+
+// ===== GAME LOOP =====
+function gameLoop(now){
+    if(!state.active) return;
+    if(state.paused) return;
+    const dt=now-state.lastFrameTime;
+    state.lastFrameTime=now;
+
+    state.timeLeft-=dt/1000;
+    if(state.timeLeft<=0){
+        state.active=false;
+        endGame();
+        return;
+    }
+    const secs=Math.ceil(state.timeLeft);
+    const timeEl=document.getElementById('time-txt');
+    timeEl.innerText=secs+'s';
+    timeEl.className='hud-val'+(secs<=10?' urgent':'');
+
+    state.spawnTimer+=dt;
+    spawn();
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawMarioBg();
+
+    for(let i=state.entities.length-1;i>=0;i--){
+        const e=state.entities[i];
+        e.isAtApex=Math.abs(e.vy)<APEX_THRESHOLD;
+        let gravScale=e.isShielded?0.6:1.0;
+        e.vy+=GRAVITY*gravScale; e.x+=e.vx; e.y+=e.vy; e.rot+=e.rv;
+        if(e.y>canvas.height+150||e.y<-200||e.x<-200||e.x>canvas.width+200){ state.entities.splice(i,1); continue; }
+        if(!e.active){ state.entities.splice(i,1); continue; }
+
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(e.rot);
+
+        if(e.type==='mineral'){
+            const scale=e.isAtApex?1.3:1.0;
+            ctx.scale(scale,scale);
+
+            if(e.isShielded){
+                // Gold shielded mineral - Mario Party coin style
+                ctx.shadowBlur=20; ctx.shadowColor='#FFD600';
+                // outer ring
+                const pulse=Math.sin(now/200)*8;
+                ctx.strokeStyle='rgba(255,214,0,0.5)';
+                ctx.lineWidth=4;
+                ctx.beginPath(); ctx.arc(0,0,e.r+12+pulse,0,Math.PI*2); ctx.stroke();
+                // inner gem
+                ctx.fillStyle='#FFD600';
+                ctx.beginPath();
+                for(let j=0;j<6;j++){ let a=(j/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*e.r,Math.sin(a)*e.r); }
+                ctx.closePath(); ctx.fill();
+                // shine
+                ctx.globalAlpha=0.4; ctx.fillStyle='#fff';
+                ctx.beginPath();
+                for(let j=0;j<6;j++){ let a=(j/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*e.r*0.45,Math.sin(a)*e.r*0.45); }
+                ctx.closePath(); ctx.fill();
+                ctx.globalAlpha=1;
+                // hp count
+                ctx.rotate(-e.rot);
+                ctx.fillStyle='#1A0A4A'; ctx.font=`bold ${e.r*0.7}px Fredoka One`;
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(e.hp,0,2);
+                // orbiting stars
+                ctx.rotate(now/400);
+                for(let k=0;k<3;k++){
+                    ctx.save();
+                    ctx.rotate((k/3)*Math.PI*2);
+                    ctx.fillStyle='#FFD600';
+                    ctx.font='12px sans-serif'; ctx.fillText('⭐',e.r+14,0);
+                    ctx.restore();
+                }
+            } else {
+                // Normal mineral - colorful gem
+                ctx.shadowBlur=e.isAtApex?20:8;
+                ctx.shadowColor=e.color;
+                ctx.fillStyle=e.color;
+                ctx.beginPath();
+                for(let j=0;j<6;j++){ let a=(j/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*e.r,Math.sin(a)*e.r); }
+                ctx.closePath(); ctx.fill();
+                // shine
+                ctx.globalAlpha=0.35; ctx.fillStyle='#fff';
+                ctx.beginPath();
+                for(let j=0;j<6;j++){ let a=(j/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*e.r*0.45,Math.sin(a)*e.r*0.45); }
+                ctx.closePath(); ctx.fill();
+                ctx.globalAlpha=1;
+                // apex glow ring
+                if(e.isAtApex){
+                    ctx.rotate(-e.rot);
+                    ctx.strokeStyle='rgba(255,255,255,0.6)';
+                    ctx.lineWidth=3;
+                    ctx.beginPath(); ctx.arc(0,0,e.r+8,0,Math.PI*2); ctx.stroke();
+                }
+            }
+        } else if(e.type==='penalty'){
+            // Boo ghost / dark block
+            ctx.shadowBlur=10; ctx.shadowColor='#ff3333';
+            ctx.fillStyle='#1A0A4A';
+            ctx.strokeStyle='#FF3B3B'; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.arc(0,0,e.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.rotate(-e.rot);
+            ctx.fillStyle='#FF3B3B'; ctx.font=`bold ${e.r*0.9}px sans-serif`;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('👻',0,3);
+        } else if(e.type==='bomb'){
+            // Bob-omb style
+            ctx.shadowBlur=15; ctx.shadowColor='#ff6600';
+            ctx.fillStyle='#111';
+            ctx.strokeStyle='#ff6600'; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.arc(0,0,e.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.rotate(-e.rot);
+            ctx.font=`${e.r*0.95}px sans-serif`;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('💣',0,3);
+        }
+        ctx.restore();
+    }
+
+    // particles
+    for(let i=state.particles.length-1;i>=0;i--){
+        const p=state.particles[i];
+        p.x+=p.vx; p.y+=p.vy; p.life-=0.05;
+        if(p.life<=0){ state.particles.splice(i,1); continue; }
+        ctx.globalAlpha=p.life;
+        ctx.fillStyle=p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    requestAnimationFrame(gameLoop);
+}
+
+function endGame(){
+    const finalScore=state.score;
+    document.getElementById('final-score').innerText=finalScore;
+    let stars='⭐';
+    if(finalScore>=3000) stars='⭐⭐⭐';
+    else if(finalScore>=1500) stars='⭐⭐';
+    document.getElementById('result-stars').innerText=stars;
+    document.getElementById('game-over').classList.remove('hidden');
+    spawnConfetti();
+    const nb=document.getElementById('next-lvl-btn');
+    if(state.level>=TOTAL_LEVELS){ nb.style.display='none'; } else { nb.style.display=''; }
+    // 通知平台遊戲結束
+    window.parent.postMessage({
+        type: 'W1_GAMEOVER',
+        score: finalScore,
+        level: state.level,
+        group: window.GROUP_ID || ''
+    }, '*');
+}
+
+function spawnConfetti(){
+    const colors=['#FF3B3B','#2D8FFF','#FFD600','#2ECC40','#A855F7','#FF7A00'];
+    const container=document.getElementById('game-over');
+    for(let i=0;i<40;i++){
+        const el=document.createElement('div');
+        el.className='confetti-piece';
+        el.style.cssText=`
+            left:${Math.random()*100}%;
+            top:${Math.random()*30}%;
+            background:${colors[Math.floor(Math.random()*colors.length)]};
+            border-radius:${Math.random()>0.5?'50%':'3px'};
+            --fall:${1.5+Math.random()*1.5}s;
+            --delay:${Math.random()*1}s;
+            transform:rotate(${Math.random()*360}deg);
+        `;
+        container.appendChild(el);
+        setTimeout(()=>el.remove(),3000);
+    }
+}
+
+function createParticles(x,y,color,count){
+    for(let i=0;i<count;i++){
+        state.particles.push({x,y,vx:(Math.random()-0.5)*14,vy:(Math.random()-0.5)*14,life:1.0,color});
+    }
+}
+
+// ===== PLATFORM BRIDGE (postMessage) =====
+// 回報分數給平台
+function reportScore() {
+    window.parent.postMessage({
+        type: 'W1_SCORE',
+        score: state.score,
+        level: state.level,
+        group: window.GROUP_ID || ''
+    }, '*');
+}
+
+// 接收平台指令
+window.addEventListener('message', (e) => {
+    if (!e.data || !e.data.type) return;
+    switch(e.data.type) {
+        case 'PLATFORM_START':
+            if (e.data.group) window.GROUP_ID = e.data.group;
+            startGame(e.data.level || 1);
+            break;
+        case 'PLATFORM_PAUSE':
+            state.paused = true;
+            document.getElementById('pause-overlay').style.display = 'flex';
+            break;
+        case 'PLATFORM_RESUME':
+            if (state.paused) {
+                state.paused = false;
+                document.getElementById('pause-overlay').style.display = 'none';
+                state.lastFrameTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+            break;
+        case 'PLATFORM_RESET':
+            backToLobby();
+            break;
+    }
+});
+
+// 加入暫停覆蓋層
+(function(){
+    const overlay = document.createElement('div');
+    overlay.id = 'pause-overlay';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px';
+    overlay.innerHTML = '<div style="font-size:3rem">⏸</div><div style="font-family:Fredoka One,sans-serif;font-size:2rem;color:#FFD600">遊戲暫停</div>';
+    document.body.appendChild(overlay);
+})();
+
+// 通知平台遊戲已準備好
+window.parent.postMessage({ type: 'W1_READY' }, '*');
+
+// ── 自動開始（讀取 URL 參數，預設第1關）──
+(function(){
+    const params = new URLSearchParams(window.location.search);
+    const autoLevel = parseInt(params.get('autostart')) || 1;
+    const group = params.get('group');
+    if (group) window.GROUP_ID = group;
+    // 無論有無 URL 參數都自動開始
+    if (document.readyState !== 'loading') {
+        setTimeout(() => startGame(autoLevel), 300);
+    } else {
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => startGame(autoLevel), 300);
+        });
+    }
+})();
+
+// ===== RESIZE + INPUT =====
+function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+window.addEventListener('resize',resize);
+resize();
+
+canvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const r=canvas.getBoundingClientRect();
+    for(let i=0;i<e.changedTouches.length;i++) handleInput(e.changedTouches[i].clientX-r.left,e.changedTouches[i].clientY-r.top);
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const r=canvas.getBoundingClientRect();
+    for(let i=0;i<e.changedTouches.length;i++) handleInput(e.changedTouches[i].clientX-r.left,e.changedTouches[i].clientY-r.top);
+},{passive:false});
+canvas.addEventListener('mousedown',e=>{
+    const r=canvas.getBoundingClientRect();
+    handleInput(e.clientX-r.left,e.clientY-r.top);
+});
+</script>
+</body>
+</html>
