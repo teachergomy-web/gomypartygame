@@ -761,11 +761,19 @@ window.addEventListener('message', (e) => {
 
 // 輪詢：偵測玩家加入、遊戲狀態 + 房間關閉
 setInterval(() => {
+    // 新增：如果停留在加入房間列表，自動更新列表，確保老師創房後學生立刻看見
+    if (window.state && window.pStates) {
+        const currentPState = window.pStates[window.state.perspective];
+        if (currentPState && currentPState.screen === 'screen-join' && currentPState.joinStep === 1) {
+            window.renderRoomList();
+        }
+    }
+
     if (!window.state || !window.state.roomCode) return;
     const rooms = window.getRooms();
     const r = rooms[window.state.roomCode];
 
-    // 新增：多方測試同步大廳人數，讓分頁能彼此看到新加入的玩家
+    // 多方測試同步大廳人數，讓分頁能彼此看到新加入的玩家
     if (r && r.players && r.players.length !== window.state.players.length) {
         window.state.players = r.players;
         window.state.takenSymbols = r.players.map(p => p.symbol);
@@ -966,7 +974,7 @@ function renderRoomList() {
       return `<div class="room-card ${isFull ? 'room-full' : ''}" onclick="${isFull ? "showToast('房間已滿')" : `selectRoom('${code}', '${r.roomNum}')`}">
           <div style="display:flex;flex-direction:column;gap:4px">
             <div style="font-weight:900;font-size:1.1rem">${r.teacherName || '老師'} 的房間</div>
-            <div style="font-size:.8rem;color:#888">測試專用代碼：${code}</div>
+            <div style="font-size:.8rem;color:#888">房間代碼：${code}</div>
           </div>
           <div class="${isFull ? 'room-full-badge' : 'room-num-badge'}">${r.playerCount || 0}/5</div>
         </div>`;
@@ -1148,9 +1156,18 @@ function teacherLogin() {
   
   window.state.perspective = 'teacher'; // 設定此分頁為老師視角
   
-  const code = '0000'; 
+  // 動態產生 4 位數房間代碼
+  let code = Math.floor(1000 + Math.random() * 9000).toString();
   const rooms = window.getRooms();
-  rooms[code] = { open: true, teacherName: '老師', roomNum: 0, playerCount: window.state.players.length, status: 'lobby', finishedGroups: [] };
+  while (rooms[code] && rooms[code].open) {
+      code = Math.floor(1000 + Math.random() * 9000).toString();
+  }
+  
+  // 取得房間編號
+  let roomNum = parseInt(localStorage.getItem('playroom_counter') || '0') + 1;
+  localStorage.setItem('playroom_counter', roomNum);
+
+  rooms[code] = { open: true, teacherName: '老師', roomNum: roomNum, playerCount: window.state.players.length, status: 'lobby', finishedGroups: [] };
   window.saveRooms(rooms);
   
   window.state.roomCode = code;
@@ -1167,10 +1184,10 @@ function teacherLogin() {
   const lobbyCode = document.getElementById('lobby-code');
   if (lobbyCode) lobbyCode.textContent = code;
   const lobbyRoomName = document.getElementById('lobby-room-name');
-  if (lobbyRoomName) lobbyRoomName.textContent = `誰是遊戲王 — 測試房間`;
+  if (lobbyRoomName) lobbyRoomName.textContent = `誰是遊戲王 — 房間 #${roomNum}`;
   window.renderLobby();
   window.goTo('screen-lobby');
-  window.showToast('🏠 測試房間 0000 已建立！');
+  window.showToast(`🏠 房間 ${code} 已建立！`);
 }
 
 function doCloseRoom() {
