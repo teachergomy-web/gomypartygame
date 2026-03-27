@@ -461,8 +461,9 @@ body::before {
   <div class="card" style="text-align:center">
     <div style="font-size:3.5rem">🔑</div>
     <span class="mp-title" style="font-size:1.8rem">老師登入</span>
-    <div style="margin:20px 0">
-      <input type="password" id="tl-pw" class="input-select" placeholder="" style="text-align:center" inputmode="numeric" pattern="[0-9]*">
+    <div style="margin:20px 0; display:flex; flex-direction:column; gap:12px;">
+      <input type="text" id="tl-name" class="input-select" placeholder="輸入老師名稱" style="text-align:center">
+      <input type="password" id="tl-pw" class="input-select" placeholder="輸入登入密碼" style="text-align:center" inputmode="numeric" pattern="[0-9]*">
     </div>
     <button class="btn btn-red" onclick="teacherLogin()">確認登入</button>
   </div>
@@ -516,7 +517,10 @@ if (isFirebase) {
     })();
 }
 
-window.getRooms = function() { return JSON.parse(localStorage.getItem('playroom_rooms') || '{}'); };
+window.getRooms = function() { 
+    let r = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+    return r; 
+};
 window.saveRooms = function(r) { 
     localStorage.setItem('playroom_rooms', JSON.stringify(r)); 
     if (isFirebase && db && isFirebaseAuthComplete && window.state && window.state.roomCode && r[window.state.roomCode]) {
@@ -1220,8 +1224,11 @@ function simulateJoin() {
 
 function teacherLogin() {
   const pwEl = document.getElementById('tl-pw');
+  const nameEl = document.getElementById('tl-name');
   if (pwEl && pwEl.value !== window.TEACHER_PW) { window.showToast('❌ 密碼錯誤'); return; }
   
+  const tName = (nameEl && nameEl.value.trim() !== '') ? nameEl.value.trim() : '老師';
+
   window.state.perspective = 'teacher'; // 設定此分頁為老師視角
   
   const rooms = window.getRooms();
@@ -1237,7 +1244,7 @@ function teacherLogin() {
   localStorage.setItem('playroom_counter', roomNum);
 
   rooms[code] = { 
-      open: true, teacherName: '老師', roomNum: roomNum, 
+      open: true, teacherName: tName, roomNum: roomNum, 
       playerCount: window.state.players.length, status: 'lobby', 
       finishedGroups: [], scores: {}, selectedGame: window.state.selectedGame 
   };
