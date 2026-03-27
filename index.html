@@ -477,45 +477,48 @@ body::before {
 let db = null;
 let fsDoc = null, fsSet = null, fsOnSnap = null;
 let appId = typeof __app_id !== 'undefined' ? __app_id : 'game-king';
-let isFirebase = typeof __firebase_config !== 'undefined';
+let isFirebase = true;
 let isFirebaseAuthComplete = false;
 
-if (isFirebase) {
-    (async function initFirebase() {
-        try {
-            const appModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-            const authModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-            const fsModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-            
-            const firebaseConfig = JSON.parse(__firebase_config);
-            const app = appModule.initializeApp(firebaseConfig);
-            const auth = authModule.getAuth(app);
-            db = fsModule.getFirestore(app);
-            
-            fsDoc = fsModule.doc; 
-            fsSet = fsModule.setDoc; 
-            fsOnSnap = fsModule.onSnapshot;
+(async function initFirebase() {
+    try {
+        const appModule  = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+        const authModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+        const fsModule   = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await authModule.signInWithCustomToken(auth, __initial_auth_token);
+        const firebaseConfig = {
+            apiKey:            "AIzaSyCVQuGDlfTmYN1VZ6weHy2tWDcegFm7TP4",
+            authDomain:        "gomypartygame.firebaseapp.com",
+            projectId:         "gomypartygame",
+            storageBucket:     "gomypartygame.firebasestorage.app",
+            messagingSenderId: "494993693704",
+            appId:             "1:494993693704:web:86d3d5207a0f9dd3fa45bd"
+        };
+
+        const app  = appModule.initializeApp(firebaseConfig);
+        const auth = authModule.getAuth(app);
+        db = fsModule.getFirestore(app);
+
+        fsDoc    = fsModule.doc;
+        fsSet    = fsModule.setDoc;
+        fsOnSnap = fsModule.onSnapshot;
+
+        await authModule.signInAnonymously(auth);
+
+        authModule.onAuthStateChanged(auth, (user) => {
+            if (user) {
+                isFirebaseAuthComplete = true;
+                console.log("✅ Firebase 雲端連線成功！");
+                if (window.state && window.state.roomCode) startSyncListener();
             } else {
-                await authModule.signInAnonymously(auth);
+                isFirebaseAuthComplete = false;
             }
-            
-            authModule.onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    isFirebaseAuthComplete = true;
-                    console.log("Firebase 雲端連線成功！");
-                    if(window.state && window.state.roomCode) startSyncListener();
-                } else {
-                    isFirebaseAuthComplete = false;
-                }
-            });
-        } catch(e) {
-            console.error("Firebase init error:", e);
-        }
-    })();
-}
+        });
+    } catch(e) {
+        console.error("Firebase init error:", e);
+        isFirebase = false;
+    }
+})();
 
 window.getRooms = function() { 
     let r = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
@@ -524,12 +527,41 @@ window.getRooms = function() {
 window.saveRooms = function(r) { 
     localStorage.setItem('playroom_rooms', JSON.stringify(r)); 
     if (isFirebase && db && isFirebaseAuthComplete && window.state && window.state.roomCode && r[window.state.roomCode]) {
-        const ref = fsDoc(db, 'artifacts', appId, 'public', 'data', 'rooms', window.state.roomCode);
+        const ref = fsDoc(db, 'rooms', window.state.roomCode);
         fsSet(ref, r[window.state.roomCode], {merge: true}).catch(e => console.error("Firebase Save Error:", e));
     }
 };
 
 let roomSyncUnsubscribe = null;
+
+// ══════════════════════════════════════════
+// Firebase 即時同步監聽
+// 讓不同裝置透過 Firestore onSnapshot 接收更新
+// ══════════════════════════════════════════
+function startSyncListener() {
+    if (!isFirebase || !db || !window.state || !window.state.roomCode) return;
+    // 停止舊的監聽
+    if (roomSyncUnsubscribe) { roomSyncUnsubscribe(); roomSyncUnsubscribe = null; }
+
+    const roomCode = window.state.roomCode;
+    const ref = fsDoc(db, 'rooms', roomCode);
+
+    roomSyncUnsubscribe = fsOnSnap(ref, (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        // 把 Firebase 的資料同步回 localStorage
+        const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        rooms[roomCode] = data;
+        localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+    }, (err) => {
+        console.error('Firestore sync error:', err);
+    });
+    console.log('✅ 開始監聽房間:', roomCode);
+}
+
+function stopSyncListener() {
+    if (roomSyncUnsubscribe) { roomSyncUnsubscribe(); roomSyncUnsubscribe = null; }
+}
 function initReset() {
     // 真正清空所有房間 (已取消自動清空，以免蓋掉其他老師的房間)
     // localStorage.removeItem('playroom_rooms');
@@ -840,6 +872,7 @@ setInterval(() => {
     if (!pData || !pData.joined) return;
     if (!r || !r.open) {
         pData.joined = false; pData.screen = 'screen-home';
+        stopSyncListener();
         window.goTo('screen-home');
         window.showToast('🚪 房間已關閉');
         return;
@@ -1051,6 +1084,7 @@ function selectRoom(code, num) {
 function verifyRoomPassword() {
     if (document.getElementById('room-pw-input').value === window.state.tempRoomCode) {
         window.state.roomCode = window.state.tempRoomCode;
+        startSyncListener(); // 學生加入後開始監聽 Firebase
         const room = window.getRooms()[window.state.roomCode];
         if(!room || !room.open) { window.showToast('⚠️ 房間已關閉'); return; }
         document.getElementById('selected-room-info').textContent = `房間：${window.state.roomCode}`;
@@ -1252,6 +1286,7 @@ function teacherLogin() {
   
   window.state.roomCode = code;
   window.state.players = []; window.state.takenSymbols = [];
+  startSyncListener(); // 老師建房後開始監聽 Firebase
   
   Object.keys(window.pStates).forEach(k => {
       if (k !== 'teacher' && k !== 'guest') {
