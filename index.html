@@ -527,9 +527,9 @@ window.saveRooms = function(r) {
 
 let roomSyncUnsubscribe = null;
 function initReset() {
-    // 真正清空所有房間
-    localStorage.removeItem('playroom_rooms');
-    localStorage.removeItem('playroom_counter');
+    // 真正清空所有房間 (已取消自動清空，以免蓋掉其他老師的房間)
+    // localStorage.removeItem('playroom_rooms');
+    // localStorage.removeItem('playroom_counter');
 }
 initReset();
 
@@ -821,6 +821,12 @@ setInterval(() => {
     if (r && r.players && r.players.length !== window.state.players.length) {
         window.state.players = r.players;
         window.state.takenSymbols = r.players.map(p => p.symbol);
+        window.renderLobby();
+    }
+
+    // 同步老師選擇的遊戲
+    if (r && r.selectedGame !== undefined && r.selectedGame !== window.state.selectedGame) {
+        window.state.selectedGame = r.selectedGame;
         window.renderLobby();
     }
 
@@ -1131,6 +1137,14 @@ function leaveRoomStudent() {
 
 function selectGame(i) {
     window.state.selectedGame = i;
+    
+    // 將選擇的遊戲同步寫入共用房間資料
+    const rooms = window.getRooms();
+    if (window.state.roomCode && rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].selectedGame = i;
+        window.saveRooms(rooms);
+    }
+    
     window.renderLobby();
     const g = GAMES[i];
     window.showToast(`已選擇：${g.icon} ${g.name}`);
@@ -1225,7 +1239,7 @@ function teacherLogin() {
   rooms[code] = { 
       open: true, teacherName: '老師', roomNum: roomNum, 
       playerCount: window.state.players.length, status: 'lobby', 
-      finishedGroups: [], scores: {} 
+      finishedGroups: [], scores: {}, selectedGame: window.state.selectedGame 
   };
   window.saveRooms(rooms);
   
