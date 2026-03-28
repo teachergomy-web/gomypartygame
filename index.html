@@ -894,11 +894,13 @@ function tcStartGame() {
                     try {
                         const rooms2 = window.getRooms();
                         const r2 = rooms2[window.state.roomCode] || {};
-                        w3iframe.contentWindow.postMessage({
-                            type: 'PLATFORM_START', isTeacher: true, group: '',
-                            state: r2.w3state || null,
-                            players: window.state.players || []
-                        }, '*');
+                        // 傳入最新狀態讓老師 iframe 立刻顯示轉播
+                const latestW3 = window.getRooms()[window.state.roomCode]?.w3state || r2.w3state || null;
+                w3iframe.contentWindow.postMessage({
+                    type: 'PLATFORM_START', isTeacher: true, group: '',
+                    state: latestW3,
+                    players: window.state.players || []
+                }, '*');
                     } catch(e) {}
                 }, 300);
             }

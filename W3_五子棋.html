@@ -30,8 +30,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .sc-wins{font-family:'Fredoka One',sans-serif;font-size:16px;color:var(--yellow);}
 .sc-info{font-size:9px;color:rgba(255,255,255,.3);font-family:'Nunito',sans-serif;font-weight:700;}
 
-/* ── 抽籤/準備畫面 ── */
-#lobby-view{position:absolute;top:100px;left:0;right:0;bottom:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:12px 16px;overflow-y:auto;}
+/* lobby-view is inline styled */
 
 /* 抽籤卡片（兩排） */
 #matches-panel{display:flex;flex-direction:column;gap:12px;width:100%;max-width:480px;}
@@ -129,7 +128,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 <div id="score-bar"></div>
 
 <!-- ══ 抽籤/準備畫面（老師+觀賽組+等待組） ══ -->
-<div id="lobby-view">
+<div id="lobby-view" style="position:absolute;top:100px;left:0;right:0;bottom:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:12px 16px;overflow-y:auto;z-index:10;background:var(--bg);">
   <div id="matches-panel">
     <!-- Match 0 card -->
     <div class="match-card idle-card" id="mc-0">
@@ -194,7 +193,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 </div>
 
 <!-- ══ 老師雙棋盤轉播 ══ -->
-<div id="teacher-view" style="position:absolute;top:100px;left:0;right:0;bottom:60px;display:none;flex-direction:column;gap:6px;padding:8px;overflow:hidden;">
+<div id="teacher-view" style="position:absolute;top:100px;left:0;right:0;bottom:60px;display:none;flex-direction:column;gap:6px;padding:8px;overflow:hidden;z-index:10;background:var(--bg);">
   <!-- 場0 mini board -->
   <div style="flex:1;display:flex;flex-direction:column;min-height:0;gap:4px;">
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -727,8 +726,8 @@ function renderTeacherView(){
     // 只要抽過籤就顯示轉播，不管當前場次狀態
     const tv=document.getElementById('teacher-view');
     const lv=document.getElementById('lobby-view');
-    if(tv) tv.style.display=state.started?'flex':'none';
-    if(lv) lv.style.display=state.started?'none':'flex';
+    if(tv){ tv.style.display=state.started?'flex':'none'; tv.style.zIndex=state.started?'12':'10'; }
+    if(lv){ lv.style.display=state.started?'none':'flex'; lv.style.zIndex='10'; }
     if(!state.started)return;
 
     buildTeacherBoards();
@@ -857,6 +856,11 @@ window.addEventListener('message',(e)=>{
             if(e.data.players&&e.data.players.length>0){
                 state.activePlayers=e.data.players.map(p=>p.group);
                 state.activePlayers.forEach(g=>{if(!state.scores[g])state.scores[g]={wins:0,matches:0};});
+            }
+            // 如果有既有 state（比賽已進行），立刻套用並顯示轉播
+            if(e.data.state){
+                applyState(e.data.state);
+                return; // applyState 已呼叫 renderAll
             }
             if(e.data.state)applyState(e.data.state);
             else{updateMyRole();renderAll();}
