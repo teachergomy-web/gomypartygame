@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>誰是遊戲王！</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS (Mario Party + KartRider Style)
+   ═══════════════════════════════════════════ */
+:root {
+  --sky:    #4ab8ff;
+  --ink:    #1a1200;
+  --white:  #fff9f0;
+  --yellow: #f5c800;
+  --yellow2:#c89800;
+  --red:    #e82020; --red2:   #b81010;
+  --blue:   #1a78e0; --blue2:  #1060c0;
+  --green:  #22c040; --green2: #169030;
+  --purple: #9030c8;
+  --outline:#1a1200;
+}
+
+/* ═══════════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  max-height: -webkit-fill-available;
+  font-family: 'Noto Sans TC', 'Nunito', sans-serif;
+  background: var(--sky) !important; color: var(--ink);
+  overflow: hidden;
+  position: fixed;
+  top: 0; left: 0;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 所有元素禁止縮放手勢 */
+* { touch-action: manipulation; }
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 50% at 30% 20%, rgba(255,255,255,.25) 0%, transparent 60%),
+              radial-gradient(ellipse 60% 40% at 80% 75%, rgba(255,255,255,.12) 0%, transparent 50%);
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS & PARTICLES
+   ═══════════════════════════════════════════ */
+@keyframes titleBounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
+@keyframes heroBounce  { 0%,100%{transform:translateY(0) scale(1);} 50%{transform:translateY(-16px) scale(1.05);} }
+@keyframes floatCoin   { 0%{transform:translateY(110vh) rotate(0deg);opacity:0;} 8%{opacity:.55;} 92%{opacity:.3;} 100%{transform:translateY(-60px) rotate(360deg);opacity:0;} }
+
+/* Hero block */
+.hero-block { text-align:center; margin-bottom: 8px; animation: mpPop .55s cubic-bezier(.34,1.56,.64,1) both; }
+.hero-icon   { font-size:4.5rem; display:block; margin-bottom:10px; animation:heroBounce 2s ease-in-out infinite; }
+
+/* Coins */
+.coins { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.coin  { position:absolute; font-size:1.2rem; animation:floatCoin linear infinite; opacity:.55; }
+.clouds { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.cloud  { position: absolute; background: white; border-radius: 60px; opacity: .85; animation: driftCloud linear infinite; }
+.cloud::before, .cloud::after { content: ''; position: absolute; background: white; border-radius: 50%; }
+.cloud::before { width: 50%; height: 100%; top: -40%; left: 15%; }
+.cloud::after { width: 40%; height: 80%; top: -30%; right: 15%; }
+@keyframes driftCloud { from { transform: translateX(-250px); } to { transform: translateX(calc(100vw + 250px)); } }
+
+.bg-particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.particle { position: absolute; opacity: 0.15; animation: floatParticle linear infinite; user-select: none; }
+@keyframes floatParticle {
+  0% { transform: translateY(110vh) rotate(0deg) scale(0.8); opacity: 0; }
+  10% { opacity: 0.25; } 90% { opacity: 0.25; }
+  100% { transform: translateY(-100px) rotate(360deg) scale(1.2); opacity: 0; }
+}
+
+.ground-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 0; height: 28px; background: #c8882a; border-top: 4px solid var(--outline); pointer-events: none; }
+.ground-bar::before { content: ''; position: absolute; top: -16px; left: 0; right: 0; height: 16px; background: #38b044; border-top: 3px solid var(--outline); }
+
+/* ═══════════════════════════════════════════
+   SCREENS & CARDS
+   ═══════════════════════════════════════════ */
+.screen {
+  display: none; position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  flex-direction: column; align-items: center;
+  padding: 28px 16px 80px;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.screen.active { display: flex; }
+
+/* 深色畫面背景覆蓋 */
+/* 深色全螢幕畫面：align-items stretch，不留邊距，不允許捲動 */
+#screen-lobby.active, #screen-student-wait.active,
+#screen-level-select.active, #screen-teacher-console.active,
+#screen-settlement.active, #screen-student-game.active {
+    align-items: stretch; padding: 0; overflow: hidden;
+    top: 0 !important; left: 0 !important;
+    width: 100% !important; height: 100% !important;
+}
+
+/* 排行榜項目 */
+.tc-lb-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.1);
+  transition: all .15s;
+}
+.tc-lb-item:hover { background: rgba(245,200,0,.15); border-color: rgba(245,200,0,.4); }
+.tc-lb-item.broadcasting { border-color: var(--red); background: rgba(232,32,32,.18); box-shadow: 0 0 10px rgba(232,32,32,.3); }
+.tc-lb-rank { font-family: 'Nunito',sans-serif; font-weight: 900; font-size: .75rem; color: rgba(255,255,255,.4); width: 20px; }
+.tc-lb-name { font-family: 'Nunito',sans-serif; font-weight: 900; font-size: .82rem; color: white; flex: 1; padding: 0 8px; }
+.tc-lb-score { font-family: 'Nunito',sans-serif; font-weight: 900; font-size: 1rem; color: #f5c800; transition: transform .2s; }
+
+.card { width: 100%; max-width: 560px; background: var(--white); border: 4px solid var(--outline); border-radius: 24px; box-shadow: 0 6px 0 var(--outline); padding: 28px 24px; margin-bottom: 16px; }
+
+.mp-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 2.6rem; color: var(--yellow); -webkit-text-stroke: 4px var(--outline); paint-order: stroke fill; text-shadow: 4px 5px 0 var(--outline); display: block; line-height: 1.05; animation: titleBounce 1.5s ease-in-out infinite alternate; }
+.mp-subtitle { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: .9rem; color: white; background: var(--blue); border: 3px solid var(--outline); border-radius: 8px; padding: 4px 18px; display: inline-block; box-shadow: 0 3px 0 var(--blue2); }
+
+.home-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 480px; }
+.home-btn-card { padding: 44px 20px 40px; border-radius: 24px; cursor: pointer; border: 4px solid var(--outline); box-shadow: 0 8px 0 var(--outline); text-align: center; transition: transform .12s, box-shadow .12s; }
+.home-btn-card:hover { transform: translateY(-4px); box-shadow: 0 12px 0 var(--outline); filter: brightness(1.05); }
+.home-btn-card:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--outline); }
+.home-btn-card.teacher { background: linear-gradient(160deg, #ffe55a, #f5a800); }
+.home-btn-card.student  { background: linear-gradient(160deg, #5fea78, #20b040); }
+.hbc-icon { font-size: 3.8rem; margin-bottom: 14px; display: block; }
+.hbc-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.4rem; color: var(--ink); }
+
+/* ═══════════════════════════════════════════
+   JOIN FLOW
+   ═══════════════════════════════════════════ */
+.join-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
+.field-label { display: block; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: .9rem; color: var(--ink); margin-bottom: 12px; }
+.input-select { width: 100%; background: white; border: 4px solid var(--outline); border-radius: 14px; padding: 14px 16px; font-family: 'Nunito','Noto Sans TC',sans-serif; font-weight: 900; font-size: 1rem; color: var(--ink); appearance: none; cursor: pointer; box-shadow: 0 4px 0 var(--outline); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%231a1200' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.symbol-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.symbol-opt { aspect-ratio: 1; border-radius: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; border: 3px solid var(--outline); background: white; box-shadow: 0 4px 0 var(--outline); transition: all .12s; }
+.symbol-opt.selected { background: var(--yellow); transform: translateY(3px); box-shadow: 0 1px 0 var(--outline); }
+.symbol-opt.taken { opacity: .3; filter: grayscale(1); cursor: not-allowed; background: #ddd; border-color: #bbb; box-shadow: none; pointer-events: none; }
+
+.room-card { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; background: white; border: 4px solid var(--outline); border-radius: 18px; cursor: pointer; box-shadow: 0 5px 0 var(--outline); transition: transform .1s; margin-bottom: 12px; }
+.room-card.room-full { opacity: 0.6; filter: grayscale(0.8); cursor: not-allowed; }
+.room-num-badge { background: var(--blue); color: white; border: 2px solid var(--outline); border-radius: 10px; padding: 4px 12px; font-weight: 900; font-size: .8rem; }
+.room-full-badge { background: var(--red); color: white; border: 2px solid var(--outline); border-radius: 10px; padding: 4px 12px; font-weight: 900; font-size: .8rem; }
+
+/* ═══════════════════════════════════════════
+   LOBBY & WAIT KR-STYLE
+   ═══════════════════════════════════════════ */
+.kr-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: linear-gradient(180deg, #1a1d30 0%, #0d0f1a 100%); border-bottom: 3px solid #f5c800; width: 100%; flex-shrink: 0; }
+.kr-room-name { font-family: 'Nunito',sans-serif; font-weight: 900; color: white; font-size: 1.1rem; }
+.kr-code { font-family: 'Nunito',sans-serif; font-weight: 900; color: #f5c800; font-size: 2.2rem; letter-spacing: .2em; line-height: 1; }
+
+.kr-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; width: 100%; min-height: 0; overflow: hidden; height: 0; }
+.kr-body.vertical { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; flex: 1; }
+.kr-body.vertical .kr-panel { border-right: none; }
+
+.kr-panel { padding: 16px 18px; display: flex; flex-direction: column; overflow: hidden; }
+.kr-panel-title { font-family: 'Nunito',sans-serif; font-weight: 900; font-size: .8rem; color: rgba(245,200,0,0.8); text-transform: uppercase; margin-bottom: 12px; }
+
+.kr-seats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-content: start; }
+.kr-seat { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 8px; background: rgba(255,255,255,.07); border: 2px solid rgba(255,255,255,.15); border-radius: 16px; animation: krPop .25s cubic-bezier(.34,1.56,.64,1) both; }
+.kr-seat-emoji { font-size: 2rem; }
+.kr-seat-name { font-family: 'Nunito','Noto Sans TC',sans-serif; font-weight: 900; font-size: .72rem; color: white; text-align: center; }
+
+.kr-games-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.kr-game-card { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 7px; padding: 11px 10px; background: rgba(255,255,255,.05); border: 2px solid rgba(255,255,255,.12); border-radius: 14px; cursor: pointer; transition: all .15s; }
+.kr-game-card:hover  { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.3); }
+.kr-game-card:active { transform: scale(.94); }
+.kr-game-card.selected { border-color: #f5c800; background: rgba(245,200,0,.2); box-shadow: 0 0 12px rgba(245,200,0,0.35); }
+
+.kr-footer { display: flex; align-items: center; gap: 12px; padding: 14px 24px; background: #1a1d30; border-top: 2px solid rgba(245,200,0,.2); width: 100%; flex-shrink:0; }
+.kr-btn { font-family: 'Nunito',sans-serif; font-weight: 900; font-size: .85rem; padding: 10px 20px; border-radius: 12px; border: none; cursor: pointer; transition: transform 0.1s; }
+.kr-btn:active { transform: scale(0.95); }
+.kr-btn-start { background: linear-gradient(135deg, #f5c800, #e09000); color: #1a1200; padding: 12px 30px; font-size: 1rem; }
+.kr-btn-ghost { background: rgba(255,255,255,0.1); color: white; }
+.kr-btn-danger { background: rgba(232,32,32,0.2); color: #ff6060; }
+.kr-btn-yellow { background: var(--yellow); color: var(--ink); }
+.kr-btn-blue { background: var(--blue); color: white; }
+
+/* ═══════════════════════════════════════════
+   TEACHER BROADCAST SCREEN
+   ═══════════════════════════════════════════ */
+#tg-broadcast-grid { flex: 3; padding: 16px; background: #111; display: flex; align-items: center; justify-content: center; }
+.tg-screen-wrap { position: relative; width: 100%; height: 100%; max-width: 1024px; max-height: 768px; border: 4px solid var(--outline); border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 0 var(--outline); transition: all 0.3s ease; display: none; }
+.tg-screen-label { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); border: 2px solid var(--yellow); color: white; padding: 4px 12px; border-radius: 8px; font-weight: 900; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; z-index: 50; }
+.lb-item { background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s; cursor: pointer; }
+.lb-item:hover { transform: scale(1.02); background: rgba(255,255,255,0.1); }
+
+.fullscreen-student { position: fixed !important; top: 40px !important; left: 0 !important; width: 100vw !important; height: calc(100vh - 40px) !important; z-index: 9999 !important; border: none !important; border-radius: 0 !important; background: var(--bg) !important; box-shadow: none !important; margin: 0 !important; max-width: none !important; max-height: none !important; }
+.fullscreen-student .broadcast-iframe { pointer-events: auto !important; }
+.fullscreen-student .tg-screen-label { display: none !important; }
+.broadcast-iframe { pointer-events: none; }
+
+/* ═══════════════════════════════════════════
+   QR CODE & UTILS
+   ═══════════════════════════════════════════ */
+#qr-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+.qr-container { background: #fff; padding: 30px; border-radius: 24px; text-align: center; border: 6px solid #f5c800; box-shadow: 0 0 40px rgba(245,200,0,0.5); }
+#qr-canvas { margin: 15px auto; padding: 10px; background: white; border-radius: 12px; display: inline-block; }
+
+#toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--yellow); border: 3px solid var(--yellow); border-radius: 12px; padding: 12px 24px; font-weight: 900; opacity: 0; transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); pointer-events: none; z-index: 2000; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; border: 4px solid var(--outline); border-radius: 16px; cursor: pointer; font-weight: 900; padding: 14px; width: 100%; }
+.btn-green { background: var(--green); color: white; box-shadow: 0 4px 0 var(--green2); }
+.btn-red { background: var(--red); color: white; box-shadow: 0 4px 0 var(--red2); }
+.btn-blue { background: var(--blue); color: white; box-shadow: 0 4px 0 var(--blue2); }
+.btn-yellow { background: var(--yellow); color: var(--ink); box-shadow: 0 4px 0 var(--yellow2); }
+
+.back-link { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: .88rem; color: white; text-shadow: 1px 1px 0 rgba(0,0,0,.3); background: none; border: none; cursor: pointer; padding: 0; margin-bottom: 20px; opacity: .85; }
+</style>
+</head>
+<body>
+
+<div class="clouds"   id="clouds"></div>
+<div class="coins"    id="coins"></div>
+<div id="bg-particles"></div>
+<div class="ground-bar"></div>
+<div id="toast"></div>
+
+<div id="qr-popup" onclick="toggleQR()">
+    <div class="qr-container" onclick="event.stopPropagation()">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;color:#1a1d30;font-size:1.2rem;margin-bottom:10px">📱 掃碼加入遊戲房間</div>
+        <div id="qr-canvas"></div>
+        <div id="qr-url" style="font-size:10px;color:#888;word-break:break-all;max-width:220px;margin:0 auto;line-height:1.4"></div>
+        <button class="btn btn-red" style="margin-top:20px; border-width: 0; box-shadow: none; padding: 10px" onclick="toggleQR()">✕ 關閉視窗</button>
+    </div>
+</div>
+
+<div id="screen-home" class="screen active" style="justify-content:center;gap:20px">
+  <div class="hero-block">
+    <span class="hero-icon">🎲</span>
+    <span class="mp-title">誰是遊戲王</span>
+    <div style="margin-top:10px"><span class="mp-subtitle">CLASSROOM PARTY GAMES</span></div>
+  </div>
+  <div class="home-btn-grid">
+    <div class="home-btn-card teacher" onclick="goToTeacherLogin()">
+      <span class="hbc-icon">🏠</span>
+      <div class="hbc-title">建立房間</div>
+    </div>
+    <div class="home-btn-card student" onclick="goToJoin()">
+      <span class="hbc-icon">🚀</span>
+      <div class="hbc-title">加入房間</div>
+    </div>
+  </div>
+</div>
+
+<div id="screen-join" class="screen">
+  <div style="width:100%;max-width:560px"><button class="back-link" onclick="goTo('screen-home')">◀ 返回首頁</button></div>
+
+  <div id="join-step-1" style="width:100%;max-width:560px">
+    <div class="card" style="text-align:center;padding:20px"><span class="mp-title" style="font-size:1.8rem;color:var(--blue)">選擇房間</span></div>
+    <div class="card" style="padding:20px">
+      <div id="room-list"></div>
+      <div id="room-empty" style="text-align:center;padding:32px 0;display:none">
+        <div style="font-size:2.5rem">🔍</div>
+        <div style="font-weight:900;color:#aaa;margin-top:10px">目前沒有開放的房間</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="join-step-password" style="display:none;width:100%;max-width:400px">
+    <button class="back-link" onclick="backToStep1()">◀ 返回列表</button>
+    <div class="card" style="text-align:center">
+      <div style="font-size:3rem;margin-bottom:10px">🔐</div>
+      <h3 style="font-weight:900;margin-bottom:15px" id="pw-room-title">請輸入密碼</h3>
+      <input type="number" id="room-pw-input" class="input-select" placeholder="四位數代碼" style="text-align:center; font-size: 2rem; letter-spacing: 0.3em" maxlength="4">
+      <button class="btn btn-blue" style="margin-top:20px" onclick="verifyRoomPassword()">進入房間</button>
+    </div>
+  </div>
+
+  <div id="join-step-2" style="display:none;width:100%;max-width:640px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;width:100%">
+      <button class="back-link" style="margin-bottom:0" onclick="backToPassword()">◀ 返回</button>
+      <div id="selected-room-info" style="font-weight:900;color:white;text-shadow:1px 1px 0 rgba(0,0,0,.3)"></div>
+    </div>
+    <div class="join-layout">
+      <div class="card" style="padding:24px 20px">
+        <label class="field-label">1. 選擇組別</label>
+        <select id="group-select" class="input-select" onchange="onGroupSelect(this.value)">
+          <option value="">— 請選擇 —</option>
+          <option value="1">第 1 組</option>
+          <option value="2">第 2 組</option>
+          <option value="3">第 3 組</option>
+          <option value="4">第 4 組</option>
+          <option value="5">第 5 組</option>
+        </select>
+      </div>
+      <div class="card" style="padding:24px 20px">
+        <label class="field-label">2. 選擇圖像</label>
+        <div id="symbol-picker" class="symbol-grid"></div>
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="joinRoom()" style="font-size:1.2rem;padding:18px;margin-top:10px">準備完成！→</button>
+  </div>
+</div>
+
+<div id="screen-lobby" class="screen" style="padding:0;background:#0d0f1a;overflow:hidden;flex-direction:column;height:100%">
+  <div class="kr-header">
+    <div style="display:flex;flex-direction:column">
+      <div style="color:#f5c800;font-size:.65rem;font-weight:900">🏁 遊戲大廳</div>
+      <div class="kr-room-name" id="lobby-room-name">誰是遊戲王</div>
+    </div>
+    <div style="text-align:center">
+      <div style="color:rgba(245,200,0,0.7);font-size:.6rem;font-weight:900">房間代碼</div>
+      <div class="kr-code" id="lobby-code">0000</div>
+    </div>
+    <div style="text-align:right">
+        <div style="color:white;font-weight:900;font-size:1.2rem" id="lobby-count">0/5</div>
+        <div style="color:rgba(255,255,255,0.4);font-size:.6rem">玩家人數</div>
+    </div>
+  </div>
+
+  <div class="kr-body vertical" style="overflow:hidden">
+    <div class="kr-panel" style="border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0;padding:12px 18px">
+      <div class="kr-panel-title" style="margin-bottom:8px">👥 已加入玩家</div>
+      <div class="kr-seats" id="lobby-players"></div>
+    </div>
+    <div class="kr-panel" style="flex:1;min-height:0;justify-content:center;padding:16px 18px">
+      <div class="kr-panel-title" style="margin-bottom:10px">🎮 選擇遊戲</div>
+      <div class="kr-games-grid" id="lobby-games"></div>
+    </div>
+  </div>
+
+  <div class="kr-footer">
+    <button class="kr-btn kr-btn-ghost" onclick="simulateJoin()">➕ 模擬加入</button>
+    <button class="kr-btn kr-btn-ghost" onclick="toggleQR()">📱 QR Code</button>
+    <button class="kr-btn kr-btn-danger" onclick="doCloseRoom()">🚪 關閉</button>
+    <div style="flex:1"></div>
+    <button class="kr-btn kr-btn-start" onclick="openTeacherConsole()">▶ 開始遊戲</button>
+  </div>
+</div>
+
+<div id="screen-level-select" class="screen" style="padding:0;background:#0d0f1a;flex-direction:column;overflow:hidden">
+  <div class="kr-header">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="color:#f5c800;font-size:.65rem;font-weight:900">⭐ 星際採礦</div>
+      <div class="kr-room-name">選擇關卡</div>
+    </div>
+    <div style="text-align:right">
+      <div style="color:white;font-weight:900;font-size:1.1rem" id="ls-count">0 組</div>
+      <div style="color:rgba(255,255,255,.4);font-size:.6rem">已加入</div>
+    </div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:32px 20px">
+
+    <div style="text-align:center">
+      <div style="color:rgba(255,255,255,.4);font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;letter-spacing:.1em;margin-bottom:12px">選擇關卡</div>
+      <div style="display:flex;align-items:center;gap:24px">
+        <button class="kr-btn kr-btn-ghost" style="font-size:1.4rem;padding:12px 20px;border-radius:50%" onclick="changeLevel(-1)">◀</button>
+        <div style="text-align:center">
+          <div id="ls-level-num" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:4.5rem;color:#f5c800;line-height:1;text-shadow:0 0 30px rgba(245,200,0,.5)">1</div>
+          <div id="ls-level-phase" style="font-family:'Nunito',sans-serif;font-weight:700;font-size:.85rem;color:rgba(255,255,255,.5);margin-top:4px">🌿 初級</div>
+        </div>
+        <button class="kr-btn kr-btn-ghost" style="font-size:1.4rem;padding:12px 20px;border-radius:50%" onclick="changeLevel(1)">▶</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="kr-btn kr-btn-ghost" style="font-size:.8rem;padding:8px 16px" onclick="jumpToPhase(1)">🌿 1–10</button>
+      <button class="kr-btn kr-btn-ghost" style="font-size:.8rem;padding:8px 16px" onclick="jumpToPhase(2)">⚡ 11–20</button>
+      <button class="kr-btn kr-btn-ghost" style="font-size:.8rem;padding:8px 16px" onclick="jumpToPhase(3)">🔥 21–30</button>
+    </div>
+
+    <button class="kr-btn kr-btn-start" style="font-size:1.2rem;padding:18px 60px" onclick="tcStartGame()">▶ 全班開始！</button>
+  </div>
+
+  <div class="kr-footer">
+    <button class="kr-btn kr-btn-ghost" onclick="exitToLobby()">← 返回大廳</button>
+  </div>
+</div>
+
+<div id="screen-teacher-console" class="screen" style="padding:0;background:#0d0f1a;flex-direction:column;overflow:hidden">
+
+  <div class="kr-header" style="border-bottom:3px solid var(--red);flex-shrink:0">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="color:var(--red);font-size:.65rem;font-weight:900;letter-spacing:.08em">🔴 LIVE</div>
+      <div class="kr-room-name" id="tc-game-name">⭐ 星際採礦</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="tc-level-badge" style="background:rgba(245,200,0,.2);border:2px solid #f5c800;border-radius:8px;padding:4px 12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;color:#f5c800">關卡 1</span>
+      <button id="tc-btn-pause"  class="kr-btn kr-btn-ghost"  onclick="tcPauseGame()"   style="font-size:.85rem;padding:10px 16px">⏸ 暫停</button>
+      <button id="tc-btn-resume" class="kr-btn kr-btn-ghost"  onclick="tcResumeGame()"  style="display:none;font-size:.85rem;padding:10px 16px">▶ 繼續</button>
+      <button id="tc-btn-settle" class="kr-btn kr-btn-start"  onclick="tcSettleGame()"  style="font-size:.85rem;padding:10px 16px">🏆 結算</button>
+      <button id="tc-btn-end"    class="kr-btn kr-btn-danger" onclick="tcEndGame()"     style="font-size:.85rem;padding:10px 16px">■ 結束</button>
+    </div>
+    <button class="kr-btn kr-btn-ghost" onclick="exitToLobby()" style="font-size:.82rem">← 大廳</button>
+  </div>
+
+  <div id="tc-scores-area" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;overflow:hidden">
+    <div style="color:rgba(255,255,255,.25);font-family:'Nunito',sans-serif;font-size:.9rem">按「全班開始」後顯示即時分數</div>
+  </div>
+
+</div>
+
+<div id="screen-settlement" class="screen" style="padding:0;background:#0d0f1a;flex-direction:column;overflow:hidden">
+  <div class="kr-header" style="border-bottom:3px solid #f5c800;flex-shrink:0">
+    <div style="color:#f5c800;font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem">🏆 最終結算</div>
+    <button class="kr-btn kr-btn-start" onclick="tcEndGame()" style="font-size:.85rem;padding:10px 20px">✓ 返回大廳</button>
+  </div>
+  <div id="settlement-list" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;overflow-y:auto"></div>
+</div>
+
+<div id="screen-student-game" class="screen" style="padding:0;background:#000;flex-direction:column;overflow:hidden">
+  <div style="width:100%;background:#111;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:2px solid #f5c800;flex-shrink:0">
+    <span id="sg-title" style="color:white;font-weight:900;font-size:.9rem;flex:1">🎮 遊戲中</span>
+    <span id="sg-group" style="color:#f5c800;font-size:.8rem;font-weight:900"></span>
+  </div>
+  <iframe id="sg-iframe" style="flex:1;border:none;width:100%;height:calc(100% - 42px)" allow="autoplay"></iframe>
+</div>
+
+<div id="screen-student-wait" class="screen" style="padding:0;background:#0d0f1a;overflow:hidden">
+    <div class="kr-header">
+        <div style="display:flex;flex-direction:column">
+            <div style="color:#f5c800;font-size:.65rem;font-weight:900">🏁 學生大廳</div>
+            <div class="kr-room-name" id="sw-room-name">誰是遊戲王</div>
+        </div>
+        <div style="text-align:center">
+            <div style="color:rgba(245,200,0,0.7);font-size:.6rem;font-weight:900">房間代碼</div>
+            <div class="kr-code" id="sw-code">0000</div>
+        </div>
+        <div style="text-align:right">
+            <div style="color:white;font-weight:900;font-size:1.2rem" id="sw-count">1/5</div>
+            <div style="color:rgba(255,255,255,0.4);font-size:.6rem">玩家人數</div>
+        </div>
+    </div>
+
+    <div class="kr-body vertical">
+        <div class="kr-panel" style="border-bottom:1px solid rgba(255,255,255,0.1); align-items:center; justify-content:center; text-align:center; padding-bottom: 20px;">
+            <div class="kr-panel-title" style="width:100%; text-align:left;">🎮 老師選擇的遊戲</div>
+            
+            <div id="sw-my-card" style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.08);border:2px solid rgba(245,200,0,0.4);border-radius:16px;padding:12px 20px;margin:10px 0;width:85%;max-width:300px">
+                <div id="sw-my-symbol" style="font-size:2.8rem;line-height:1">🎮</div>
+                <div style="text-align:left">
+                    <div id="sw-my-group" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:white">—</div>
+                    <div id="sw-my-group-status" style="color:#22c040;font-size:.78rem;font-weight:900;margin-top:2px">✅ 已連線，等待老師啟動...</div>
+                </div>
+            </div>
+            
+            <div id="sw-selected-game-card" style="background:rgba(255,255,255,0.05); border:3px solid var(--yellow); border-radius:24px; padding:15px 30px; width:85%; max-width:300px; box-shadow: 0 0 20px rgba(245,200,0,0.15); margin-top:10px; transition:all 0.3s ease; display:flex; flex-direction:column; align-items:center;">
+                </div>
+        </div>
+
+        <div class="kr-panel" style="padding-top: 16px;">
+            <div class="kr-panel-title">👥 已加入玩家</div>
+            <div class="kr-seats" id="sw-lobby-players"></div>
+        </div>
+    </div>
+
+    <div class="kr-footer">
+        <button class="kr-btn kr-btn-danger" onclick="leaveRoomStudent()">🚪 離開房間</button>
+    </div>
+</div>
+
+<div id="screen-teacher-login" class="screen">
+  <div style="width:100%;max-width:560px"><button class="back-link" onclick="goTo('screen-home')">◀ 返回</button></div>
+  <div class="card" style="text-align:center">
+    <div style="font-size:3.5rem">🔑</div>
+    <span class="mp-title" style="font-size:1.8rem">老師登入</span>
+    <div style="margin:20px 0; display:flex; flex-direction:column; gap:12px;">
+      <input type="text" id="tl-name" class="input-select" placeholder="輸入老師名稱" style="text-align:center">
+      <input type="password" id="tl-pw" class="input-select" placeholder="輸入登入密碼" style="text-align:center" inputmode="numeric" pattern="[0-9]*">
+    </div>
+    <button class="btn btn-red" onclick="teacherLogin()">確認登入</button>
+  </div>
+</div>
+
+
+<script>
+// ════════════════════════════════════════════
+// FIREBASE / LOCAL SYNC 引擎 (改用動態載入提高相容性)
+// ════════════════════════════════════════════
+let db = null;
+let fsDoc = null, fsSet = null, fsOnSnap = null, fsCollection = null, fsDelete = null;
+let appId = 'game-king';
+let isFirebase = true;
+let isFirebaseAuthComplete = false;
+
+(async function initFirebase() {
+    try {
+        const appModule  = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+        const authModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+        const fsModule   = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+        const firebaseConfig = {
+            apiKey:            "AIzaSyCVQuGDlfTmYN1VZ6weHy2tWDcegFm7TP4",
+            authDomain:        "gomypartygame.firebaseapp.com",
+            projectId:         "gomypartygame",
+            storageBucket:     "gomypartygame.firebasestorage.app",
+            messagingSenderId: "494993693704",
+            appId:             "1:494993693704:web:86d3d5207a0f9dd3fa45bd"
+        };
+
+        const app  = appModule.initializeApp(firebaseConfig);
+        const auth = authModule.getAuth(app);
+        db = fsModule.getFirestore(app);
+
+        fsDoc        = fsModule.doc;
+        fsSet        = fsModule.setDoc;
+        fsOnSnap     = fsModule.onSnapshot;
+        fsCollection = fsModule.collection;
+        fsDelete     = fsModule.deleteDoc;
+
+        await authModule.signInAnonymously(auth);
+
+        authModule.onAuthStateChanged(auth, (user) => {
+            if (user) {
+                isFirebaseAuthComplete = true;
+                console.log("✅ Firebase 雲端連線成功！");
+                // 頁面一登入就開始監聽所有房間（學生可以看到房間列表）
+                startAllRoomsListener();
+                // 如果已有房間代碼，再開始監聽單一房間
+                if (window.state && window.state.roomCode) startSyncListener();
+            } else {
+                isFirebaseAuthComplete = false;
+            }
+        });
+    } catch(e) {
+        console.error("Firebase init error:", e);
+        isFirebase = false;
+    }
+})();
+
+// ── localStorage 讀寫（本地快取）──
+window.getRooms = function() {
+    return JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+};
+window.saveRooms = function(r) {
+    localStorage.setItem('playroom_rooms', JSON.stringify(r));
+    // 同步寫入 Firebase（只寫當前房間）
+    if (isFirebase && db && isFirebaseAuthComplete && window.state && window.state.roomCode) {
+        const data = r[window.state.roomCode];
+        if (data) {
+            const ref = fsDoc(db, 'rooms', window.state.roomCode);
+            fsSet(ref, data).catch(e => console.error("Firebase Save Error:", e));
+        }
+    }
+};
+
+// ── 刪除單一房間（Firebase + localStorage）──
+window.deleteRoom = function(code) {
+    const rooms = window.getRooms();
+    delete rooms[code];
+    localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+    if (isFirebase && db && isFirebaseAuthComplete) {
+        fsDelete(fsDoc(db, 'rooms', code)).catch(e => console.error("Firebase Delete Error:", e));
+    }
+};
+
+let roomSyncUnsubscribe = null;
+let allRoomsUnsubscribe = null;
+
+// ── 監聽所有房間（讓學生看到房間列表）──
+function startAllRoomsListener() {
+    if (!isFirebase || !db) return;
+    if (allRoomsUnsubscribe) { allRoomsUnsubscribe(); allRoomsUnsubscribe = null; }
+    const colRef = fsCollection(db, 'rooms');
+    allRoomsUnsubscribe = fsOnSnap(colRef, (snapshot) => {
+        const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        snapshot.forEach(doc => {
+            rooms[doc.id] = doc.data();
+        });
+        // 移除 Firebase 上已不存在的房間
+        snapshot.docChanges && snapshot.docChanges().forEach(change => {
+            if (change.type === 'removed') delete rooms[change.doc.id];
+        });
+        localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+    }, err => console.error('All rooms sync error:', err));
+}
+
+// ── 監聽單一房間（遊戲中即時同步）──
+function startSyncListener() {
+    if (!isFirebase || !db || !window.state || !window.state.roomCode) return;
+    if (roomSyncUnsubscribe) { roomSyncUnsubscribe(); roomSyncUnsubscribe = null; }
+    const roomCode = window.state.roomCode;
+    const ref = fsDoc(db, 'rooms', roomCode);
+    roomSyncUnsubscribe = fsOnSnap(ref, (snap) => {
+        if (!snap.exists()) return;
+        const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        rooms[roomCode] = snap.data();
+        localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+    }, err => console.error('Room sync error:', err));
+    console.log('✅ 監聽房間:', roomCode);
+}
+
+function stopSyncListener() {
+    if (roomSyncUnsubscribe) { roomSyncUnsubscribe(); roomSyncUnsubscribe = null; }
+}
+function initReset() {
+    // 清除本機 localStorage 中超過 6 小時的舊房間
+    const rooms = window.getRooms();
+    const now = Date.now();
+    let changed = false;
+    Object.keys(rooms).forEach(code => {
+        const r = rooms[code];
+        if (r.createdAt && (now - r.createdAt) > 6 * 60 * 60 * 1000) {
+            delete rooms[code]; changed = true;
+        }
+    });
+    if (changed) localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+}
+initReset();
+
+// ══════════════════════════════════════════
+// 老師控制台
+// ══════════════════════════════════════════
+const TC = {
+    level: 1, running: false, paused: false,
+    gameFile: 'W1_消除方塊.html',
+    scores: {}
+};
+
+// ── 開啟老師控制台（選關卡畫面）──
+function openTeacherConsole() {
+    if (!window.state.roomCode) { showToast('⚠️ 請先建立房間'); return; }
+    TC.level = 1; TC.running = false; TC.paused = false; TC.scores = {};
+    updateLevelDisplay();
+    const lsCount = document.getElementById('ls-count');
+    if (lsCount) lsCount.textContent = window.state.players.length + ' 組';
+    window.pStates['teacher'].screen = 'screen-level-select';
+    window.goTo('screen-level-select');
+}
+
+function updateLevelDisplay() {
+    const phases = ['','🌿 初級','⚡ 中級','🔥 高級'];
+    const phase  = TC.level > 20 ? 3 : TC.level > 10 ? 2 : 1;
+    const numEl   = document.getElementById('ls-level-num');
+    const phaseEl = document.getElementById('ls-level-phase');
+    if (numEl)   numEl.textContent   = TC.level;
+    if (phaseEl) phaseEl.textContent = phases[phase];
+}
+
+function changeLevel(d) {
+    if (TC.running) return;
+    TC.level = Math.max(1, Math.min(30, TC.level + d));
+    updateLevelDisplay();
+}
+
+function jumpToPhase(phase) {
+    TC.level = phase === 1 ? 1 : phase === 2 ? 11 : 21;
+    updateLevelDisplay();
+}
+
+// ── 即時分數渲染 ──
+function tcRenderScores() {
+    const area = document.getElementById('tc-scores-area');
+    if (!area) return;
+    const players = window.state.players;
+    if (!players.length) {
+        area.innerHTML = '<div style="color:rgba(255,255,255,.25);font-family:Nunito,sans-serif;font-size:.9rem">等待玩家加入...</div>';
+        return;
+    }
+    const sorted = [...players].sort((a,b) => (TC.scores[b.group]||0) - (TC.scores[a.group]||0));
+    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+    area.innerHTML = sorted.map((p,i) => `
+        <div style="display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);border-radius:20px;padding:16px 24px;width:100%;max-width:600px">
+            <div style="font-size:2rem;width:40px;text-align:center">${medals[i]||''}</div>
+            <div style="font-size:2rem">${p.symbol}</div>
+            <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:white">${p.group}</div>
+            <div id="tc-score-${p.group.replace(/\s/g,'')}" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:2rem;color:#f5c800;min-width:80px;text-align:right;transition:transform .2s">${TC.scores[p.group]||0}</div>
+        </div>`).join('');
+}
+
+function tcUpdateScore(group, score) {
+    TC.scores[group] = score;
+    const el = document.getElementById('tc-score-' + group.replace(/\s/g,''));
+    if (el) {
+        el.textContent = score;
+        el.style.transform = 'scale(1.4)';
+        setTimeout(() => { if(el) el.style.transform = 'scale(1)'; }, 250);
+    }
+    // 重新排序
+    tcRenderScores();
+}
+
+// ── 開始遊戲 ──
+function tcStartGame() {
+    const players = window.state.players;
+    if (!players.length) { showToast('⚠️ 還沒有學生加入！'); return; }
+    TC.running = true; TC.paused = false; TC._lastPaused = false; TC.scores = {};
+
+    // 更新 header
+    const badge = document.getElementById('tc-level-badge');
+    if (badge) badge.textContent = '關卡 ' + TC.level;
+    document.getElementById('tc-btn-pause').style.display  = '';
+    document.getElementById('tc-btn-resume').style.display = 'none';
+
+    // 更新 rooms
+    const rooms = window.getRooms();
+    if (rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].status   = 'playing';
+        rooms[window.state.roomCode].gameLevel = TC.level;
+        rooms[window.state.roomCode].scores = {}; // 重新開始遊戲時清空分數
+        window.saveRooms(rooms);
+    }
+
+    tcRenderScores();
+    window.pStates['teacher'].screen = 'screen-teacher-console';
+    window.goTo('screen-teacher-console');
+
+    // 若目前是學生視角，立刻進入遊戲
+    tcLaunchStudentIfNeeded();
+    showToast('🎮 遊戲開始！關卡 ' + TC.level);
+}
+
+// ── 學生進入遊戲 ──
+function tcLaunchStudentIfNeeded() {
+    const p = window.state.perspective;
+    if (p==='teacher') return;
+    const pData = window.pStates[p];
+    if (!pData || !pData.joined) return;
+
+    const r = window.getRooms()[window.state.roomCode] || {};
+    const level = r.gameLevel || TC.level || 1;
+
+    const iframe = document.getElementById('sg-iframe');
+    const titleEl = document.getElementById('sg-title');
+    const groupEl = document.getElementById('sg-group');
+    if (titleEl) titleEl.textContent = '⭐ 星際採礦 — 關卡 ' + level;
+    if (groupEl) groupEl.textContent = (pData.symbol||'') + ' ' + (pData.group||'');
+
+    if (iframe) {
+        const url = TC.gameFile + '?autostart=' + level + '&group=' + encodeURIComponent(pData.group||'');
+        iframe.src = url;
+        iframe.onload = () => setTimeout(() => {
+            try { iframe.contentWindow?.postMessage({ type:'PLATFORM_START', level, group: pData.group||'' }, '*'); }
+            catch(e) {}
+        }, 400);
+    }
+    pData.screen = 'screen-student-game';
+    window.goTo('screen-student-game');
+}
+
+function tcPauseGame() {
+    TC.paused = true;
+    document.getElementById('tc-btn-pause').style.display  = 'none';
+    document.getElementById('tc-btn-resume').style.display = '';
+    // 寫入 rooms 讓學生端 poll 偵測到
+    const rooms = window.getRooms();
+    if (rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].paused = true;
+        window.saveRooms(rooms);
+    }
+    // 同頁面學生 iframe 也直接發
+    document.getElementById('sg-iframe')?.contentWindow?.postMessage({ type:'PLATFORM_PAUSE' }, '*');
+    showToast('⏸ 遊戲已暫停');
+}
+
+function tcResumeGame() {
+    TC.paused = false;
+    document.getElementById('tc-btn-pause').style.display  = '';
+    document.getElementById('tc-btn-resume').style.display = 'none';
+    const rooms = window.getRooms();
+    if (rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].paused = false;
+        window.saveRooms(rooms);
+    }
+    document.getElementById('sg-iframe')?.contentWindow?.postMessage({ type:'PLATFORM_RESUME' }, '*');
+    showToast('▶ 遊戲繼續');
+}
+
+function tcSettleGame() {
+    const list = document.getElementById('settlement-list');
+    if (!list) return;
+    const players = window.state.players;
+    const sorted = [...players].sort((a,b) => (TC.scores[b.group]||0) - (TC.scores[a.group]||0));
+    const medals  = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+    const colors  = ['#FFD600','#C0C0C0','#CD7F32','#aaa','#aaa'];
+    list.innerHTML = `
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.4rem;color:#f5c800;margin-bottom:8px;text-align:center">⭐ 最終排名</div>
+        ${sorted.map((p,i) => `
+        <div style="display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.08);border:3px solid ${colors[i]||'rgba(255,255,255,.15)'};border-radius:20px;padding:18px 28px;width:100%;max-width:560px">
+            <div style="font-size:2.4rem;width:44px;text-align:center">${medals[i]||''}</div>
+            <div style="font-size:2rem">${p.symbol}</div>
+            <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:white">${p.group}</div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:2.2rem;color:${colors[i]||'#f5c800'}">${TC.scores[p.group]||0}</div>
+        </div>`).join('')}`;
+    window.pStates['teacher'].screen = 'screen-settlement';
+    window.goTo('screen-settlement');
+    // 清除暫停狀態，通知學生遊戲已結束
+    const rooms = window.getRooms();
+    if (rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].status = 'finished';
+        rooms[window.state.roomCode].paused = false;
+        window.saveRooms(rooms);
+    }
+    TC.paused = false;
+    TC._lastPaused = false;
+}
+
+function tcEndGame() {
+    TC.running = false; TC.paused = false; TC._lastPaused = false;
+    const sgIframe = document.getElementById('sg-iframe');
+    if (sgIframe) { sgIframe.src = 'about:blank'; }
+    // 重置按鈕狀態
+    document.getElementById('tc-btn-pause').style.display  = '';
+    document.getElementById('tc-btn-resume').style.display = 'none';
+    const rooms = window.getRooms();
+    if (rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].status = 'lobby';
+        rooms[window.state.roomCode].paused = false;
+        window.saveRooms(rooms);
+    }
+    Object.keys(window.pStates).forEach(k => {
+        if (k!=='teacher' && k!=='guest') window.pStates[k].screen = 'screen-student-wait';
+    });
+    window.pStates['teacher'].screen = 'screen-lobby';
+    window.renderLobby();
+    window.goTo('screen-lobby');
+    showToast('✓ 遊戲結束，返回大廳');
+}
+
+function exitToLobby() {
+    if (TC.running) tcEndGame(); else {
+        window.pStates['teacher'].screen = 'screen-lobby';
+        window.renderLobby();
+        window.goTo('screen-lobby');
+    }
+}
+
+// 接收 W1 postMessage (處理分數同步)
+window.addEventListener('message', (e) => {
+    if (!e.data || !e.data.type) return;
+    if (e.data.type==='W1_SCORE' && e.data.group) {
+        tcUpdateScore(e.data.group, e.data.score);
+        // 學生端將自己最新的分數同步到 rooms
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
+            rooms[window.state.roomCode].scores[e.data.group] = e.data.score;
+            window.saveRooms(rooms);
+        }
+    }
+    if (e.data.type==='W1_GAMEOVER' && e.data.group) {
+        tcUpdateScore(e.data.group, e.data.score);
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
+            rooms[window.state.roomCode].scores[e.data.group] = e.data.score;
+            window.saveRooms(rooms);
+        }
+        if (window.state.perspective === 'teacher') {
+            showToast(`🏁 ${e.data.group} 完成！得分：${e.data.score}`);
+        }
+    }
+});
+
+// 輪詢：偵測玩家加入、遊戲狀態、分數同步 + 房間關閉
+setInterval(() => {
+    // 停留在加入房間列表，自動更新列表
+    if (window.state && window.pStates) {
+        const currentPState = window.pStates[window.state.perspective];
+        if (currentPState && currentPState.screen === 'screen-join' && currentPState.joinStep === 1) {
+            window.renderRoomList();
+        }
+    }
+
+    if (!window.state || !window.state.roomCode) return;
+    const rooms = window.getRooms();
+    const r = rooms[window.state.roomCode];
+    if (!r) return;
+
+    // 老師端透過輪詢從 shared rooms 讀取所有學生即時同步的最新分數
+    if (r.scores) {
+        let scoreChanged = false;
+        for (let g in r.scores) {
+            if (TC.scores[g] !== r.scores[g]) {
+                TC.scores[g] = r.scores[g];
+                scoreChanged = true;
+                
+                // 如果目前是老師端，只針對有變動的項目觸發跳動特效
+                if (window.state.perspective === 'teacher' && window.pStates['teacher'].screen === 'screen-teacher-console') {
+                    const el = document.getElementById('tc-score-' + g.replace(/\s/g,''));
+                    if (el) {
+                        el.textContent = r.scores[g];
+                        el.style.transform = 'scale(1.4)';
+                        setTimeout(() => { if(el) el.style.transform = 'scale(1)'; }, 250);
+                    }
+                }
+            }
+        }
+        // 如果分數有變且是老師端，重新排序並渲染
+        if (scoreChanged && window.state.perspective === 'teacher' && window.pStates['teacher'].screen === 'screen-teacher-console') {
+            tcRenderScores();
+        }
+    }
+
+    // 多方測試同步大廳人數
+    if (r && r.players && r.players.length !== window.state.players.length) {
+        window.state.players = r.players;
+        window.state.takenSymbols = r.players.map(p => p.symbol);
+        window.renderLobby();
+    }
+
+    // 同步老師選擇的遊戲
+    if (r && r.selectedGame !== undefined && r.selectedGame !== window.state.selectedGame) {
+        window.state.selectedGame = r.selectedGame;
+        window.renderLobby();
+    }
+
+    const p = window.state.perspective;
+    if (p === 'teacher') return;
+    const pData = window.pStates && window.pStates[p];
+    if (!pData || !pData.joined) return;
+    if (!r || !r.open) {
+        pData.joined = false; pData.screen = 'screen-home';
+        stopSyncListener();
+        window.goTo('screen-home');
+        window.showToast('🚪 房間已關閉');
+        return;
+    }
+    // 偵測老師按了開始遊戲
+    if (r.status === 'playing' && pData.screen !== 'screen-student-game') {
+        tcLaunchStudentIfNeeded();
+    }
+    // 偵測暫停/繼續
+    if (r.status === 'playing' && pData.screen === 'screen-student-game') {
+        const sgIfr = document.getElementById('sg-iframe');
+        if (sgIfr?.contentWindow) {
+            if (r.paused) {
+                sgIfr.contentWindow.postMessage({ type:'PLATFORM_PAUSE' }, '*');
+            } else if (r.paused === false && TC._lastPaused) {
+                sgIfr.contentWindow.postMessage({ type:'PLATFORM_RESUME' }, '*');
+            }
+            TC._lastPaused = r.paused;
+        }
+    }
+    // 偵測遊戲結束 → 回等待畫面
+    if (r.status === 'finished' && pData.screen === 'screen-student-game') {
+        pData.screen = 'screen-student-wait';
+        window.goTo('screen-student-wait');
+        window.showToast('🏁 遊戲結束！');
+    }
+}, 1000);
+
+
+// ── 環境動畫：雲朵 + 金幣 ──
+(function(){
+  const clouds = document.getElementById('clouds');
+  const coins  = document.getElementById('coins');
+  const sz = [[80,40],[130,58],[92,46],[165,68],[72,36]];
+  for(let i=0;i<6;i++){
+    const [w,h]=sz[i%sz.length];
+    const d=document.createElement('div');d.className='cloud';
+    const dur=22+Math.random()*28;
+    d.style.cssText=`width:${w}px;height:${h}px;top:${Math.random()*38+5}%;animation-duration:${dur}s;animation-delay:-${Math.random()*dur}s`;
+    clouds.appendChild(d);
+  }
+  const COIN_EMOJI=['⭐','💎','🎮','🏆','✨'];
+  for(let i=0;i<10;i++){
+    const d=document.createElement('div');d.className='coin';
+    d.textContent=COIN_EMOJI[i%COIN_EMOJI.length];
+    const dur=8+Math.random()*12;
+    d.style.cssText=`left:${Math.random()*100}%;animation-duration:${dur}s;animation-delay:-${Math.random()*dur}s;font-size:${0.9+Math.random()*0.6}rem`;
+    coins.appendChild(d);
+  }
+})();
+
+window.state = {
+  perspective: 'guest', 
+  roomCode: '', tempRoomCode: '', 
+  selectedGroup: '', selectedSymbol: '',
+  players: [], selectedGame: 0, takenSymbols: [],
+  isGamePaused: false,
+  manualBroadcastGroup: null,
+  currentBroadcastGroup: null
+};
+
+window.pStates = {
+  'guest': { screen: 'screen-home', joinStep: 1 },
+  'teacher': { screen: 'screen-home', joinStep: 1 },
+  's1': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 },
+  's2': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 },
+  's3': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 },
+  's4': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 },
+  's5': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 }
+};
+
+window.SYMBOLS = ['🐉', '🦁', '🐸', '🌟', '🚀', '🔮', '🦊', '🌊', '🔥', '🌍'];
+window.TEACHER_PW = '3758';
+
+// ════════════════════════════════════════════
+// 完整嵌入的遊戲 HTML 字串：消除方塊
+// ════════════════════════════════════════════
+const GAMES = [
+  {id:1, name:'星際採礦',   icon:'⭐', desc:'點擊礦石得分'},
+  {id:2, name:'能源管線',   icon:'⚡', desc:'接通電力線路'},
+  {id:3, name:'五子棋對戰', icon:'⚫', desc:'經典組間對決'},
+  {id:4, name:'節奏合鳴',   icon:'🎵', desc:'跟隨音樂律動'},
+  {id:5, name:'你畫我猜',   icon:'🎨', desc:'繪畫聯想猜謎'},
+  {id:6, name:'雙人圓圈',   icon:'⭕', desc:'雙人協作平衡'},
+  {id:7, name:'星際大富翁', icon:'🚀', desc:'擲骰冒險奪寶'},
+  {id:8, name:'記憶大考驗', icon:'🧠', desc:'腦力連線挑戰'}
+];
+
+// ── 排行榜更新與轉播畫面更新 ──
+let isSwitchingPerspective = false;
+const DARK_SCREENS = new Set(['screen-lobby','screen-student-wait','screen-level-select','screen-teacher-console','screen-settlement','screen-student-game']);
+
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // 強制歸零捲動（含 iOS 殘留偏移）
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  // 深色畫面時隱藏地面裝飾和藍色背景元素
+  const isDark = DARK_SCREENS.has(id);
+  const groundBar = document.querySelector('.ground-bar');
+  const bgParticles = document.getElementById('bg-particles');
+  const clouds = document.getElementById('clouds');
+  const coins = document.getElementById('coins');
+  if (groundBar) groundBar.style.display = isDark ? 'none' : '';
+  if (bgParticles) bgParticles.style.display = isDark ? 'none' : '';
+  if (clouds) clouds.style.display = isDark ? 'none' : '';
+  if (coins) coins.style.display = isDark ? 'none' : '';
+  // 深色畫面時把 body 背景也換掉，並修正 iOS 鍵盤收起後的位移
+  document.body.style.background = isDark ? '#0d0f1a' : '';
+  if (isDark) {
+    document.body.style.top = '0';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+  }
+  if (!window.isSwitchingPerspective && window.state.perspective && window.pStates[window.state.perspective]) {
+      window.pStates[window.state.perspective].screen = id;
+  }
+}
+function toggleQR() {
+    const popup = document.getElementById('qr-popup');
+    if (!popup) return;
+    const isOpen = popup.style.display === 'flex';
+    if (isOpen) {
+        popup.style.display = 'none';
+    } else {
+        popup.style.display = 'flex';
+        // 產生 QR Code（每次開啟重新產生）
+        const canvas = document.getElementById('qr-canvas');
+        const urlEl  = document.getElementById('qr-url');
+        if (canvas) {
+            canvas.innerHTML = '';
+            const url = window.location.href.split('?')[0].split('#')[0];
+            if (urlEl) urlEl.textContent = url;
+            if (window.QRCode) {
+                try {
+                    new QRCode(canvas, {
+                        text: url,
+                        width: 200, height: 200,
+                        colorDark: '#1a1200', colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                } catch(e) {
+                    canvas.innerHTML = '<div style="padding:20px;color:#aaa;font-size:.8rem">QR Code 產生失敗</div>';
+                }
+            } else {
+                canvas.innerHTML = '<div style="padding:20px;color:#aaa;font-size:.8rem">載入中…</div>';
+            }
+        }
+    }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function syncJoinDOM() {
+    const step = window.pStates[window.state.perspective]?.joinStep || 1;
+    document.getElementById('join-step-1').style.display = step === 1 ? 'block' : 'none';
+    document.getElementById('join-step-password').style.display = step === 1.5 ? 'block' : 'none';
+    document.getElementById('join-step-2').style.display = step === 2 ? 'block' : 'none';
+    if (step === 2) {
+        window.state.selectedGroup = ''; window.state.selectedSymbol = '';
+        document.getElementById('group-select').value = '';
+        window.renderSymbolPicker();
+    }
+}
+
+function goToJoin() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; window.syncJoinDOM(); window.renderRoomList(); window.goTo('screen-join'); }
+
+function renderRoomList() {
+  const rooms = window.getRooms();
+  const listEl = document.getElementById('room-list');
+  const emptyEl = document.getElementById('room-empty');
+  const openRooms = Object.entries(rooms).filter(([_, r]) => r.open);
+
+  if (openRooms.length === 0) {
+    listEl.innerHTML = ''; emptyEl.style.display = 'block';
+  } else {
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = openRooms.map(([code, r]) => {
+      const isPlaying = r.status === 'playing';
+      // 如果遊戲已經開始，開放點擊進入，方便斷線重連
+      const isFull = (r.playerCount || 0) >= 5 && !isPlaying; 
+      const statusBadge = isPlaying ? `<span style="margin-left:8px;background:var(--yellow);color:var(--ink);padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:900;">遊戲中</span>` : '';
+      
+      return `<div class="room-card ${isFull ? 'room-full' : ''}" onclick="${isFull ? "showToast('房間已滿')" : `selectRoom('${code}', '${r.roomNum}')`}">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-weight:900;font-size:1.1rem">${r.teacherName || '老師'} 的房間${statusBadge}</div>
+            <div style="font-size:.8rem;color:#888">房間 #${r.roomNum}</div>
+          </div>
+          <div class="${(r.playerCount || 0) >= 5 ? 'room-full-badge' : 'room-num-badge'}">${r.playerCount || 0}/5</div>
+        </div>`;
+    }).join('');
+  }
+}
+
+function selectRoom(code, num) {
+  window.state.tempRoomCode = code;
+  document.getElementById('pw-room-title').textContent = `請輸入房間密碼`;
+  document.getElementById('room-pw-input').value = '';
+  if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1.5;
+  window.syncJoinDOM();
+}
+
+function verifyRoomPassword() {
+    if (document.getElementById('room-pw-input').value === window.state.tempRoomCode) {
+        window.state.roomCode = window.state.tempRoomCode;
+        startSyncListener(); // 學生加入後開始監聽 Firebase
+        const room = window.getRooms()[window.state.roomCode];
+        if(!room || !room.open) { window.showToast('⚠️ 房間已關閉'); return; }
+        document.getElementById('selected-room-info').textContent = `房間：${window.state.roomCode}`;
+        if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 2;
+        window.syncJoinDOM();
+    } else { window.showToast('❌ 密碼錯誤'); }
+}
+function backToStep1() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; window.syncJoinDOM(); }
+function backToPassword() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1.5; window.syncJoinDOM(); }
+function onGroupSelect(val) { window.state.selectedGroup = val; }
+function renderSymbolPicker() {
+  document.getElementById('symbol-picker').innerHTML = window.SYMBOLS.map(s => {
+    const isTaken = window.state.takenSymbols.includes(s);
+    return `<div class="symbol-opt ${isTaken ? 'taken' : ''} ${window.state.selectedSymbol === s ? 'selected' : ''}" onclick="pickSymbol('${s}')">${s}</div>`;
+  }).join('');
+}
+function pickSymbol(s) { if (!window.state.takenSymbols.includes(s)) { window.state.selectedSymbol = s; window.renderSymbolPicker(); } }
+
+function joinRoom() {
+  if (!window.state.selectedGroup || !window.state.selectedSymbol) { window.showToast('❌ 請完成選擇'); return; }
+  const rooms = window.getRooms();
+  if (!rooms[window.state.roomCode] || !rooms[window.state.roomCode].open) { window.showToast('⚠️ 房間已關閉'); window.goToJoin(); return; }
+
+  // 同步最新玩家狀態，避免多開分頁時互相覆蓋
+  if (rooms[window.state.roomCode].players) {
+      window.state.players = rooms[window.state.roomCode].players;
+      window.state.takenSymbols = window.state.players.map(p => p.symbol);
+  }
+
+  const groupName = `第 ${window.state.selectedGroup} 組`;
+  const existingIndex = window.state.players.findIndex(p => p.group === groupName);
+
+  if (existingIndex !== -1) {
+      // 允許中途重連：覆蓋原有的符號
+      window.state.players[existingIndex].symbol = window.state.selectedSymbol;
+  } else {
+      // 新玩家加入
+      if (window.state.players.length >= 5) { window.showToast('⚠️ 房間已滿'); window.goToJoin(); return; }
+      window.state.players.push({group: groupName, symbol: window.state.selectedSymbol});
+  }
+  
+  window.state.takenSymbols = window.state.players.map(p => p.symbol);
+
+  // 同時寫入 players 陣列
+  rooms[window.state.roomCode].players = window.state.players;
+  rooms[window.state.roomCode].playerCount = window.state.players.length;
+  window.saveRooms(rooms);
+
+  const pData = window.pStates[window.state.perspective];
+  if (pData) {
+    pData.joined = true;
+    pData.group  = groupName;
+    pData.symbol = window.state.selectedSymbol;
+    pData.screen = 'screen-student-wait';
+  }
+
+  document.getElementById('sw-code').textContent = window.state.roomCode;
+  document.getElementById('sw-room-name').textContent = `誰是遊戲王 — 房間 #${rooms[window.state.roomCode].roomNum}`;
+  document.getElementById('sw-my-group-status').innerHTML = `✅ <b>${groupName}</b> 已連線，等待老師啟動...`;
+  
+  window.renderLobby();
+  window.updateStudentWaitDisplay();
+  window.goTo('screen-student-wait');
+  window.showToast(`✅ ${groupName} 已加入房間！`);
+}
+
+function leaveRoomStudent() {
+    if(window.state.perspective && window.pStates[window.state.perspective]) {
+        const pData = window.pStates[window.state.perspective];
+        pData.joined = false;
+        if(pData.group) {
+            const groupName = pData.group;
+            window.state.players = window.state.players.filter(p => p.group !== groupName);
+            window.state.takenSymbols = window.state.takenSymbols.filter(s => s !== pData.symbol);
+            // 同時更新 rooms.players
+            const rooms = window.getRooms();
+            if(rooms[window.state.roomCode]) {
+                rooms[window.state.roomCode].players = window.state.players;
+                rooms[window.state.roomCode].playerCount = window.state.players.length;
+                window.saveRooms(rooms);
+            }
+            window.renderLobby();
+        }
+        pData.group = ''; pData.symbol = ''; pData.joinStep = 1;
+    }
+    window.syncJoinDOM(); window.goTo('screen-home'); window.showToast('🚪 已離開房間');
+}
+
+function selectGame(i) {
+    window.state.selectedGame = i;
+    
+    // 將選擇的遊戲同步寫入共用房間資料
+    const rooms = window.getRooms();
+    if (window.state.roomCode && rooms[window.state.roomCode]) {
+        rooms[window.state.roomCode].selectedGame = i;
+        window.saveRooms(rooms);
+    }
+    
+    window.renderLobby();
+    const g = GAMES[i];
+    window.showToast(`已選擇：${g.icon} ${g.name}`);
+}
+function renderLobby() {
+  // 固定顯示5個座位格，有人就填，沒人就空位
+  const slots = Array.from({length:5}, (_,i) => {
+    const p = window.state.players[i];
+    if (p) return `<div class="kr-seat"><div class="kr-seat-emoji">${p.symbol}</div><div class="kr-seat-name">${p.group}</div></div>`;
+    return `<div class="kr-seat" style="opacity:.2;border-style:dashed"><div class="kr-seat-emoji">＋</div><div class="kr-seat-name">空位</div></div>`;
+  });
+  const pHTML = slots.join('');
+  
+  document.getElementById('lobby-players').innerHTML = pHTML;
+  document.getElementById('lobby-count').textContent = `${window.state.players.length}/5`;
+  document.getElementById('sw-lobby-players').innerHTML = pHTML;
+  document.getElementById('sw-count').textContent = `${window.state.players.length}/5`;
+
+  document.getElementById('lobby-games').innerHTML = GAMES.map((g, i) => `
+    <div class="kr-game-card ${window.state.selectedGame === i ? 'selected' : ''}" onclick="selectGame(${i})">
+        <span style="font-size:1.3rem;flex-shrink:0">${g.icon}</span>
+        <span style="color:white;font-size:.72rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.name}</span>
+    </div>`).join('');
+    
+  const selGame = GAMES[window.state.selectedGame] || GAMES[0];
+  document.getElementById('sw-selected-game-card').innerHTML = `
+      <div style="font-size:3rem; margin-bottom:5px;">${selGame.icon}</div>
+      <div style="font-size:1.3rem; color:var(--yellow); font-weight:900;">${selGame.name}</div>
+      <div style="color:rgba(255,255,255,0.6); font-size:0.8rem; margin-top:5px;">${selGame.desc}</div>
+  `;
+}
+function updateStudentWaitDisplay() {
+  // 更新目前視角學生的頭像和組別
+  const p = window.state.perspective;
+  if (!p || p === 'teacher' || p === 'guest') return;
+  const pData = window.pStates[p];
+  if (!pData || !pData.joined) return;
+  const symEl  = document.getElementById('sw-my-symbol');
+  const grpEl  = document.getElementById('sw-my-group');
+  if (symEl) symEl.textContent = pData.symbol || '🎮';
+  if (grpEl) grpEl.textContent = pData.group  || '—';
+}
+
+function simulateJoin() {
+  if (window.state.players.length >= 5) { window.showToast('房間已滿'); return; }
+  let gNum = 1; while(window.state.players.some(p => p.group === `第 ${gNum} 組`) && gNum <= 5) gNum++;
+  if (gNum > 5) return;
+
+  const sym = window.SYMBOLS[(gNum - 1) % window.SYMBOLS.length];
+  const newPlayer = {group: `第 ${gNum} 組`, symbol: sym};
+  window.state.players.push(newPlayer);
+  window.state.takenSymbols.push(sym);
+  
+  let pKey = 's' + gNum;
+  if (window.pStates[pKey] && !window.pStates[pKey].joined) {
+    window.pStates[pKey].joined = true;
+    window.pStates[pKey].group = `第 ${gNum} 組`;
+    window.pStates[pKey].symbol = sym;
+    window.pStates[pKey].screen = 'screen-student-wait';
+  }
+  
+  // 把 players 陣列寫入 rooms
+  const rooms = window.getRooms();
+  if (rooms[window.state.roomCode]) {
+    rooms[window.state.roomCode].players = window.state.players;
+    rooms[window.state.roomCode].playerCount = window.state.players.length;
+    window.saveRooms(rooms);
+  }
+  window.renderLobby();
+  updateStudentWaitDisplay();
+  window.showToast(`✅ 第 ${gNum} 組加入！`);
+}
+
+function teacherLogin() {
+  const pwEl = document.getElementById('tl-pw');
+  const nameEl = document.getElementById('tl-name');
+  if (pwEl && pwEl.value !== window.TEACHER_PW) { window.showToast('❌ 密碼錯誤'); return; }
+  
+  const tName = (nameEl && nameEl.value.trim() !== '') ? nameEl.value.trim() : '老師';
+
+  window.state.perspective = 'teacher'; // 設定此分頁為老師視角
+  
+  const rooms = window.getRooms();
+
+  // 動態產生 4 位數房間代碼
+  let code = Math.floor(1000 + Math.random() * 9000).toString();
+  while (rooms[code] && rooms[code].open) {
+      code = Math.floor(1000 + Math.random() * 9000).toString();
+  }
+  
+  // 取得房間編號
+  let roomNum = parseInt(localStorage.getItem('playroom_counter') || '0') + 1;
+  localStorage.setItem('playroom_counter', roomNum);
+
+  rooms[code] = { 
+      open: true, teacherName: tName, roomNum: roomNum, createdAt: Date.now(),
+      playerCount: window.state.players.length, status: 'lobby', 
+      finishedGroups: [], scores: {}, selectedGame: window.state.selectedGame 
+  };
+  window.saveRooms(rooms);
+  
+  window.state.roomCode = code;
+  window.state.players = []; window.state.takenSymbols = [];
+  startSyncListener(); // 老師建房後開始監聽 Firebase
+  
+  Object.keys(window.pStates).forEach(k => {
+      if (k !== 'teacher' && k !== 'guest') {
+          window.pStates[k].joined = false;
+          window.pStates[k].screen = 'screen-home';
+          window.pStates[k].joinStep = 1;
+      }
+  });
+
+  const lobbyCode = document.getElementById('lobby-code');
+  if (lobbyCode) lobbyCode.textContent = code;
+  const lobbyRoomName = document.getElementById('lobby-room-name');
+  if (lobbyRoomName) lobbyRoomName.textContent = `誰是遊戲王 — 房間 #${roomNum}`;
+  window.renderLobby();
+  window.goTo('screen-lobby');
+  window.showToast(`🏠 房間 ${code} 已建立！`);
+}
+
+function doCloseRoom() {
+  const code = window.state.roomCode;
+  if (code) {
+      // 通知學生房間關閉（先設 open:false 讓學生 poll 偵測到）
+      const rooms = window.getRooms();
+      if (rooms[code]) { rooms[code].open = false; window.saveRooms(rooms); }
+      // 稍後真正刪除
+      setTimeout(() => window.deleteRoom(code), 2000);
+  }
+  stopSyncListener();
+  window.state.roomCode = ''; window.state.players = []; window.state.takenSymbols = [];
+  Object.keys(window.pStates).forEach(k => {
+      if (k !== 'teacher' && k !== 'guest') {
+          window.pStates[k].joined = false;
+          window.pStates[k].screen = 'screen-home';
+          window.pStates[k].joinStep = 1;
+      }
+  });
+  window.goTo('screen-home');
+}
+
+function testResetToHome() {
+    // 真正清空所有狀態
+    Object.keys(window.pStates).forEach(k => {
+        window.pStates[k].screen = 'screen-home';
+        window.pStates[k].joined = false;
+        window.pStates[k].group = '';
+        window.pStates[k].symbol = '';
+        window.pStates[k].joinStep = 1;
+    });
+
+    window.state.perspective = 'guest';
+    window.state.roomCode = ''; 
+    window.state.tempRoomCode = '';
+    window.state.players = []; 
+    window.state.takenSymbols = [];
+    window.state.selectedGame = 0;
+    window.state.isGamePaused = false;
+
+    // 清空 localStorage 房間資料
+    localStorage.removeItem('playroom_rooms');
+    localStorage.removeItem('playroom_counter');
+
+    // 重置 iframe
+    const iframe = document.getElementById('game-frame');
+    if (iframe) iframe.src = 'about:blank';
+    const tPanel = document.getElementById('teacher-panel');
+    if (tPanel) tPanel.style.display = 'none';
+
+    window.isSwitchingPerspective = true;
+    window.syncJoinDOM();
+    window.goTo('screen-home');
+    window.isSwitchingPerspective = false;
+    window.showToast('🔄 已重置所有測試數據');
+}
+
+function testSetPerspective(p) {
+    window.state.perspective = p;
+    let pData = window.pStates[p];
+
+    const btnExit = document.getElementById('btn-exit-game');
+    if (btnExit) btnExit.style.display = (p === 'teacher') ? 'inline-block' : 'none';
+    
+    const r = window.getRooms()[window.state.roomCode] || {};
+    const isGameRunning = r.status === 'playing';
+
+    if (p !== 'teacher' && p !== 'guest') {
+        if (pData.joined) {
+            const swCode = document.getElementById('sw-code');
+            if (swCode) swCode.textContent = window.state.roomCode || '0000';
+            const swMyGroupStatus = document.getElementById('sw-my-group-status');
+            const swCount = document.getElementById('sw-count');
+            if (swCount) swCount.textContent = `${window.state.players.length}/5`;
+            
+            if (r.status === 'level_select') {
+                if (swMyGroupStatus) swMyGroupStatus.innerHTML = `✅ <b>${pData.group}</b> 已連線<br><span style="color:var(--yellow)">⏳ 等待老師宣布開始...</span>`;
+                pData.screen = 'screen-student-wait';
+            } else if (r.status === 'finished') {
+                if (swMyGroupStatus) swMyGroupStatus.innerHTML = `🏁 <b>遊戲結束</b><br><span style="color:var(--yellow)">請看大螢幕結算總分！</span>`;
+                pData.screen = 'screen-student-wait';
+            } else if (r.status === 'playing') {
+                // 需要真正載入遊戲 iframe
+                setTimeout(() => tcLaunchStudentIfNeeded(), 50);
+            } else {
+                if (swMyGroupStatus) swMyGroupStatus.innerHTML = `✅ <b>${pData.group}</b> 已連線，等待老師啟動...`;
+                pData.screen = 'screen-student-wait'; 
+            }
+        } else {
+            // 未加入 → 停在首頁
+            pData.screen = 'screen-home';
+        }
+    } else if (p === 'teacher') {
+        if (!window.state.roomCode) {
+            pData.screen = 'screen-home';
+        } else {
+            const lobbyCode = document.getElementById('lobby-code');
+            if (lobbyCode) lobbyCode.textContent = window.state.roomCode;
+            if (r.status === 'playing') pData.screen = 'screen-teacher-console';
+            else pData.screen = 'screen-lobby';
+        }
+    }
+    
+    if (window.state.roomCode && (!isGameRunning || p === 'teacher')) window.renderLobby();
+
+    window.isSwitchingPerspective = true;
+    window.syncJoinDOM();
+    window.goTo(pData.screen);
+    window.updateBroadcastVisibility();
+    if (p !== 'teacher' && p !== 'guest') window.updateStudentWaitDisplay();
+    window.isSwitchingPerspective = false;
+    
+    if (!window._initLoad) {
+        window.showToast(`👁️ 已切換：${p === 'teacher' ? '老師' : '學生 ' + (p.length > 1 ? p.charAt(1) : '')} 視角`);
+    }
+}
+
+function setViewTeacher() { window.testSetPerspective('teacher'); }
+function setViewStudent() { window.testSetPerspective('s1'); }
+function goToTeacherLogin() { window.goTo('screen-teacher-login'); }
+
+// ── 頁面載入 ──
+window._initLoad = true;
+document.addEventListener('DOMContentLoaded', () => {
+    // 預設為訪客視角，讓每個分頁或裝置能自行選擇登入身份
+    window.state.perspective = 'guest';
+    window._initLoad = false;
+
+    // 防止雙擊縮放（iOS Safari）
+    let lastTap = 0;
+    document.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) e.preventDefault();
+        lastTap = now;
+    }, { passive: false });
+
+    // 防止雙指縮放
+    document.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+});
+
+// ==========================================
+// 綁定全域函數
+// ==========================================
+Object.assign(window, {
+    testResetToHome, testSetPerspective, toggleQR, goToTeacherLogin, goToJoin, goTo,
+    backToStep1, verifyRoomPassword, backToPassword, onGroupSelect, joinRoom,
+    simulateJoin, doCloseRoom, selectGame, leaveRoomStudent, teacherLogin,
+    openTeacherConsole, changeLevel, jumpToPhase, updateLevelDisplay,
+    tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby,
+    showToast, setViewTeacher, setViewStudent,
+    syncJoinDOM, renderLobby, renderSymbolPicker, updateStudentWaitDisplay,
+    getRooms, saveRooms
+});
+</script>
+</body>
+</html>
