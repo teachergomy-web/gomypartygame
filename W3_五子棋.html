@@ -444,12 +444,13 @@ function buildTeacherBoards(){
 function resizeTeacherBoards(){
     const view=document.getElementById('teacher-view');
     if(!view||view.style.display==='none')return;
-    const availableHeight = view.clientHeight - 80; // 扣掉頂部模式切換列
+    // 扣除頂部模式切換列與上下黑白子選單區域的高度，預留 180px 保證選單不被擠出畫面
+    const availableHeight = view.clientHeight - 180; 
     [0,1].forEach(mi=>{
         const outer=document.getElementById('tv-board-outer-'+mi);
         if(!outer)return;
-        const w=view.clientWidth-32;
-        const sz=Math.min(w/2, availableHeight)-16;
+        const w=view.clientWidth-40;
+        const sz=Math.min(w/2, availableHeight);
         if(sz>40){outer.style.width=sz+'px';outer.style.height=sz+'px';}
     });
 }
@@ -966,7 +967,7 @@ function renderTeacherView(){
                         <div id="auto-clear-text-${mi}" style="font-size:12px; color:#ddd; margin-bottom:16px;">(10秒後自動清空棋盤)</div>
                         <button onclick="tvManualStart(${mi})" style="padding:10px 20px; font-size:14px; background:var(--blue); color:#fff; border:2px solid #4ab8ff; border-radius:8px; font-weight:900; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,0.5);">⚔️ 略過並強制開始</button>`;
                 } else {
-                    ovContent.innerHTML = `<button onclick="tvManualStart(${mi})" style="padding:12px 28px; font-size:18px; background:linear-gradient(160deg,#1a6fc4,#0d4a8a); color:#fff; border:3px solid #2D8FFF; border-radius:12px; font-weight:900; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,0.5); transition:transform 0.1s;">⚔️ 開始這桌對戰</button>`;
+                    ovContent.innerHTML = `<button onclick="tvManualStart(${mi})" style="padding:12px 28px; font-size:18px; background:linear-gradient(160deg,#1a6fc4,#0d4a8a); color:#fff; border:3px solid #2D8FFF; border-radius:12px; font-weight:900; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,0.5); transition:transform 0.1s;">⚔️ 開始對戰</button>`;
                 }
             } else {
                 if(wrapB) wrapB.innerHTML = `<span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;color:rgba(255,255,255,0.5);">— 等待學生約戰 —</span>`;
@@ -1174,6 +1175,18 @@ window.addEventListener('message',(e)=>{
 
 // Auto-start
 (function(){
+    // 嘗試隱藏外層 index.html 的抽籤列，釋放上方空間避免干擾
+    try {
+        if (window.parent && window.parent.document) {
+            const drawBar = window.parent.document.getElementById('tc-w3-draw-bar');
+            if (drawBar) drawBar.style.display = 'none';
+            // 癱瘓原本的更新函數，確保抽籤列不會再被打開
+            if (window.parent.tcW3UpdateDrawBtn) {
+                window.parent.tcW3UpdateDrawBtn = function(){};
+            }
+        }
+    } catch(e) {}
+
     const params=new URLSearchParams(window.location.search);
     const group=params.get('group')||'';
     const isTeacher=params.get('teacher')==='1';
