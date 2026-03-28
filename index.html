@@ -880,13 +880,13 @@ function tcStartGame() {
     }
 
     if (window.state.selectedGame === 2) {
-        // W3：新遊戲開始時清空上次的 w3state，確保抽籤按鈕顯示
+        // W3：新遊戲開始時清空上次的 w3state
         const rooms0 = window.getRooms();
         if (rooms0[window.state.roomCode]) {
             rooms0[window.state.roomCode].w3state = null;
             window.saveRooms(rooms0);
         }
-        // W3：老師控制台嵌入 W3 iframe + 頂部抽籤按鈕
+        // W3：老師控制台嵌入 W3 iframe
         const settleBtn = document.getElementById('tc-btn-settle');
         const levelBadge = document.getElementById('tc-level-badge');
         const pauseBtn = document.getElementById('tc-btn-pause');
@@ -898,12 +898,7 @@ function tcStartGame() {
        const sa = document.getElementById('tc-scores-area');
         if (sa) {
             sa.style.padding = '0';
-            sa.innerHTML = `
-                <div id="tc-w3-draw-bar" style="display:none; align-items:center; justify-content:space-between; width:100%; padding:10px 16px; background:rgba(255,255,255,0.05); border-bottom:2px solid rgba(245,200,0,.3); flex-shrink:0;">
-                    <span id="tc-w3-player-count" style="color:white; font-family:'Nunito',sans-serif; font-weight:900; font-size:.9rem;">⏳ 等待學生加入...</span>
-                    <button id="tc-w3-draw-btn" class="kr-btn kr-btn-start" onclick="tcW3DrawLots()" style="font-size:.85rem; padding:8px 16px;">🎲 抽籤開始</button>
-                </div>
-                <iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="flex:1; width:100%; border:none; border-radius:0"></iframe>`;
+            sa.innerHTML = `<iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="flex:1; width:100%; border:none; border-radius:0"></iframe>`;
             const w3iframe = document.getElementById('tc-w3-iframe');
             if (w3iframe) {
                 w3iframe.onload = () => setTimeout(() => {
@@ -918,8 +913,6 @@ function tcStartGame() {
                         }, '*');
                     } catch(e) {}
                 }, 300);
-                // 更新抽籤按鈕狀態
-                tcW3UpdateDrawBtn();
             }
         }
     } else {
@@ -1071,35 +1064,6 @@ function tcResumeGame() {
     showToast('▶ 遊戲繼續');
 }
 
-// ── W3 老師端抽籤控制（index.html 直接操作，不透過 iframe）──
-function tcW3UpdateDrawBtn() {
-    const bar = document.getElementById('tc-w3-draw-bar');
-    const btn = document.getElementById('tc-w3-draw-btn');
-    const countEl = document.getElementById('tc-w3-player-count');
-    if (!bar) return;
-    const rooms = window.getRooms();
-    const r = rooms[window.state.roomCode] || {};
-    const started = r.w3state && r.w3state.started;
-    // 抽過籤就隱藏按鈕列
-    bar.style.display = started ? 'none' : 'flex';
-    if (!started && btn) {
-        const playerCount = (r.players || window.state.players || []).length;
-        btn.disabled = playerCount < 2;
-        btn.style.opacity = playerCount < 2 ? '.4' : '1';
-        btn.style.cursor = playerCount < 2 ? 'not-allowed' : 'pointer';
-        if (countEl) countEl.textContent = playerCount >= 2
-            ? `（已加入 ${playerCount} 組）`
-            : `⏳ 等待學生加入（${playerCount}/2）`;
-    }
-}
-
-function tcW3DrawLots() {
-    const tcW3 = document.getElementById('tc-w3-iframe');
-    if (tcW3 && tcW3.contentWindow) {
-        try { tcW3.contentWindow.postMessage({ type: 'W3_DRAW_LOTS' }, '*'); } catch(e) {}
-    }
-}
-
 function tcSettleGame() {
     const list = document.getElementById('settlement-list');
     if (!list) return;
@@ -1226,8 +1190,6 @@ window.addEventListener('message', (e) => {
     }
     // W3 五子棋：老師 iframe 廣播棋局狀態 → 存入 Firebase → 推送給所有學生
     if (type === 'W3_STATE' && e.data.data) {
-        // 收到狀態更新時，同步更新抽籤按鈕
-        if (typeof tcW3UpdateDrawBtn === 'function') tcW3UpdateDrawBtn();
         const w3d = e.data.data;
         // 更新控制台的回合數（計算棋盤上的棋子數）
         if (window.state.selectedGame === 2) {
@@ -1300,11 +1262,6 @@ setInterval(() => {
         window.renderLobby();
         const perspective = window.state.perspective;
         if (perspective !== 'teacher') window.updateStudentWaitDisplay();
-        
-        // 確保老師控制台的抽籤按鈕，能即時看到學生加入的人數變化
-        if (perspective === 'teacher' && window.state.selectedGame === 2 && typeof tcW3UpdateDrawBtn === 'function') {
-            tcW3UpdateDrawBtn();
-        }
     }
 
     // 同步老師選擇的遊戲

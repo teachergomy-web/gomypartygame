@@ -30,34 +30,12 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .sc-wins{font-family:'Fredoka One',sans-serif;font-size:16px;color:var(--yellow);}
 .sc-info{font-size:9px;color:rgba(255,255,255,.3);font-family:'Nunito',sans-serif;font-weight:700;}
 
-/* 抽籤卡片（兩排） */
-#matches-panel{display:flex;flex-direction:column;gap:12px;width:100%;max-width:480px;}
+/* 卡片與按鈕通用 */
 .match-card{background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.1);border-radius:16px;padding:12px 16px;}
-.match-card.rolling{border-color:rgba(0,229,255,.4);animation:borderPulse 1s ease-in-out infinite alternate;}
-.match-card.ready{border-color:rgba(255,214,0,.5);}
-.match-card.playing{border-color:var(--green);background:rgba(46,204,64,.06);}
-.match-card.idle-card{opacity:.45;}
-@keyframes borderPulse{from{border-color:rgba(0,229,255,.2)}to{border-color:rgba(0,229,255,.7)}}
 .match-label{font-family:'Nunito',sans-serif;font-weight:900;font-size:10px;color:rgba(255,255,255,.4);letter-spacing:.1em;margin-bottom:8px;}
-.match-vs-row{display:flex;align-items:center;gap:8px;}
-.player-chip{flex:1;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border-radius:12px;padding:7px 10px;}
-.player-chip.ready-chip{background:rgba(46,204,64,.15);border:1.5px solid var(--green);}
 .stone-sm{width:22px;height:22px;border-radius:50%;flex-shrink:0;}
 .stone-sm.black{background:radial-gradient(circle at 35% 35%,#555,#000);border:1.5px solid rgba(255,255,255,.2);}
 .stone-sm.white{background:radial-gradient(circle at 35% 35%,#fff,#ccc);border:1.5px solid rgba(0,0,0,.15);}
-.chip-name{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(12px,3vw,16px);}
-.chip-tag{font-size:9px;color:rgba(255,255,255,.4);font-family:'Nunito',sans-serif;font-weight:700;}
-.chip-ready{font-size:10px;color:var(--green);font-family:'Nunito',sans-serif;font-weight:900;white-space:nowrap;}
-.vs-label{font-family:'Fredoka One',sans-serif;font-size:16px;color:rgba(255,255,255,.25);flex-shrink:0;}
-.match-action{margin-top:8px;text-align:center;}
-.ready-btn{background:linear-gradient(160deg,#27ae60,#1a7a42);color:#fff;border:2px solid #4dff80;border-radius:12px;padding:8px 24px;font-family:'Fredoka One',sans-serif;font-size:15px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4);animation:readyPulse 1.2s ease-in-out infinite;}
-.ready-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.4);}
-@keyframes readyPulse{0%,100%{box-shadow:0 4px 0 rgba(0,0,0,.4),0 0 0 0 rgba(46,204,64,0)}50%{box-shadow:0 4px 0 rgba(0,0,0,.4),0 0 0 8px rgba(46,204,64,.2)}}
-.ready-status{font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;padding:6px 16px;border-radius:10px;}
-.rs-waiting{color:rgba(255,255,255,.4);}
-.rs-done{color:var(--green);}
-.rs-go{background:rgba(46,204,64,.15);border:2px solid var(--green);color:var(--green);animation:readyPulse 1s infinite;}
-.countdown-badge{font-family:'Fredoka One',sans-serif;font-size:28px;color:#00E5FF;animation:countPulse .5s ease-in-out infinite alternate;}
 @keyframes countPulse{from{transform:scale(.9);opacity:.7}to{transform:scale(1.1);opacity:1}}
 
 /* ── 遊戲畫面（單棋盤）── */
@@ -95,19 +73,8 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .tb-wait{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.4);}
 .tb-your{background:rgba(46,204,64,.2);border-color:var(--green);color:var(--green);animation:pulse 1.2s infinite;}
 
-/* Teacher ctrl */
-#teacher-ctrl{width:100%;max-width:480px;}
-.tc-btn{padding:10px 24px;font-family:'Fredoka One',sans-serif;font-size:16px;color:#fff;cursor:pointer;border:3px solid #fff;border-radius:14px;box-shadow:0 4px 0 rgba(0,0,0,.4);}
-.tc-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.4);}
-.tc-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
-.tc-btn-blue{background:linear-gradient(160deg,#1a6fc4,#0d4a8a);border-color:var(--blue);}
-
 /* Teacher broadcast columns */
 .tv-col{flex:1;display:flex;flex-direction:column;min-width:0;padding:6px;}
-.tv-header{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0 2px 4px;border-bottom:1px solid rgba(255,255,255,.1);}
-.tv-player{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:10px;padding:3px 8px;flex:1;min-width:0;}
-.tv-status{font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.5);flex-shrink:0;white-space:nowrap;}
-.tv-board-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:4px;}
 .tv-board-outer{background:#dcb35c;padding:4px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);}
 
 /* ── 倒數全螢幕 Overlay ── */
@@ -117,13 +84,6 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .cd-number{font-family:'Fredoka One',sans-serif;font-size:clamp(100px,22vw,180px);color:#00E5FF;line-height:1;text-shadow:0 0 60px rgba(0,229,255,.8);}
 @keyframes cdBounce{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 .cd-vs{font-family:'Fredoka One',sans-serif;font-size:clamp(18px,4vw,28px);color:rgba(255,255,255,.5);}
-
-/* ── 棋盤上方落子提示 ── */
-#turn-banner{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:30;}
-.tb-banner{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(14px,3.5vw,20px);padding:8px 24px;border-radius:24px;backdrop-filter:blur(4px);box-shadow:0 4px 16px rgba(0,0,0,.5);}
-.tb-banner-your{background:rgba(46,204,64,.25);border:2px solid var(--green);color:var(--green);animation:tbPulse 1.2s ease-in-out infinite;}
-.tb-banner-wait{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);}
-@keyframes tbPulse{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 0 rgba(46,204,64,0)}50%{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 8px rgba(46,204,64,.2)}}
 
 #pause-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
 #pause-overlay.show{display:flex;}
@@ -147,46 +107,12 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 <!-- Score bar -->
 <div id="score-bar"></div>
 
-<!-- ══ 抽籤/準備畫面（老師+觀賽組+等待組） ══ -->
+<!-- ══ 學生大廳畫面 ══ -->
 <div id="lobby-view" style="position:absolute;top:100px;left:0;right:0;bottom:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:12px 16px;overflow-y:auto;z-index:10;background:var(--bg);">
 
-  <div id="matches-panel">
-    <!-- Match 0 card -->
-    <div class="match-card idle-card" id="mc-0">
-      <div class="match-label" id="mlabel-0">第一場</div>
-      <div class="match-vs-row">
-        <div class="player-chip" id="pc-black-0">
-          <div class="stone-sm black"></div>
-          <div><div class="chip-name" id="cn-black-0">—</div><div class="chip-tag">先手</div></div>
-          <div id="cr-black-0" class="chip-ready" style="display:none">✅</div>
-        </div>
-        <div class="vs-label">VS</div>
-        <div class="player-chip" id="pc-white-0">
-          <div class="stone-sm white"></div>
-          <div><div class="chip-name" id="cn-white-0">—</div><div class="chip-tag">後手</div></div>
-          <div id="cr-white-0" class="chip-ready" style="display:none">✅</div>
-        </div>
-      </div>
-      <div class="match-action" id="ma-0"></div>
-    </div>
-    <!-- Match 1 card -->
-    <div class="match-card idle-card" id="mc-1">
-      <div class="match-label" id="mlabel-1">第二場</div>
-      <div class="match-vs-row">
-        <div class="player-chip" id="pc-black-1">
-          <div class="stone-sm black"></div>
-          <div><div class="chip-name" id="cn-black-1">—</div><div class="chip-tag">先手</div></div>
-          <div id="cr-black-1" class="chip-ready" style="display:none">✅</div>
-        </div>
-        <div class="vs-label">VS</div>
-        <div class="player-chip" id="pc-white-1">
-          <div class="stone-sm white"></div>
-          <div><div class="chip-name" id="cn-white-1">—</div><div class="chip-tag">後手</div></div>
-          <div id="cr-white-1" class="chip-ready" style="display:none">✅</div>
-        </div>
-      </div>
-      <div class="match-action" id="ma-1"></div>
-    </div>
+  <!-- 學生狀態提示 -->
+  <div id="student-status-panel" style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom: 20px;">
+      <div id="student-status-text" style="font-size:1.5rem; color:var(--yellow); font-weight:900;">⏳ 等待老師配對中...</div>
   </div>
 
   <!-- 學生邀請面板 -->
@@ -196,11 +122,6 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
       <div id="invite-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
     <div id="incoming-invites"></div>
-  </div>
-
-  <!-- 老師抽籤按鈕 -->
-  <div id="teacher-ctrl" style="display:none;width:100%;max-width:480px;padding:0 4px;">
-    <button id="btn-draw" onclick="drawLots()" style="width:100%;padding:16px;font-family:'Fredoka One',sans-serif;font-size:18px;color:#fff;background:linear-gradient(160deg,#1a6fc4,#0d4a8a);border:3px solid #2D8FFF;border-radius:16px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.4);">🎲 抽籤開始</button>
   </div>
 
 </div>
@@ -259,7 +180,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
       </div>
       <!-- 棋盤 -->
       <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;">
-        <div id="tv-board-outer-0" style="position:relative; background:#dcb35c;padding:5px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);width:min(calc(50vw - 24px),calc(100vh - 260px));height:min(calc(50vw - 24px),calc(100vh - 260px));">
+        <div id="tv-board-outer-0" class="tv-board-outer" style="position:relative;">
           <div id="tv-board-0" style="display:grid;width:100%;height:100%;"></div>
           <div id="tv-overlay-0" style="position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:10;border-radius:4px;display:none;flex-direction:column;align-items:center;justify-content:center;padding:10px;text-align:center;">
             <div id="tv-overlay-content-0"></div>
@@ -285,7 +206,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
       </div>
       <!-- 棋盤 -->
       <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;">
-        <div id="tv-board-outer-1" style="position:relative; background:#dcb35c;padding:5px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);width:min(calc(50vw - 24px),calc(100vh - 260px));height:min(calc(50vw - 24px),calc(100vh - 260px));">
+        <div id="tv-board-outer-1" class="tv-board-outer" style="position:relative;">
           <div id="tv-board-1" style="display:grid;width:100%;height:100%;"></div>
           <div id="tv-overlay-1" style="position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:10;border-radius:4px;display:none;flex-direction:column;align-items:center;justify-content:center;padding:10px;text-align:center;">
             <div id="tv-overlay-content-1"></div>
@@ -320,6 +241,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
   <div style="font-family:'Fredoka One',sans-serif;font-size:1.8rem;color:var(--yellow)">暫停中</div>
 </div>
 <div id="toast-w3"></div>
+
 <script>
 const GRID = 15;
 
@@ -328,13 +250,13 @@ const GRID = 15;
 // ══════════════════════════════════════
 // 每個 match: {status:'idle'|'rolling'|'countdown'|'playing'|'finished', black, white, cells, turn, lastMove, winner, countdown}
 function newMatch(){
-    return {status:'idle',black:'',white:'',cells:Array(GRID*GRID).fill(0),turn:'black',lastMove:-1,winner:null,countdown:0,blackReady:false,whiteReady:false};
+    return {status:'idle',black:'',white:'',cells:Array(GRID*GRID).fill(0),turn:'black',lastMove:-1,winner:null,countdown:0};
 }
 let state = {
     matches: [newMatch(), newMatch()],
     scores: {},          // {組名:{wins,matches}}
     activePlayers: [],   // 實際加入的組別
-    started: false,      // 是否已抽過籤
+    started: false,      // 是否已啟動
     invites: [],         // 新增：對戰邀請
     matchMode: 'designated' // 新增：老師模式 (designated | free)
 };
@@ -343,11 +265,11 @@ let myGroup = '';
 let myRole  = 'spectator'; // teacher|player|spectator
 window.GROUP_ID = '';
 
-// --- 新增：狀態判斷與邀請邏輯 ---
+// --- 狀態判斷與邀請邏輯 ---
 function isGroupIdle(g) {
     return !state.matches.some(m =>
         (m.black === g || m.white === g) &&
-        (m.status === 'rolling' || m.status === 'ready' || m.status === 'countdown' || m.status === 'playing')
+        (m.status === 'rolling' || m.status === 'countdown' || m.status === 'playing')
     );
 }
 
@@ -424,7 +346,6 @@ function showToast(m){const el=document.getElementById('toast-w3');el.textConten
 // 棋盤 DOM 初始化
 // ══════════════════════════════════════
 let _myMi = -1; // 我參與的 match index
-let _tvBuilt = false;
 
 function buildTeacherBoards(){
     [0,1].forEach(mi=>{
@@ -468,6 +389,7 @@ function buildBoards(){
     }
     resizeSoloBoard();
 }
+
 function resizeSoloBoard(){
     const wrap=document.getElementById('solo-board-wrap');
     const outer=document.getElementById('solo-board-outer');
@@ -478,16 +400,14 @@ function resizeSoloBoard(){
 window.addEventListener('resize',resizeSoloBoard);
 
 // ══════════════════════════════════════
-// 抽籤（只在第一次或特殊情況由老師觸發）
+// 模式切換與控制
 // ══════════════════════════════════════
-function drawLots(){
-    showToast('👉 老師已直接在棋盤上進行調度！');
-}
-
 function setMatchMode(mode) {
     state.matchMode = mode;
     if (mode === 'designated') {
         state.invites = []; // 切換回指定模式時，清空學生間的邀請
+    } else if (mode === 'free') {
+        state.started = true; // 強制標記遊戲已啟動，讓學生能立刻互相邀請
     }
     broadcast();
 }
@@ -529,27 +449,32 @@ function startRolling(mi, blackFinal, whiteFinal){
     const m=state.matches[mi];
     m.status='rolling';m.black=blackFinal;m.white=whiteFinal;
     m.cells=Array(GRID*GRID).fill(0);m.turn='black';m.lastMove=-1;m.winner=null;
-    m.blackReady=false;m.whiteReady=false;
+    m.countdown=0;
 
     state.scores[blackFinal]=state.scores[blackFinal]||{wins:0,matches:0};
     state.scores[whiteFinal]=state.scores[whiteFinal]||{wins:0,matches:0};
     state.scores[blackFinal].matches++;
     state.scores[whiteFinal].matches++;
 
-    broadcast(); // 廣播 rolling（名字已確定，CSS 做動畫效果）
+    broadcast(); 
 
+    // 只有觸發者負責跑 timeout
     setTimeout(()=>{
         const m2=state.matches[mi];
-        if(m2.status!=='rolling')return; // 已被其他操作中斷
-        m2.status='ready';
+        if(m2.status!=='rolling')return; 
+        
+        // 跳過準備階段，直接進入倒數
+        m2.status='countdown';
+        m2.countdown=3;
         broadcast();
-    },6000); // 6秒後進入準備階段
+        runCountdown(mi);
+    }, 2000); // 2秒閃爍配對動畫後進入倒數
 }
 
 function runCountdown(mi){
     clearInterval(countdownTimers[mi]);
     countdownTimers[mi] = null;
-    // 只有觸發者（黑方）負責倒數，白方/觀眾透過 applyState 收到更新
+    // 只有觸發者負責倒數，其他人透過 applyState 收到更新
     countdownTimers[mi]=setInterval(()=>{
         const m=state.matches[mi];
         if(m.status!=='countdown'){
@@ -606,9 +531,8 @@ function hideCountdownOverlay(){
     document.getElementById('countdown-overlay')?.classList.remove('show');
 }
 
-// 賽局結束後自動配對閒置組
+// 賽局結束後自動配對閒置組 (保留給未來需要)
 function autoNextMatch(finishedMi){
-    // 找出目前其他場次正在使用的組別
     const inUse=new Set();
     state.matches.forEach((m,i)=>{
         if(i!==finishedMi && m.status!=='idle' && m.status!=='finished'){
@@ -617,32 +541,25 @@ function autoNextMatch(finishedMi){
         }
     });
 
-    // 閒置組 = activePlayers 中不在 inUse 的
     const idle=state.activePlayers.filter(g=>!inUse.has(g));
-
-    // 剛結束那場的兩組
     const lastB=state.matches[finishedMi].black;
     const lastW=state.matches[finishedMi].white;
 
     if(idle.length<2){
-        // 閒置組不足2，等待其他場結束
         state.matches[finishedMi].status='idle';
         broadcast();
         return;
     }
 
-    // 嘗試找「不是上一場同一對」的組合
     const sorted=[...idle].sort((a,b)=>{
         const d=(state.scores[a]?.matches||0)-(state.scores[b]?.matches||0);
         return d!==0?d:Math.random()-.5;
     });
 
-    // 找出不會重複上一場對陣組合的配對
     let black=null, white=null;
     for(let i=0;i<sorted.length;i++){
         for(let j=i+1;j<sorted.length;j++){
             const a=sorted[i], b=sorted[j];
-            // 排除完全相同的對陣（不分先後手）
             const sameAsBefore=(a===lastB&&b===lastW)||(a===lastW&&b===lastB);
             if(!sameAsBefore){black=a;white=b;break;}
         }
@@ -650,37 +567,12 @@ function autoNextMatch(finishedMi){
     }
 
     if(!black){
-        // 所有閒置組都跟上一場一樣，等待更多組閒置
         state.matches[finishedMi].status='idle';
         broadcast();
         return;
     }
 
     setTimeout(()=>startRolling(finishedMi,black,white),800);
-}
-
-// ══════════════════════════════════════
-// 準備 & 倒數
-// ══════════════════════════════════════
-function handleReady(mi){
-    initAudio();
-    const m=state.matches[mi];
-    if(m.status!=='ready')return;
-    if(myGroup===m.black) m.blackReady=true;
-    else if(myGroup===m.white) m.whiteReady=true;
-    else return;
-    // 雙方都準備好 → 開始倒數
-    if(m.blackReady&&m.whiteReady){
-        // 清除可能殘留的舊 timer
-        clearInterval(countdownTimers[mi]);
-        countdownTimers[mi]=null;
-        m.status='countdown';m.countdown=3;
-        broadcast();
-        // 只有觸發這次準備完成的裝置負責廣播倒數
-        runCountdown(mi);
-    } else {
-        broadcast();
-    }
 }
 
 // ══════════════════════════════════════
@@ -710,7 +602,6 @@ function handleCellClick(mi,idx){
         playSound('win');
         showToast(`🏆 ${wG} 獲勝！`);
         broadcast();
-        // 移除自動配對，改由老師手動配對
     }else{
         playSound('stone');
     }
@@ -733,10 +624,6 @@ function checkWin(cells,idx,p){
 // ══════════════════════════════════════
 // 廣播
 // ══════════════════════════════════════
-function onDrawBtnClick(){
-    drawLots();
-}
-
 function broadcast(){
     const data=JSON.parse(JSON.stringify(state));
     window.parent.postMessage({type:'W3_STATE',data,group:myGroup},'*');
@@ -793,7 +680,7 @@ function applyState(newState){
 
 function updateMyRole(){
     if(myRole==='teacher')return;
-    const inAny=state.matches.some(m=>m.black===myGroup||m.white===myGroup);
+    const inAny=state.matches.some(m=>(m.black===myGroup||m.white===myGroup)&&m.status!=='idle');
     myRole=inAny?'player':'spectator';
 }
 
@@ -804,15 +691,14 @@ function showView(name){
     // 確保只顯示一個畫面
     ['lobby-view','teacher-view','game-view'].forEach(id=>{
         const el=document.getElementById(id);
-        if(el) el.style.display=(id===name)?
-            (id==='game-view'?'flex':id==='teacher-view'?'flex':'flex')
-            :'none';
+        if(el) el.style.display=(id===name)?'flex':'none';
     });
 }
 
 function renderAll(){
     renderHUD();
     renderScoreboard();
+    
     // 決定顯示哪個畫面
     if(myRole==='teacher'){
         if(!state.started) state.started = true; // 老師端強制進入遊戲狀態
@@ -822,11 +708,11 @@ function renderAll(){
     } else {
         showView('lobby-view');
     }
+    
     renderTeacherView();
     renderLobbyCards();
     renderGameView();
     renderBottom();
-    renderTeacherCtrl();
     renderInvites();
 }
 
@@ -835,7 +721,7 @@ function renderInvites() {
     if (!panel) return;
     
     // 只有學生且不在比賽中，且老師設定為「自由對戰」才顯示邀請面板
-    if (myRole !== 'player' || !state.started || !isGroupIdle(myGroup) || state.matchMode !== 'free') {
+    if (myRole === 'teacher' || !state.started || !isGroupIdle(myGroup) || state.matchMode !== 'free') {
         panel.style.display = 'none';
         return;
     }
@@ -912,11 +798,6 @@ function renderScoreboard(){
     }).join('');
 }
 
-function renderTeacherCtrl(){
-    const tc = document.getElementById('teacher-ctrl');
-    if(tc) tc.style.display = 'none'; // 隱藏原本的大抽籤按鈕
-}
-
 function renderTeacherView(){
     if(myRole!=='teacher')return;
 
@@ -982,7 +863,7 @@ function renderTeacherView(){
                 }
             }
         } else {
-            // playing, countdown, ready, rolling
+            // playing, countdown, rolling
             if(wrapB) wrapB.innerHTML = `<span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:#fff;">${m.black||'???'}</span>`;
             if(wrapW) wrapW.innerHTML = `<span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:#fff;">${m.white||'???'}</span>`;
             
@@ -991,7 +872,6 @@ function renderTeacherView(){
             } else {
                 overlay.style.display = 'flex';
                 if (s === 'rolling') ovContent.innerHTML = `<div style="color:var(--yellow); font-weight:900; font-size:24px; text-shadow:0 2px 4px rgba(0,0,0,0.8);">⚡ 配對中...</div>`;
-                else if (s === 'ready') ovContent.innerHTML = `<div style="color:var(--green); font-weight:900; font-size:22px; text-shadow:0 2px 4px rgba(0,0,0,0.8);">等待雙方準備...</div>`;
                 else if (s === 'countdown') ovContent.innerHTML = `<div style="color:#00E5FF; font-weight:900; font-size:64px; text-shadow:0 4px 12px rgba(0,0,0,0.8);">${m.countdown}</div>`;
             }
         }
@@ -1015,49 +895,20 @@ function renderTeacherView(){
 }
 
 function renderLobbyCards(){
-    // showView 已控制顯示，這裡只更新卡片內容
-    [0,1].forEach(mi=>{
-        const m=state.matches[mi];const s=m.status;
-        const mc=document.getElementById('mc-'+mi);if(!mc)return;
-        mc.className='match-card '+(s==='idle'?'idle-card':s==='rolling'?'rolling':s==='ready'?'ready':(s==='playing'||s==='countdown')?'playing':'idle-card');
-        const lbl=document.getElementById('mlabel-'+mi);
-        if(lbl)lbl.textContent=s==='idle'?`第${mi===0?'一':'二'}場（等待配對）`:s==='rolling'?`⚡ 配對中...`:s==='ready'?`第${mi===0?'一':'二'}場 — 準備`:s==='countdown'?`⚡ 倒數 ${m.countdown} 秒`:s==='playing'?`第${mi===0?'一':'二'}場 — 進行中`:s==='finished'?`第${mi===0?'一':'二'}場 — 結束`:`第${mi===0?'一':'二'}場`;
-        const cnB=document.getElementById('cn-black-'+mi);const cnW=document.getElementById('cn-white-'+mi);
-        
-        // 學生端單純顯示組別名稱
-        if(cnB) cnB.textContent=m.black||'—';
-        if(cnW) cnW.textContent=m.white||'—';
-
-        const crB=document.getElementById('cr-black-'+mi);const crW=document.getElementById('cr-white-'+mi);
-        const pcB=document.getElementById('pc-black-'+mi);const pcW=document.getElementById('pc-white-'+mi);
-        if(crB)crB.style.display=m.blackReady?'':'none';if(crW)crW.style.display=m.whiteReady?'':'none';
-        if(pcB)pcB.className='player-chip'+(m.blackReady?' ready-chip':'');if(pcW)pcW.className='player-chip'+(m.whiteReady?' ready-chip':'');
-        const ma=document.getElementById('ma-'+mi);if(!ma)return;
-        
-        if(s==='ready'){
-            const iAmB=myGroup===m.black,iAmW=myGroup===m.white;
-            const myRdy=(iAmB&&m.blackReady)||(iAmW&&m.whiteReady);
-            const cnt=(m.blackReady?1:0)+(m.whiteReady?1:0);
-            if((iAmB||iAmW)&&!myRdy) ma.innerHTML=`<button class="ready-btn" onclick="handleReady(${mi})">✋ 我準備好了！</button>`;
-            else if((iAmB||iAmW)&&myRdy) ma.innerHTML=`<div class="ready-status rs-done">✅ 已準備 (${cnt}/2)</div>`;
-            else ma.innerHTML=`<div class="ready-status rs-waiting">等待雙方準備 ${cnt}/2</div>`;
-        }else if(s==='countdown'){ma.innerHTML=`<div class="countdown-badge">${m.countdown}</div>`;}
-        else if(s==='playing'){ma.innerHTML=`<div class="ready-status rs-go">🔴 對戰中</div>`;}
-        else if(s==='finished'){
-            const wG=m.winner==='black'?m.black:m.white;
-            ma.innerHTML=`<div class="ready-status rs-done">🏆 ${wG} 獲勝</div>`;
+    const statusText = document.getElementById('student-status-text');
+    if(statusText) {
+        if(state.matchMode === 'free') {
+            statusText.textContent = "🤝 開放自由約戰中";
+        } else {
+            statusText.textContent = "⏳ 等待老師配對中...";
         }
-        else {
-            const hint = state.matchMode === 'free' ? '開放約戰中' : '等待老師配對';
-            ma.innerHTML=`<div class="ready-status rs-waiting" style="font-size:11px">⏳ ${hint}</div>`;
-        }
-    });
+    }
 }
 
 function isMyMatchPlaying(){
-    if(myRole!=='player')return false;
+    if(myRole === 'spectator') return false; 
     return state.matches.some(m=>(m.black===myGroup||m.white===myGroup)&&
-        (m.status==='playing'||m.status==='countdown'||m.status==='finished'));
+        (m.status==='rolling'||m.status==='countdown'||m.status==='playing'||m.status==='finished'));
 }
 
 function renderGameView(){
@@ -1072,10 +923,16 @@ function renderGameView(){
     if(snB)snB.textContent=m.black;
     if(snW)snW.textContent=m.white;
 
-    // 倒數 overlay
+    // 倒數/配對中 overlay
     const scd=document.getElementById('solo-countdown');
     if(scd){
-        if(m.status==='countdown'){
+        if(m.status==='rolling'){
+            scd.style.display='flex';
+            const numEl=document.getElementById('solo-cd-num');
+            const vsEl=document.getElementById('solo-cd-vs');
+            if(numEl){ numEl.textContent='⚡'; numEl.style.animation='none'; }
+            if(vsEl) vsEl.textContent=`配對中...`;
+        } else if(m.status==='countdown'){
             scd.style.display='flex';
             const numEl=document.getElementById('solo-cd-num');
             const vsEl=document.getElementById('solo-cd-vs');
@@ -1108,34 +965,27 @@ function renderGameView(){
 
 function renderBottom(){
     const ind=document.getElementById('turn-indicator');if(!ind)return;
-    const banner=document.getElementById('turn-banner');
 
     if(myRole!=='player'){
         ind.className='turn-badge tb-wait';ind.textContent=state.started?'觀賽中':'等待老師配對';
-        if(banner)banner.style.display='none';
         return;
     }
     const mi=state.matches.findIndex(m=>m.black===myGroup||m.white===myGroup);
     if(mi<0){
         ind.className='turn-badge tb-wait';ind.textContent='等待配對';
-        if(banner)banner.style.display='none';
         return;
     }
     const m=state.matches[mi];
-    const inGame=m.status==='playing'||m.status==='countdown';
 
     // 底部小標籤
-    if(m.status==='ready'){const myRdy=(myGroup===m.black&&m.blackReady)||(myGroup===m.white&&m.whiteReady);ind.className='turn-badge '+(myRdy?'tb-wait':'tb-your');ind.textContent=myRdy?'✅ 已準備，等待對方...':'請按準備！';}
-    else if(m.status==='countdown'){ind.className='turn-badge tb-your';ind.textContent=`⚡ ${m.countdown} 秒後`;}
+    if(m.status==='rolling'){ind.className='turn-badge tb-your';ind.textContent='⚡ 配對中...';}
+    else if(m.status==='countdown'){ind.className='turn-badge tb-your';ind.textContent=`⚡ ${m.countdown} 秒後開始`;}
     else if(m.status==='playing'){const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');ind.className='turn-badge '+(myTurn?'tb-your':'tb-wait');ind.textContent=myTurn?'⚔️ 你的回合！':'等待對方...';}
     else if(m.status==='finished'){ind.className='turn-badge tb-wait';ind.textContent='比賽結束';}
     else{ind.className='turn-badge tb-wait';ind.textContent='等待配對';}
 }
 
 function dismissSoloWinner(){document.getElementById('solo-winner').classList.remove('show');}
-function dismissWinner(mi){
-    document.getElementById('winner-ov-'+mi)?.classList.add('hidden');
-}
 
 // ══════════════════════════════════════
 // Platform Bridge
@@ -1161,9 +1011,6 @@ window.addEventListener('message',(e)=>{
         case 'W3_STATE':
             if(e.data.data)applyState(e.data.data);
             break;
-        case 'W3_DRAW_LOTS':
-            drawLots(); // 支援從 index.html 觸發（向下兼容）
-            break;
         case 'PLATFORM_PAUSE':
             document.getElementById('pause-overlay').classList.add('show');
             break;
@@ -1175,15 +1022,12 @@ window.addEventListener('message',(e)=>{
 
 // Auto-start
 (function(){
-    // 嘗試隱藏外層 index.html 的抽籤列，釋放上方空間避免干擾
+    // 隱藏外層 index.html 的抽籤列
     try {
         if (window.parent && window.parent.document) {
             const drawBar = window.parent.document.getElementById('tc-w3-draw-bar');
             if (drawBar) drawBar.style.display = 'none';
-            // 癱瘓原本的更新函數，確保抽籤列不會再被打開
-            if (window.parent.tcW3UpdateDrawBtn) {
-                window.parent.tcW3UpdateDrawBtn = function(){};
-            }
+            if (window.parent.tcW3UpdateDrawBtn) { window.parent.tcW3UpdateDrawBtn = function(){}; }
         }
     } catch(e) {}
 
