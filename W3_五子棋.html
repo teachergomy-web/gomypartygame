@@ -105,6 +105,13 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .tc-btn-blue{background:linear-gradient(160deg,#1a6fc4,#0d4a8a);border-color:var(--blue);}
 
 /* Pause */
+/* Teacher broadcast columns */
+.tv-col{flex:1;display:flex;flex-direction:column;min-width:0;padding:6px;}
+.tv-header{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0 2px 4px;border-bottom:1px solid rgba(255,255,255,.1);}
+.tv-player{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:10px;padding:3px 8px;flex:1;min-width:0;}
+.tv-status{font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.5);flex-shrink:0;white-space:nowrap;}
+.tv-board-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:4px;}
+.tv-board-outer{background:#dcb35c;padding:4px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);}
 #pause-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
 #pause-overlay.show{display:flex;}
 #toast-w3{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A0A4A;border:3px solid var(--yellow);border-radius:12px;padding:10px 22px;font-family:'Nunito',sans-serif;font-weight:900;color:var(--yellow);opacity:0;transition:.25s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:500;white-space:nowrap;}
@@ -192,50 +199,42 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
   </div>
 </div>
 
-<!-- ══ 老師雙棋盤轉播 ══ -->
-<div id="teacher-view" style="position:absolute;top:100px;left:0;right:0;bottom:60px;display:none;flex-direction:column;gap:6px;padding:8px;overflow:hidden;z-index:10;background:var(--bg);">
-  <!-- 場0 mini board -->
-  <div style="flex:1;display:flex;flex-direction:column;min-height:0;gap:4px;">
-    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px 10px;flex:1">
-        <div class="stone-sm black"></div>
-        <span class="chip-name" id="tv-black-0" style="font-size:13px">—</span>
-      </div>
-      <span class="vs-label" style="font-size:13px">VS</span>
-      <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px 10px;flex:1">
-        <div class="stone-sm white"></div>
-        <span class="chip-name" id="tv-white-0" style="font-size:13px">—</span>
-      </div>
-      <div id="tv-status-0" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.4);flex-shrink:0"></div>
+<!-- ══ 老師雙棋盤轉播（左右兩欄）══ -->
+<div id="teacher-view" style="position:absolute;top:100px;left:0;right:0;bottom:60px;display:none;flex-direction:row;gap:0;overflow:hidden;z-index:10;background:var(--bg);">
+
+  <!-- 場0 左欄 -->
+  <div class="tv-col" id="tv-col-0">
+    <div class="tv-header">
+      <div class="tv-player"><div class="stone-sm black"></div><span class="chip-name" id="tv-black-0">—</span></div>
+      <span class="vs-label" style="font-size:12px">VS</span>
+      <div class="tv-player"><div class="stone-sm white"></div><span class="chip-name" id="tv-white-0">—</span></div>
+      <div id="tv-status-0" class="tv-status"></div>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0">
-      <div id="tv-board-outer-0" style="background:#dcb35c;padding:4px;border-radius:8px;border:3px solid #8b4513;">
-        <div id="tv-board-0" style="display:grid;"></div>
+    <div class="tv-board-wrap">
+      <div id="tv-board-outer-0" class="tv-board-outer">
+        <div id="tv-board-0" style="display:grid;width:100%;height:100%;"></div>
       </div>
     </div>
   </div>
+
   <!-- 分隔線 -->
-  <div style="border-top:1px solid rgba(255,255,255,.1);flex-shrink:0"></div>
-  <!-- 場1 mini board -->
-  <div style="flex:1;display:flex;flex-direction:column;min-height:0;gap:4px;">
-    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px 10px;flex:1">
-        <div class="stone-sm black"></div>
-        <span class="chip-name" id="tv-black-1" style="font-size:13px">—</span>
-      </div>
-      <span class="vs-label" style="font-size:13px">VS</span>
-      <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px 10px;flex:1">
-        <div class="stone-sm white"></div>
-        <span class="chip-name" id="tv-white-1" style="font-size:13px">—</span>
-      </div>
-      <div id="tv-status-1" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.4);flex-shrink:0"></div>
+  <div id="tv-divider" style="width:1px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+
+  <!-- 場1 右欄 -->
+  <div class="tv-col" id="tv-col-1">
+    <div class="tv-header">
+      <div class="tv-player"><div class="stone-sm black"></div><span class="chip-name" id="tv-black-1">—</span></div>
+      <span class="vs-label" style="font-size:12px">VS</span>
+      <div class="tv-player"><div class="stone-sm white"></div><span class="chip-name" id="tv-white-1">—</span></div>
+      <div id="tv-status-1" class="tv-status"></div>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0">
-      <div id="tv-board-outer-1" style="background:#dcb35c;padding:4px;border-radius:8px;border:3px solid #8b4513;">
-        <div id="tv-board-1" style="display:grid;"></div>
+    <div class="tv-board-wrap">
+      <div id="tv-board-outer-1" class="tv-board-outer">
+        <div id="tv-board-1" style="display:grid;width:100%;height:100%;"></div>
       </div>
     </div>
   </div>
+
 </div>
 
 <!-- Bottom bar -->
@@ -742,15 +741,20 @@ function renderTeacherCtrl(){
 
 function renderTeacherView(){
     if(myRole!=='teacher')return;
-    // 只要抽過籤就顯示轉播，不管當前場次狀態
-    const tv=document.getElementById('teacher-view');
-    const lv=document.getElementById('lobby-view');
     if(!state.started)return; // showView 已控制顯示
 
     buildTeacherBoards();
+
+    // 判斷場1是否有效（非 idle 或 activePlayers < 4）
+    const m1Active = state.matches[1].status!=='idle' || state.activePlayers.length>=4;
+    const col1 = document.getElementById('tv-col-1');
+    const divider = document.getElementById('tv-divider');
+    if(col1) col1.style.display = m1Active ? 'flex' : 'none';
+    if(divider) divider.style.display = m1Active ? '' : 'none';
+
     [0,1].forEach(mi=>{
-        const m=state.matches[mi];
-        const s=m.status;
+        if(mi===1 && !m1Active)return;
+        const m=state.matches[mi];const s=m.status;
         // Names
         const tb=document.getElementById('tv-black-'+mi);
         const tw=document.getElementById('tv-white-'+mi);
@@ -758,16 +762,18 @@ function renderTeacherView(){
         if(tw)tw.textContent=m.white||'—';
         // Status
         const tst=document.getElementById('tv-status-'+mi);
-        if(tst){
-            tst.textContent=s==='idle'?'等待':s==='rolling'?'配對中':s==='ready'?'準備中':s==='countdown'?`${m.countdown}秒`:s==='playing'?(m.turn==='black'?'⚫回合':'⚪回合'):s==='finished'?(m.winner==='black'?'🏆'+m.black:'🏆'+m.white):'';
-        }
-        // Board outer size
+        if(tst) tst.textContent=
+            s==='idle'?'等待':s==='rolling'?'配對中':s==='ready'?'準備中':
+            s==='countdown'?`${m.countdown}秒`:s==='playing'?
+            (m.turn==='black'?'⚫回合':'⚪回合'):s==='finished'?
+            (m.winner?'🏆'+(m.winner==='black'?m.black:m.white):'結束'):'';
+        // Board outer size: square fitting the column
+        const col=document.getElementById('tv-col-'+mi);
         const outer=document.getElementById('tv-board-outer-'+mi);
-        if(outer){
-            const tv2=document.getElementById('teacher-view');
-            const halfH=Math.floor((tv2.clientHeight-50)/2);
-            const w=tv2.clientWidth-24;
-            const sz=Math.min(w,halfH-36);
+        if(col&&outer){
+            const colW=col.clientWidth-20;
+            const colH=col.clientHeight-44; // minus header
+            const sz=Math.min(colW,colH);
             if(sz>40){outer.style.width=sz+'px';outer.style.height=sz+'px';}
         }
         // Board cells
@@ -776,11 +782,12 @@ function renderTeacherView(){
         if(!cells.length)return;
         cells.forEach((cell,i)=>{
             const val=m.cells[i];
-            cell.className='cell'; // no clicking
+            cell.className='cell';
             cell.innerHTML=val===0?'':`<div class="piece ${val===1?'black':'white'}${m.lastMove===i?' last':''}"></div>`;
         });
     });
 }
+
 
 function renderLobbyCards(){
     // showView 已控制顯示，這裡只更新卡片內容
