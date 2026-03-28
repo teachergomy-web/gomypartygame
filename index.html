@@ -535,6 +535,8 @@ let isFirebaseAuthComplete = false;
                 startAllRoomsListener();
                 // 如果已有房間代碼，再開始監聽單一房間
                 if (window.state && window.state.roomCode) startSyncListener();
+                // Firebase 連線後嘗試恢復 session（延遲讓 allRoomsListener 先拿到資料）
+                setTimeout(tryRestoreSession, 1500);
             } else {
                 isFirebaseAuthComplete = false;
             }
@@ -1764,60 +1766,11 @@ function goToTeacherLogin() { window.goTo('screen-teacher-login'); }
 window._initLoad = true;
 document.addEventListener('DOMContentLoaded', () => {
     window._initLoad = false;
-
-    // ── 重整恢復：從 localStorage 讀取上次的狀態 ──
-    try {
-        const saved = JSON.parse(localStorage.getItem('game_session') || 'null');
-        if (saved && saved.perspective && saved.roomCode) {
-            const rooms = window.getRooms();
-            const room  = rooms[saved.roomCode];
-            if (room && room.open) {
-                // 房間還存在，恢復狀態
-                window.state.perspective  = saved.perspective;
-                window.state.roomCode     = saved.roomCode;
-                window.state.players      = room.players || [];
-                window.state.takenSymbols = window.state.players.map(p => p.symbol);
-                window.state.selectedGame = room.selectedGame || 0;
-                if (saved.perspective === 'teacher') {
-                    const lobbyCode = document.getElementById('lobby-code');
-                    if (lobbyCode) lobbyCode.textContent = saved.roomCode;
-                    window.renderLobby();
-                    if (room.status === 'playing' || room.status === 'settlement') {
-                        window.pStates['teacher'].screen = 'screen-teacher-console';
-                        window.goTo('screen-teacher-console');
-                    } else {
-                        window.pStates['teacher'].screen = 'screen-lobby';
-                        window.goTo('screen-lobby');
-                    }
-                    startSyncListener();
-                } else {
-                    // 學生視角恢復
-                    const pData = window.pStates[saved.perspective];
-                    if (pData && saved.group) {
-                        pData.joined = true;
-                        pData.group  = saved.group;
-                        pData.symbol = saved.symbol || '';
-                        window.state.perspective = saved.perspective;
-                        if (room.status === 'playing') {
-                            tcLaunchStudentIfNeeded();
-                        } else {
-                            pData.screen = 'screen-student-wait';
-                            window.goTo('screen-student-wait');
-                        }
-                        startSyncListener();
-                    } else {
-                        window.state.perspective = 'guest';
-                        window.goTo('screen-home');
-                    }
-                }
-                showToast('🔄 已恢復上次連線');
-                return;
-            }
-        }
-    } catch(e) { console.warn('Session restore failed:', e); }
-
-    // 沒有可恢復的狀態，從首頁開始
     window.state.perspective = 'guest';
+
+    // ── 重整恢復：等 Firebase 連線後再檢查 ──
+    // 先檢查有沒有 session，有的話等 Firebase 連線後恢復
+    window._pendingRestore = JSON.parse(localStorage.getItem('game_session') || 'null');
 
     // 防止雙擊縮放（iOS Safari）
     let lastTap = 0;
@@ -1833,6 +1786,70 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 });
 
+// ── Firebase 連線後執行恢復 ──
+function tryRestoreSession() {
+    const saved = window._pendingRestore;
+    if (!saved || !saved.perspective || !saved.roomCode) return;
+    window._pendingRestore = null;
+
+    const rooms = window.getRooms();
+    const room  = rooms[saved.roomCode];
+    if (!room || !room.open) {
+        // 房間已不存在，清除 session
+        localStorage.removeItem('game_session');
+        return;
+    }
+
+    // 恢復共用狀態
+    window.state.roomCode     = saved.roomCode;
+    window.state.players      = room.players || [];
+    window.state.takenSymbols = window.state.players.map(p => p.symbol);
+    window.state.selectedGame = room.selectedGame || 0;
+
+    if (saved.perspective === 'teacher') {
+        window.state.perspective = 'teacher';
+        const lobbyCode = document.getElementById('lobby-code');
+        if (lobbyCode) lobbyCode.textContent = saved.roomCode;
+        window.renderLobby();
+        startSyncListener();
+        if (room.status === 'playing' || room.status === 'settlement') {
+            window.pStates['teacher'].screen = 'screen-teacher-console';
+            window.goTo('screen-teacher-console');
+        } else {
+            window.pStates['teacher'].screen = 'screen-lobby';
+            window.goTo('screen-lobby');
+        }
+    } else {
+        // 學生恢復
+        window.state.perspective = saved.perspective;
+        const pData = window.pStates[saved.perspective];
+        if (!pData || !saved.group) { localStorage.removeItem('game_session'); return; }
+
+        pData.joined = true;
+        pData.group  = saved.group;
+        pData.symbol = saved.symbol || '';
+
+        // 更新等待畫面的顯示
+        const swCode = document.getElementById('sw-code');
+        const swName = document.getElementById('sw-room-name');
+        const swStatus = document.getElementById('sw-my-group-status');
+        if (swCode) swCode.textContent = saved.roomCode;
+        if (swName) swName.textContent = `誰是遊戲王 — 房間 #${room.roomNum || ''}`;
+        if (swStatus) swStatus.innerHTML = `✅ <b>${saved.group}</b> 已連線，等待老師啟動...`;
+
+        startSyncListener();
+        window.updateStudentWaitDisplay();
+
+        if (room.status === 'playing') {
+            tcLaunchStudentIfNeeded();
+        } else {
+            pData.screen = 'screen-student-wait';
+            window.goTo('screen-student-wait');
+        }
+    }
+    showToast('🔄 已恢復上次連線');
+}
+
 // ==========================================
 // 綁定全域函數
 // ==========================================
@@ -1841,7 +1858,7 @@ Object.assign(window, {
     backToStep1, verifyRoomPassword, backToPassword, onGroupSelect, joinRoom,
     simulateJoin, doCloseRoom, selectGame, leaveRoomStudent, teacherLogin,
     openTeacherConsole, changeLevel, jumpToPhase, updateLevelDisplay,
-    tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby, studentLeaveGame,
+    tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby, studentLeaveGame, tryRestoreSession,
     showToast, setViewTeacher, setViewStudent,
     syncJoinDOM, renderLobby, renderSymbolPicker, renderGroupSelect, updateStudentWaitDisplay,
     getRooms, saveRooms
