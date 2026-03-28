@@ -880,32 +880,41 @@ function tcStartGame() {
     }
 
     if (window.state.selectedGame === 2) {
-        // W3：老師控制台嵌入 W3 iframe（導播/老師視角）
-        // W3：保留結算按鈕（老師手動按才結算），隱藏關卡 badge
+        // W3：老師控制台嵌入 W3 iframe + 頂部抽籤按鈕
         const settleBtn = document.getElementById('tc-btn-settle');
         const levelBadge = document.getElementById('tc-level-badge');
+        const pauseBtn = document.getElementById('tc-btn-pause');
+        const resumeBtn = document.getElementById('tc-btn-resume');
         if (settleBtn) { settleBtn.style.display = ''; settleBtn.textContent = '🏆 結算'; }
         if (levelBadge) levelBadge.style.display = 'none';
+        if (pauseBtn) pauseBtn.style.display = 'none';
+        if (resumeBtn) resumeBtn.style.display = 'none';
         const sa = document.getElementById('tc-scores-area');
         if (sa) {
             sa.style.padding = '0';
-            sa.innerHTML = `<iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="width:100%;height:100%;border:none;border-radius:0"></iframe>`;
-            // 等 iframe 載入後傳入現有 w3state
+            sa.style.flexDirection = 'column';
+            sa.innerHTML = `
+                <div id="tc-w3-draw-bar" style="flex-shrink:0;padding:8px 16px;background:rgba(26,10,74,.97);border-bottom:2px solid rgba(255,214,0,.2);display:flex;align-items:center;justify-content:center;gap:12px;">
+                  <button id="tc-w3-draw-btn" onclick="tcW3DrawLots()" style="background:linear-gradient(160deg,#1a6fc4,#0d4a8a);color:#fff;border:2px solid #2D8FFF;border-radius:12px;padding:10px 28px;font-family:'Fredoka One',sans-serif;font-size:1rem;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.4);">🎲 抽籤開始</button>
+                  <span id="tc-w3-player-count" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;color:rgba(255,255,255,.5)"></span>
+                </div>
+                <iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="flex:1;width:100%;border:none;min-height:0;"></iframe>`;
             const w3iframe = document.getElementById('tc-w3-iframe');
             if (w3iframe) {
                 w3iframe.onload = () => setTimeout(() => {
                     try {
                         const rooms2 = window.getRooms();
                         const r2 = rooms2[window.state.roomCode] || {};
-                        // 傳入最新狀態讓老師 iframe 立刻顯示轉播
-                const latestW3 = window.getRooms()[window.state.roomCode]?.w3state || r2.w3state || null;
-                w3iframe.contentWindow.postMessage({
-                    type: 'PLATFORM_START', isTeacher: true, group: '',
-                    state: latestW3,
-                    players: window.state.players || []
-                }, '*');
+                        const latestW3 = r2.w3state || null;
+                        w3iframe.contentWindow.postMessage({
+                            type: 'PLATFORM_START', isTeacher: true, group: '',
+                            state: latestW3,
+                            players: window.state.players || []
+                        }, '*');
                     } catch(e) {}
                 }, 300);
+                // 更新抽籤按鈕狀態
+                tcW3UpdateDrawBtn();
             }
         }
     } else {
@@ -1057,6 +1066,35 @@ function tcResumeGame() {
     showToast('▶ 遊戲繼續');
 }
 
+// ── W3 老師端抽籤控制（index.html 直接操作，不透過 iframe）──
+function tcW3UpdateDrawBtn() {
+    const bar = document.getElementById('tc-w3-draw-bar');
+    const btn = document.getElementById('tc-w3-draw-btn');
+    const countEl = document.getElementById('tc-w3-player-count');
+    if (!bar) return;
+    const rooms = window.getRooms();
+    const r = rooms[window.state.roomCode] || {};
+    const started = r.w3state && r.w3state.started;
+    // 抽過籤就隱藏按鈕列
+    bar.style.display = started ? 'none' : 'flex';
+    if (!started && btn) {
+        const playerCount = (r.players || window.state.players || []).length;
+        btn.disabled = playerCount < 2;
+        btn.style.opacity = playerCount < 2 ? '.4' : '1';
+        btn.style.cursor = playerCount < 2 ? 'not-allowed' : 'pointer';
+        if (countEl) countEl.textContent = playerCount >= 2
+            ? `（已加入 ${playerCount} 組）`
+            : `⏳ 等待學生加入（${playerCount}/2）`;
+    }
+}
+
+function tcW3DrawLots() {
+    const tcW3 = document.getElementById('tc-w3-iframe');
+    if (tcW3 && tcW3.contentWindow) {
+        try { tcW3.contentWindow.postMessage({ type: 'W3_DRAW_LOTS' }, '*'); } catch(e) {}
+    }
+}
+
 function tcSettleGame() {
     const list = document.getElementById('settlement-list');
     if (!list) return;
@@ -1183,6 +1221,8 @@ window.addEventListener('message', (e) => {
     }
     // W3 五子棋：老師 iframe 廣播棋局狀態 → 存入 Firebase → 推送給所有學生
     if (type === 'W3_STATE' && e.data.data) {
+        // 收到狀態更新時，同步更新抽籤按鈕
+        if (typeof tcW3UpdateDrawBtn === 'function') tcW3UpdateDrawBtn();
         const w3d = e.data.data;
         // 更新控制台的回合數（計算棋盤上的棋子數）
         if (window.state.selectedGame === 2) {

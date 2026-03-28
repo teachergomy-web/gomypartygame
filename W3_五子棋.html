@@ -1024,6 +1024,10 @@ window.addEventListener('message',(e)=>{
         case 'W3_STATE':
             if(e.data.data)applyState(e.data.data);
             break;
+        case 'W3_DRAW_LOTS':
+            // index.html 的抽籤按鈕觸發
+            if(myRole==='teacher') drawLots();
+            break;
         case 'PLATFORM_PAUSE':
             document.getElementById('pause-overlay').classList.add('show');
             break;

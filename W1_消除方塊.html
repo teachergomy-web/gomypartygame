@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎉 消除方塊！</title>
+    <title>🎉 派對大冒險！</title>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -357,8 +357,9 @@
         <div class="result-score" id="final-score">0</div>
         <div class="result-stars" id="result-stars">⭐⭐⭐</div>
         <div class="btn-row">
-            <button class="mp-btn mp-btn-blue" onclick="backToLobby()">🏠 回大廳</button>
+            <button class="mp-btn mp-btn-blue" id="w1-lobby-btn" onclick="backToLobby()">🏠 回大廳</button>
             <button id="next-lvl-btn" class="mp-btn mp-btn-green" onclick="startNextLevel()">▶ 下一關</button>
+            <div id="w1-platform-msg" style="display:none;font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;color:rgba(255,255,255,.5);margin-top:4px">✅ 成績已送出，等待老師結算...</div>
         </div>
     </div>
 </div>
@@ -452,6 +453,8 @@ const MINERAL_TYPES = [
 
 // ===== LOBBY / BACK =====
 function backToLobby() {
+    // 平台模式下不回選關單
+    if(document.getElementById("level-select-menu")?.style.display === "none") return;
     state.active = false;
     document.getElementById('level-select-menu').classList.remove('hidden');
     document.getElementById('ui-header').classList.add('hidden');
@@ -899,11 +902,22 @@ window.parent.postMessage({ type: 'W1_READY' }, '*');
     const group = params.get('group');
     if (group) window.GROUP_ID = group;
     // 無論有無 URL 參數都自動開始
+    const isPlatform = !!params.get('group') || !!params.get('autostart');
+    const applyPlatformMode = () => {
+        if(!isPlatform) return;
+        const lobbyBtn = document.getElementById('w1-lobby-btn');
+        const platformMsg = document.getElementById('w1-platform-msg');
+        if(lobbyBtn) lobbyBtn.style.display = 'none';
+        if(platformMsg) platformMsg.style.display = 'block';
+        // 遊戲中 level-select-menu 不開放
+        const lsMenu = document.getElementById('level-select-menu');
+        if(lsMenu) lsMenu.style.display = 'none';
+    };
     if (document.readyState !== 'loading') {
-        setTimeout(() => startGame(autoLevel), 300);
+        setTimeout(() => { startGame(autoLevel); applyPlatformMode(); }, 300);
     } else {
         window.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => startGame(autoLevel), 300);
+            setTimeout(() => { startGame(autoLevel); applyPlatformMode(); }, 300);
         });
     }
 })();
