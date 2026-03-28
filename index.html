@@ -556,20 +556,28 @@ let isFirebaseAuthComplete = false;
     }
 })();
 
-// ── localStorage 讀寫（本地快取）──
+// ── localStorage 讀寫（本地快取 + 記憶體快取合併）──
 window.getRooms = function() {
-    return JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+    const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+    // 合併記憶體快取（不覆蓋本機有的）
+    const cache = window._allRoomsCache || {};
+    const merged = Object.assign({}, cache, local);
+    return merged;
 };
 window.saveRooms = function(r) {
-    localStorage.setItem('playroom_rooms', JSON.stringify(r));
+    // 只把自己的房間存到 localStorage（避免多房間互相污染）
+    const myCode = window.state && window.state.roomCode;
+    if (myCode && r[myCode]) {
+        const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        local[myCode] = r[myCode];
+        localStorage.setItem('playroom_rooms', JSON.stringify(local));
+    }
     if (!isFirebase || !db || !isFirebaseAuthComplete) return;
-    // 把所有 open 的房間都寫入 Firebase
-    Object.keys(r).forEach(code => {
-        if (r[code]) {
-            fsSet(fsDoc(db, 'rooms', code), r[code])
-                .catch(e => console.error("Firebase Save Error:", e));
-        }
-    });
+    // Firebase 只寫自己的房間
+    if (myCode && r[myCode]) {
+        fsSet(fsDoc(db, 'rooms', myCode), r[myCode])
+            .catch(e => console.error("Firebase Save Error:", e));
+    }
 };
 
 // ── 刪除單一房間（Firebase + localStorage）──
@@ -585,39 +593,32 @@ window.deleteRoom = function(code) {
 let roomSyncUnsubscribe = null;
 let allRoomsUnsubscribe = null;
 
+// ── 全房間快取（記憶體，不寫 localStorage 避免互相污染）──
+window._allRoomsCache = {};
+
 // ── 監聽所有房間（讓學生看到房間列表）──
 function startAllRoomsListener() {
     if (!isFirebase || !db) return;
     if (allRoomsUnsubscribe) { allRoomsUnsubscribe(); allRoomsUnsubscribe = null; }
     const colRef = fsCollection(db, 'rooms');
     allRoomsUnsubscribe = fsOnSnap(colRef, (snapshot) => {
-        const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
         const now = Date.now();
-
-        // 先用 Firebase 上現有的文件完整覆蓋本機
-        const firebaseRoomIds = new Set();
+        const newCache = {};
         snapshot.forEach(doc => {
             const data = doc.data();
-            firebaseRoomIds.add(doc.id);
-            // 超過 2 小時自動刪除
-            if (data.createdAt && (now - data.createdAt) > 2 * 60 * 60 * 1000) {
-                window.deleteRoom(doc.id);
+            if (!data.createdAt || (now - data.createdAt) < 2 * 60 * 60 * 1000) {
+                newCache[doc.id] = data;
             } else {
-                rooms[doc.id] = data;
+                window.deleteRoom(doc.id);
             }
         });
+        // 只存在記憶體，不污染 localStorage
+        window._allRoomsCache = newCache;
 
-        // 把本機有但 Firebase 已不存在的房間刪掉
-        Object.keys(rooms).forEach(id => {
-            if (!firebaseRoomIds.has(id)) delete rooms[id];
-        });
-
-        localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
-
-        // Firebase 資料到了，馬上重新渲染房間列表
+        // Firebase 資料到了，重新渲染房間列表
         const p = window.state && window.state.perspective;
         const pData = p && window.pStates && window.pStates[p];
-        if (pData && pData.screen === 'screen-join' && pData.joinStep === 1) {
+        if (pData && (pData.screen === 'screen-join') && pData.joinStep === 1) {
             window.renderRoomList();
         }
     }, err => console.error('All rooms sync error:', err));
@@ -1068,7 +1069,7 @@ setInterval(() => {
     }
 
     const p = window.state.perspective;
-    if (p === 'teacher' || p === 'guest') return;
+    if (p === 'teacher') return;
     const pData = window.pStates && window.pStates[p];
     if (!pData || !pData.joined) return;
     if (!r || !r.open) {
@@ -1171,7 +1172,7 @@ window.state = {
 };
 
 window.pStates = {
-  'guest': { screen: 'screen-home', joinStep: 1 },
+  'guest': { screen: 'screen-home', joinStep: 1, joined: false, group: '', symbol: '' },
   'teacher': { screen: 'screen-home', joinStep: 1 },
   's1': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 },
   's2': { screen: 'screen-home', joined: false, group: '', symbol: '', joinStep: 1 },
@@ -1563,6 +1564,12 @@ function teacherLogin() {
       playerCount: window.state.players.length, status: 'lobby', 
       finishedGroups: [], scores: {}, selectedGame: window.state.selectedGame 
   };
+
+  // 先設 roomCode，讓 saveRooms 知道要存哪個房間
+  window.state.roomCode = code;
+  window.state.players = []; window.state.takenSymbols = [];
+  localStorage.setItem('game_session', JSON.stringify({ perspective:'teacher', roomCode:code }));
+
   window.saveRooms(rooms);
   // 直接寫入 Firebase（不管 auth 狀態，等連線後自動重試）
   const writeToFirebase = () => {
@@ -1575,10 +1582,6 @@ function teacherLogin() {
       }
   };
   writeToFirebase();
-  
-  window.state.roomCode = code;
-  window.state.players = []; window.state.takenSymbols = [];
-  localStorage.setItem('game_session', JSON.stringify({ perspective:'teacher', roomCode:code }));
   startSyncListener(); // 老師建房後開始監聽 Firebase
   
   Object.keys(window.pStates).forEach(k => {
