@@ -186,25 +186,22 @@
             padding: 0;
         }
         .level-btn:active { transform: translateY(4px); box-shadow: 0 0 0; }
-        .lvl-single { background: linear-gradient(160deg,#00c8e0,#0080a0); border-color: var(--cyan); }
-        .lvl-double { background: linear-gradient(160deg,#cc00cc,#880088); border-color: var(--pink); }
+        .lvl-single   { background: linear-gradient(160deg,#00c8e0,#0080a0); border-color: var(--cyan); }
+        .lvl-mid      { background: linear-gradient(160deg,#f5a623,#c07000); border-color: #ffcc44; }
+        .lvl-hard     { background: linear-gradient(160deg,#e74c3c,#a00000); border-color: #ff6644; }
+        .lvl-double   { background: linear-gradient(160deg,#cc00cc,#880088); border-color: var(--pink); }
+        .lvl-selected { box-shadow: 0 0 16px rgba(255,214,0,.9); border-color: #FFD600 !important; transform: scale(1.15); }
     </style>
 </head>
 <body>
 <div id="stars"></div>
 
 <div id="main-menu" class="overlay">
-    <div class="mp-card" style="max-width: 500px;">
-        <div class="mp-title" style="font-size: clamp(24px, 6vw, 42px);">⚡ 能源管線</div>
-        <div class="mp-sub">選擇關卡 (1-28)</div>
-        
-        <div id="level-grid"></div>
-        
-        <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px;">
-            <button class="mp-btn mp-btn-grey" onclick="changePage(-1)" id="btn-prev" style="margin-bottom:0; flex:1; padding:10px;">← 上一頁</button>
-            <span id="page-indicator" style="font-family:'Fredoka One',sans-serif; font-size:18px; color:var(--yellow); white-space:nowrap;">1/2</span>
-            <button class="mp-btn mp-btn-grey" onclick="changePage(1)" id="btn-next" style="margin-bottom:0; flex:1; padding:10px;">下一頁 →</button>
-        </div>
+    <div class="mp-card" style="max-width:520px">
+        <div class="mp-title" style="font-size:clamp(22px,5vw,36px);margin-bottom:4px">⚡ 能源管線</div>
+        <div class="mp-sub" style="margin-bottom:16px">選擇關卡 (1–28)</div>
+        <div id="level-grid" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:18px"></div>
+        <button class="mp-btn mp-btn-green" id="menu-start-btn" style="margin:0;opacity:.4;cursor:not-allowed" disabled onclick="startSelectedLevel()">▶ 開始此關</button>
     </div>
 </div>
 
@@ -429,29 +426,32 @@
         let currentPage = 0;
         const levelsPerPage = 20;
 
+        let selectedLevelIndex = -1;
+
         function renderLevelGrid() {
             const grid = document.getElementById('level-grid');
             grid.innerHTML = '';
-            let start = currentPage * levelsPerPage;
-            let end = Math.min(start + levelsPerPage, maxLevels);
-            
-            for (let i = start; i < end; i++) {
+            for (let i = 0; i < maxLevels; i++) {
+                const cls = i < 10 ? 'lvl-single' : i < 20 ? 'lvl-mid' : 'lvl-hard';
                 let btn = document.createElement('button');
-                btn.className = 'level-btn ' + (i < 22 ? 'lvl-single' : 'lvl-double');
+                btn.className = 'level-btn ' + cls + (i === selectedLevelIndex ? ' lvl-selected' : '');
                 btn.innerText = i + 1;
-                btn.onclick = () => selectLevel(i);
+                btn.onclick = () => {
+                    selectedLevelIndex = i;
+                    renderLevelGrid();
+                    const startBtn = document.getElementById('menu-start-btn');
+                    if (startBtn) { startBtn.disabled = false; startBtn.style.opacity = '1'; startBtn.style.cursor = 'pointer'; }
+                };
                 grid.appendChild(btn);
             }
-            
-            document.getElementById('page-indicator').innerText = (currentPage + 1) + ' / ' + Math.ceil(maxLevels / levelsPerPage);
-            document.getElementById('btn-prev').style.visibility = currentPage === 0 ? 'hidden' : 'visible';
-            document.getElementById('btn-next').style.visibility = currentPage >= Math.ceil(maxLevels / levelsPerPage) - 1 ? 'hidden' : 'visible';
         }
 
-        function changePage(dir) {
-            currentPage += dir;
-            renderLevelGrid();
+        function startSelectedLevel() {
+            if (selectedLevelIndex < 0) return;
+            selectLevel(selectedLevelIndex);
         }
+
+
 
         function selectLevel(lvlIndex) {
             currentLevel = lvlIndex;
