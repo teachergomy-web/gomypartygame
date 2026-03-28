@@ -531,14 +531,14 @@ window.getRooms = function() {
 };
 window.saveRooms = function(r) {
     localStorage.setItem('playroom_rooms', JSON.stringify(r));
-    // 同步寫入 Firebase（只寫當前房間）
-    if (isFirebase && db && isFirebaseAuthComplete && window.state && window.state.roomCode) {
-        const data = r[window.state.roomCode];
-        if (data) {
-            const ref = fsDoc(db, 'rooms', window.state.roomCode);
-            fsSet(ref, data).catch(e => console.error("Firebase Save Error:", e));
+    if (!isFirebase || !db || !isFirebaseAuthComplete) return;
+    // 把所有 open 的房間都寫入 Firebase
+    Object.keys(r).forEach(code => {
+        if (r[code]) {
+            fsSet(fsDoc(db, 'rooms', code), r[code])
+                .catch(e => console.error("Firebase Save Error:", e));
         }
-    }
+    });
 };
 
 // ── 刪除單一房間（Firebase + localStorage）──
@@ -1324,6 +1324,17 @@ function teacherLogin() {
       finishedGroups: [], scores: {}, selectedGame: window.state.selectedGame 
   };
   window.saveRooms(rooms);
+  // 直接寫入 Firebase（不管 auth 狀態，等連線後自動重試）
+  const writeToFirebase = () => {
+      if (isFirebase && db && fsDoc && fsSet) {
+          fsSet(fsDoc(db, 'rooms', code), rooms[code])
+              .then(() => console.log('✅ 房間已寫入 Firebase:', code))
+              .catch(e => console.error('Firebase write error:', e));
+      } else {
+          setTimeout(writeToFirebase, 500);
+      }
+  };
+  writeToFirebase();
   
   window.state.roomCode = code;
   window.state.players = []; window.state.takenSymbols = [];
