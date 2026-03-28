@@ -293,26 +293,28 @@ function drawLots(){
 
     const shuffled=[...pool].sort(()=>Math.random()-.5);
     state.started=true;
-    document.getElementById('btn-draw').disabled=true;
 
     if(pool.length>=4){
         // 4組以上：兩場同時開始
-        [0,1].forEach(mi=>{
-            startRolling(mi, shuffled[mi*2], shuffled[mi*2+1]);
-        });
+        state.matches[0]=newMatch();
+        state.matches[1]=newMatch();
+        broadcast(); // 先廣播清空狀態
+        startRolling(0, shuffled[0], shuffled[1]);
+        startRolling(1, shuffled[2], shuffled[3]);
     } else {
         // 2-3組：只開第0場，第1場保持 idle
-        startRolling(0, shuffled[0], shuffled[1]);
-        // 第1場 idle
+        state.matches[0]=newMatch();
         state.matches[1]=newMatch();
+        broadcast(); // 先廣播清空狀態
+        startRolling(0, shuffled[0], shuffled[1]);
     }
-    broadcast();
 }
 
 function startRolling(mi, blackFinal, whiteFinal){
     const m=state.matches[mi];
     m.status='rolling';m.black='???';m.white='???';
     m.cells=Array(GRID*GRID).fill(0);m.turn='black';m.lastMove=-1;m.winner=null;
+    m.blackReady=false;m.whiteReady=false;
 
     // 更新場次
     state.scores[blackFinal]=state.scores[blackFinal]||{wins:0,matches:0};
@@ -320,14 +322,16 @@ function startRolling(mi, blackFinal, whiteFinal){
     state.scores[blackFinal].matches++;
     state.scores[whiteFinal].matches++;
 
+    broadcast(); // 先廣播 rolling 狀態
+
     setTimeout(()=>{
-        // 確保 rolling 動畫停止
         clearInterval(rollIntervals[mi]);
         rollIntervals[mi]=null;
-        m.status='ready';m.black=blackFinal;m.white=whiteFinal;
-        m.blackReady=false;m.whiteReady=false;
-        broadcast();
-    },2000);
+        const m2=state.matches[mi];
+        m2.status='ready';m2.black=blackFinal;m2.white=whiteFinal;
+        m2.blackReady=false;m2.whiteReady=false;
+        broadcast(); // 廣播 ready 狀態
+    },2500);
 }
 
 function runCountdown(mi){
@@ -506,7 +510,12 @@ function renderScoreboard(){
     const el=document.getElementById('score-bar');
     const active=state.activePlayers.length>0?state.activePlayers:Object.keys(state.scores);
     const fighting=new Set(state.matches.flatMap(m=>[m.black,m.white]).filter(Boolean));
-    const sorted=[...active].filter(id=>state.scores[id]).sort((a,b)=>(state.scores[b].wins||0)-(state.scores[a].wins||0));
+    // 按組別名稱數字排序（第1組 < 第2組...），同勝場再按場次
+    const sorted=[...active].filter(id=>state.scores[id]).sort((a,b)=>{
+        const numA=parseInt(a.replace(/\D/g,''))||99;
+        const numB=parseInt(b.replace(/\D/g,''))||99;
+        return numA-numB;
+    });
     el.innerHTML=sorted.map(id=>{
         const d=state.scores[id]||{wins:0,matches:0};
         return `<div class="sc ${fighting.has(id)?'fighting':''}">
