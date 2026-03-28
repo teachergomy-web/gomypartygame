@@ -378,10 +378,10 @@ function handleCellClick(idx){
     initAudio();
     if(state.matchStatus!=='playing'||state.cells[idx]!==0||state.winner)return;
     const isBlack=state.turn==='black';
+    if(myRole==='teacher')return;   // 老師只觀賽，不落子
+    if(myRole==='spectator')return;
     if(myRole==='black'&&!isBlack)return;
     if(myRole==='white'&&isBlack)return;
-    if(myRole==='spectator')return;
-    // 老師可落任意子
 
     const piece=isBlack?1:2;
     state.cells[idx]=piece;
@@ -466,13 +466,22 @@ function renderHUD(){
 
 function renderScoreboard(){
     const el=document.getElementById('scoreboard');
-    const sorted=Object.entries(state.scores).sort((a,b)=>b[1].wins-a[1].wins);
-    el.innerHTML=sorted.map(([id,d])=>`
-        <div class="score-chip ${(state.black===id||state.white===id)?'fighting':''}">
+    // 只顯示實際參加的組別
+    const activeSet = state.activePlayers.length > 0
+        ? state.activePlayers
+        : Object.keys(state.scores);
+    const sorted = activeSet
+        .filter(id => state.scores[id]) // 過濾沒有分數記錄的
+        .sort((a,b) => (state.scores[b].wins||0) - (state.scores[a].wins||0));
+    el.innerHTML=sorted.map(id=>{
+        const d=state.scores[id]||{wins:0,matches:0};
+        const isFighting=(state.black===id||state.white===id);
+        return `<div class="score-chip ${isFighting?'fighting':''}">
             <span class="score-chip-name">${id}</span>
             <span class="score-chip-wins">${d.wins||0}</span>
             <span style="font-size:9px;color:rgba(255,255,255,.3);font-family:'Nunito',sans-serif;font-weight:700">${d.matches||0}場</span>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 function renderCentre(){
@@ -482,11 +491,15 @@ function renderCentre(){
     document.getElementById('s-ready').classList.toggle('hidden',s!=='ready');
     const showBoard=s==='playing'||s==='finished';
     document.getElementById('s-board').classList.toggle('hidden',!showBoard);
+    // 老師端：playing/finished 時隱藏積分和控制區，全螢幕棋盤
+    document.getElementById('scoreboard-wrap').classList.toggle('hidden', showBoard && myRole==='teacher');
 
-    // 老師控制
+    // 老師控制（遊戲進行中只顯示重置，不顯示抽籤）
     const tc=document.getElementById('teacher-ctrl');
     if(myRole==='teacher'){
+        const isPlaying=(s==='playing'||s==='finished');
         tc.classList.remove('hidden');
+        document.getElementById('btn-schedule').style.display = isPlaying ? 'none' : '';
         document.getElementById('btn-schedule').disabled=(s==='rolling');
         document.getElementById('btn-reset').disabled=(s==='idle');
     }else tc.classList.add('hidden');
@@ -511,12 +524,16 @@ function renderCentre(){
         document.getElementById('panel-white').classList.toggle('ready',state.whiteReady);
 
         const mkArea=(el,ready,color)=>{
+            const groupForColor = color==='black' ? state.black : state.white;
+            const isMyGroup = myGroup && myGroup === groupForColor;
             if(ready){
                 el.innerHTML=`<span style="color:var(--green);font-family:'Nunito',sans-serif;font-weight:900;font-size:12px">✅ 已準備</span>`;
-            }else if((color==='black'&&myRole==='black')||(color==='white'&&myRole==='white')){
+            }else if(isMyGroup){
                 el.innerHTML=`<button class="mp-btn btn-green" style="padding:7px;font-size:12px;margin:0;animation:pulse 1.2s infinite" onclick="handleReady('${color}')">點此準備！</button>`;
+            }else if(myRole==='teacher'){
+                el.innerHTML=`<span style="color:rgba(255,255,255,.3);font-size:11px;font-family:'Nunito',sans-serif;font-weight:700">等待確認...</span>`;
             }else{
-                el.innerHTML=`<span style="color:rgba(255,255,255,.3);font-size:11px;font-family:'Nunito',sans-serif;font-weight:700;animation:pulse 1s infinite">選派中...</span>`;
+                el.innerHTML=`<span style="color:rgba(255,255,255,.3);font-size:11px;font-family:'Nunito',sans-serif;font-weight:700;animation:pulse 1s infinite">👁 觀賽</span>`;
             }
         };
         mkArea(document.getElementById('area-black'),state.blackReady,'black');
@@ -546,10 +563,9 @@ function renderBoard(){
     cells.forEach((cell,i)=>{
         const val=state.cells[i];
         const canMove=!state.winner&&val===0&&s==='playing'&&(
-            myRole==='teacher'||
             (myRole==='black'&&state.turn==='black')||
             (myRole==='white'&&state.turn==='white')
-        );
+        ); // 老師和觀眾不能落子
         cell.className='cell'+(canMove?' can-move':'');
         cell.innerHTML=val===0?'':`<div class="piece ${val===1?'black':'white'}${state.lastMove===i?' last':''}"></div>`;
     });
@@ -565,6 +581,10 @@ function renderBottom(){
         return;
     }
     wb.classList.add('hidden');
+    // finished 無 winner（平局）
+    if(state.matchStatus==='finished'){
+        tb.className='turn-badge wait';tb.textContent='比賽結束';return;
+    }
     if(state.matchStatus!=='playing'){
         tb.className='turn-badge wait';
         tb.textContent=state.matchStatus==='idle'?'等待對戰開始':
