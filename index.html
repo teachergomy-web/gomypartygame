@@ -440,6 +440,7 @@ body::before {
   <div style="width:100%;background:#111;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:2px solid #f5c800;flex-shrink:0">
     <span id="sg-title" style="color:white;font-weight:900;font-size:.9rem;flex:1">🎮 遊戲中</span>
     <span id="sg-group" style="color:#f5c800;font-size:.8rem;font-weight:900"></span>
+    <button onclick="studentLeaveGame()" style="background:#c0392b;color:#fff;border:2px solid #fff;border-radius:8px;padding:4px 10px;font-family:'Nunito',sans-serif;font-size:.75rem;font-weight:900;cursor:pointer">← 返回</button>
   </div>
   <iframe id="sg-iframe" style="flex:1;border:none;width:100%;height:calc(100% - 42px)" allow="autoplay"></iframe>
 </div>
@@ -631,10 +632,45 @@ function startSyncListener() {
     const roomCode = window.state.roomCode;
     const ref = fsDoc(db, 'rooms', roomCode);
     roomSyncUnsubscribe = fsOnSnap(ref, (snap) => {
-        if (!snap.exists()) return;
-        const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-        rooms[roomCode] = snap.data();
-        localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+        if (!snap.exists()) {
+            // 房間被刪除 → 學生回首頁
+            const p = window.state.perspective;
+            if (p !== 'teacher') {
+                const pData = window.pStates[p];
+                if (pData) { pData.joined = false; pData.screen = 'screen-home'; }
+                localStorage.removeItem('game_session');
+                window.goTo('screen-home');
+                window.showToast('🚪 房間已關閉');
+            }
+            return;
+        }
+        const data = snap.data();
+        // 更新本機快取
+        const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        local[roomCode] = data;
+        localStorage.setItem('playroom_rooms', JSON.stringify(local));
+        window._allRoomsCache[roomCode] = data;
+
+        // 學生端：Firebase 資料一到就主動檢查是否需要跳轉
+        const p = window.state.perspective;
+        if (p !== 'teacher') {
+            const pData = window.pStates[p];
+            if (pData && pData.joined) {
+                if (data.status === 'playing' && pData.screen !== 'screen-student-game') {
+                    tcLaunchStudentIfNeeded();
+                }
+                if (data.status === 'settlement' && pData.screen !== 'screen-settlement') {
+                    // 顯示結算畫面（poll 已處理，這裡再觸發一次確保即時）
+                }
+                if ((data.status === 'lobby' || data.status === 'finished') &&
+                    (pData.screen === 'screen-student-game' || pData.screen === 'screen-settlement')) {
+                    const sgIframe = document.getElementById('sg-iframe');
+                    if (sgIframe) sgIframe.src = 'about:blank';
+                    pData.screen = 'screen-student-wait';
+                    window.goTo('screen-student-wait');
+                }
+            }
+        }
     }, err => console.error('Room sync error:', err));
     console.log('✅ 監聽房間:', roomCode);
 }
@@ -827,6 +863,17 @@ function tcStartGame() {
     showToast('🎮 遊戲開始！關卡 ' + TC.level);
 }
 
+function studentLeaveGame() {
+    const p = window.state.perspective;
+    const pData = window.pStates[p];
+    const sgIframe = document.getElementById('sg-iframe');
+    if (sgIframe) sgIframe.src = 'about:blank';
+    if (pData) {
+        pData.screen = 'screen-student-wait';
+    }
+    window.goTo('screen-student-wait');
+}
+
 // ── 學生進入遊戲 ──
 function tcLaunchStudentIfNeeded() {
     const p = window.state.perspective;
@@ -838,25 +885,35 @@ function tcLaunchStudentIfNeeded() {
     const level = r.gameLevel || TC.level || 1;
     const selectedGame = r.selectedGame !== undefined ? r.selectedGame : (window.state.selectedGame || 0);
     const gameMode = r.gameMode || 'SINGLE';
-    // 根據 rooms 裡的 selectedGame 決定遊戲檔案（不依賴 TC.gameFile getter）
     const gameFiles = ['W1_消除方塊.html', 'W2_能源管線.html'];
     const gameFile = gameFiles[selectedGame] || gameFiles[0];
     const isW2 = selectedGame === 1;
+
+    // group 優先從 pData 取，沒有就從 Firebase rooms.players 找
+    let myGroup = pData.group || '';
+    if (!myGroup && r.players) {
+        const saved = JSON.parse(localStorage.getItem('game_session') || '{}');
+        const match = r.players.find(pl => pl.group === saved.group);
+        if (match) {
+            myGroup = match.group;
+            pData.group = match.group;
+            pData.symbol = match.symbol;
+        }
+    }
 
     const iframe = document.getElementById('sg-iframe');
     const titleEl = document.getElementById('sg-title');
     const groupEl = document.getElementById('sg-group');
     if (titleEl) { const g = GAMES[selectedGame] || GAMES[0]; titleEl.textContent = `${g.icon} ${g.name}`; }
-    if (groupEl) groupEl.textContent = (pData.symbol||'') + ' ' + (pData.group||'');
+    if (groupEl) groupEl.textContent = (pData.symbol||'') + ' ' + myGroup;
 
     if (iframe) {
-        // W2 用 mode 參數，W1 用 autostart=level
         const url = isW2
-            ? gameFile + '?autostart=' + gameMode + '&level=' + level + '&group=' + encodeURIComponent(pData.group||'')
-            : gameFile + '?autostart=' + level + '&group=' + encodeURIComponent(pData.group||'');
+            ? gameFile + '?autostart=' + gameMode + '&level=' + level + '&group=' + encodeURIComponent(myGroup)
+            : gameFile + '?autostart=' + level + '&group=' + encodeURIComponent(myGroup);
         iframe.src = url;
         iframe.onload = () => setTimeout(() => {
-            try { iframe.contentWindow?.postMessage({ type:'PLATFORM_START', level, group: pData.group||'' }, '*'); }
+            try { iframe.contentWindow?.postMessage({ type:'PLATFORM_START', level, group: myGroup }, '*'); }
             catch(e) {}
         }, 400);
     }
@@ -1802,7 +1859,7 @@ Object.assign(window, {
     backToStep1, verifyRoomPassword, backToPassword, onGroupSelect, joinRoom,
     simulateJoin, doCloseRoom, selectGame, leaveRoomStudent, teacherLogin,
     openTeacherConsole, changeLevel, jumpToPhase, updateLevelDisplay, lsW2SetMode, lsW2ChangePage,
-    tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby,
+    tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby, studentLeaveGame,
     showToast, setViewTeacher, setViewStudent,
     syncJoinDOM, renderLobby, renderSymbolPicker, renderGroupSelect, updateStudentWaitDisplay,
     getRooms, saveRooms
