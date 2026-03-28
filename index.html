@@ -564,11 +564,16 @@ function startAllRoomsListener() {
         snapshot.forEach(doc => {
             rooms[doc.id] = doc.data();
         });
-        // 移除 Firebase 上已不存在的房間
         snapshot.docChanges && snapshot.docChanges().forEach(change => {
             if (change.type === 'removed') delete rooms[change.doc.id];
         });
         localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+        // Firebase 資料到了，馬上重新渲染房間列表
+        const p = window.state && window.state.perspective;
+        const pData = p && window.pStates && window.pStates[p];
+        if (pData && pData.screen === 'screen-join' && pData.joinStep === 1) {
+            window.renderRoomList();
+        }
     }, err => console.error('All rooms sync error:', err));
 }
 
