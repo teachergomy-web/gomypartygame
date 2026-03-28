@@ -345,7 +345,7 @@ function runCountdown(mi){
 
 // 賽局結束後自動配對閒置組
 function autoNextMatch(finishedMi){
-    // 找出目前兩場正在使用的組別
+    // 找出目前其他場次正在使用的組別
     const inUse=new Set();
     state.matches.forEach((m,i)=>{
         if(i!==finishedMi && m.status!=='idle' && m.status!=='finished'){
@@ -356,25 +356,42 @@ function autoNextMatch(finishedMi){
 
     // 閒置組 = activePlayers 中不在 inUse 的
     const idle=state.activePlayers.filter(g=>!inUse.has(g));
+
+    // 剛結束那場的兩組
+    const lastB=state.matches[finishedMi].black;
+    const lastW=state.matches[finishedMi].white;
+
     if(idle.length<2){
-        // 閒置組不足2，把剛結束的場次標為 idle 等待
+        // 閒置組不足2，等待其他場結束
         state.matches[finishedMi].status='idle';
         broadcast();
         return;
     }
 
-    // 選出場次最少的兩組（不重複上一場）
-    const lastB=state.matches[finishedMi].black;
-    const lastW=state.matches[finishedMi].white;
+    // 嘗試找「不是上一場同一對」的組合
     const sorted=[...idle].sort((a,b)=>{
         const d=(state.scores[a]?.matches||0)-(state.scores[b]?.matches||0);
         return d!==0?d:Math.random()-.5;
     });
 
-    // 嘗試排除上一場兩組
-    let candidates=sorted.filter(g=>g!==lastB&&g!==lastW);
-    if(candidates.length<2)candidates=sorted;
-    const black=candidates[0],white=candidates[1];
+    // 找出不會重複上一場對陣組合的配對
+    let black=null, white=null;
+    for(let i=0;i<sorted.length;i++){
+        for(let j=i+1;j<sorted.length;j++){
+            const a=sorted[i], b=sorted[j];
+            // 排除完全相同的對陣（不分先後手）
+            const sameAsBefore=(a===lastB&&b===lastW)||(a===lastW&&b===lastB);
+            if(!sameAsBefore){black=a;white=b;break;}
+        }
+        if(black)break;
+    }
+
+    if(!black){
+        // 所有閒置組都跟上一場一樣，等待更多組閒置
+        state.matches[finishedMi].status='idle';
+        broadcast();
+        return;
+    }
 
     setTimeout(()=>startRolling(finishedMi,black,white),800);
 }
@@ -431,8 +448,15 @@ function handleCellClick(mi,idx){
                 window.parent.postMessage({type:'W3_SCORE',group:g,score:d.wins,wins:d.wins,matches:d.matches},'*');
             });
         },500);
-        // 自動配下一場（1.5秒後，讓勝負畫面先顯示）
-        if(myRole!=='teacher') setTimeout(()=>autoNextMatch(mi),4000);
+        // 自動配下一場（4秒後，讓勝負畫面先顯示）
+        if(myRole!=='teacher') setTimeout(()=>{
+            autoNextMatch(mi);
+            // 同時嘗試喚醒正在等待的另一場
+            const otherMi = mi===0?1:0;
+            if(state.matches[otherMi].status==='idle'){
+                setTimeout(()=>autoNextMatch(otherMi),800);
+            }
+        },4000);
     }else{
         playSound('stone');
     }
