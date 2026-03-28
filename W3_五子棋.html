@@ -920,8 +920,7 @@ function renderLobbyCards(){
             } else {
                 ma.innerHTML=`<div class="ready-status rs-waiting" style="font-size:11px">⏳ 等待老師配對</div>`;
             }
-        }</div>`;}
-        else ma.innerHTML=`<div class="ready-status rs-waiting" style="font-size:11px">⏳ 棋局進行中，等待下一局配對</div>`;
+        }
     });
 }
 function isMyMatchPlaying(){
@@ -978,6 +977,7 @@ function renderGameView(){
 
 function renderBottom(){
     const ind=document.getElementById('turn-indicator');if(!ind)return;
+    const banner=document.getElementById('turn-banner');
 
     if(myRole!=='player'){
         ind.className='turn-badge tb-wait';ind.textContent=state.started?'觀賽中':'等待老師抽籤';

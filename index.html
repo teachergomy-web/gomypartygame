@@ -899,7 +899,7 @@ function tcStartGame() {
         if (sa) {
             sa.style.padding = '0';
             sa.innerHTML = `
-                <div id="tc-w3-draw-bar" style="display:flex; align-items:center; justify-content:space-between; width:100%; padding:10px 16px; background:rgba(255,255,255,0.05); border-bottom:2px solid rgba(245,200,0,.3); flex-shrink:0;">
+                <div id="tc-w3-draw-bar" style="display:none; align-items:center; justify-content:space-between; width:100%; padding:10px 16px; background:rgba(255,255,255,0.05); border-bottom:2px solid rgba(245,200,0,.3); flex-shrink:0;">
                     <span id="tc-w3-player-count" style="color:white; font-family:'Nunito',sans-serif; font-weight:900; font-size:.9rem;">⏳ 等待學生加入...</span>
                     <button id="tc-w3-draw-btn" class="kr-btn kr-btn-start" onclick="tcW3DrawLots()" style="font-size:.85rem; padding:8px 16px;">🎲 抽籤開始</button>
                 </div>
@@ -1300,6 +1300,11 @@ setInterval(() => {
         window.renderLobby();
         const perspective = window.state.perspective;
         if (perspective !== 'teacher') window.updateStudentWaitDisplay();
+        
+        // 確保老師控制台的抽籤按鈕，能即時看到學生加入的人數變化
+        if (perspective === 'teacher' && window.state.selectedGame === 2 && typeof tcW3UpdateDrawBtn === 'function') {
+            tcW3UpdateDrawBtn();
+        }
     }
 
     // 同步老師選擇的遊戲
