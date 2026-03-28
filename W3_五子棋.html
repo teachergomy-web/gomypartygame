@@ -193,7 +193,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
     <!-- 老師控制列 -->
     <div id="teacher-ctrl" class="hidden" style="width:100%;max-width:360px;">
       <button class="mp-btn btn-blue" id="btn-schedule" onclick="scheduleMatch()">🎲 隨機抽籤排賽</button>
-      <button class="mp-btn btn-red" id="btn-reset" onclick="resetMatch()" style="margin-bottom:0">🔄 重置本場</button>
+
     </div>
 
   </div>
@@ -501,7 +501,6 @@ function renderCentre(){
         tc.classList.remove('hidden');
         document.getElementById('btn-schedule').style.display = isPlaying ? 'none' : '';
         document.getElementById('btn-schedule').disabled=(s==='rolling');
-        document.getElementById('btn-reset').disabled=(s==='idle');
     }else tc.classList.add('hidden');
 
     // 抽籤動畫
@@ -649,12 +648,7 @@ window.addEventListener('message',(e)=>{
     if(isTeacher)myRole='teacher';
 
     // 積分等 PLATFORM_START 傳入實際玩家後才初始化
-    // 若直接開啟（非平台），用預設組別
-    if(state.activePlayers.length===0){
-        const fallback=['第1組','第2組','第3組','第4組','第5組'];
-        state.activePlayers=fallback;
-        fallback.forEach(t=>{if(!state.scores[t])state.scores[t]={wins:0,matches:0};});
-    }
+    // 直接開啟時保持空，等 PLATFORM_START 填入
 
     buildBoard();
     render();

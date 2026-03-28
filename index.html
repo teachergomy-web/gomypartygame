@@ -687,13 +687,20 @@ function startSyncListener() {
                     pData.screen = 'screen-student-wait';
                     window.goTo('screen-student-wait');
                 }
-                // W3：收到棋局狀態更新，推給學生 iframe
+                // W3：收到棋局狀態更新，推給學生 iframe 和老師控制台 iframe
                 if (data.w3state && pData.screen === 'screen-student-game') {
                     const sgIframe = document.getElementById('sg-iframe');
                     if (sgIframe && sgIframe.contentWindow) {
                         sgIframe.contentWindow.postMessage({ type: 'W3_STATE', data: data.w3state }, '*');
                     }
                 }
+            }
+        }
+        // 老師端：W3 狀態更新推給 tc-w3-iframe
+        if (p === 'teacher' && data.w3state) {
+            const tcW3 = document.getElementById('tc-w3-iframe');
+            if (tcW3 && tcW3.contentWindow) {
+                try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: data.w3state }, '*'); } catch(e2) {}
             }
         }
     }, err => console.error('Room sync error:', err));
@@ -1147,29 +1154,7 @@ window.addEventListener('message', (e) => {
         if (tcW3 && tcW3.contentWindow) {
             try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: w3d }, '*'); } catch(e2) {}
         }
-        // AI 自動準備：如果是 ready 狀態，AI 組別自動 handleReady
-        if (w3d.matchStatus === 'ready') {
-            const allPlayers = window.state.players;
-            const blackGroup = w3d.black;
-            const whiteGroup = w3d.white;
-            const blackIsAI = allPlayers.some(p => p.group === blackGroup && p.isAI);
-            const whiteIsAI = allPlayers.some(p => p.group === whiteGroup && p.isAI);
-            if ((blackIsAI && !w3d.blackReady) || (whiteIsAI && !w3d.whiteReady)) {
-                setTimeout(() => {
-                    const updatedW3d = Object.assign({}, w3d);
-                    if (blackIsAI) updatedW3d.blackReady = true;
-                    if (whiteIsAI) updatedW3d.whiteReady = true;
-                    const rooms2 = window.getRooms();
-                    if (rooms2[window.state.roomCode]) {
-                        rooms2[window.state.roomCode].w3state = updatedW3d;
-                        window.saveRooms(rooms2);
-                    }
-                    if (tcW3 && tcW3.contentWindow) {
-                        try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: updatedW3d }, '*'); } catch(e2) {}
-                    }
-                }, 800); // 800ms 延遲讓 AI 看起來像真人反應
-            }
-        }
+
     }
 });
 
@@ -1545,17 +1530,11 @@ function joinRoom() {
   const existingIndex = window.state.players.findIndex(p => p.group === groupName);
 
   if (existingIndex !== -1) {
-      // 同組重連或取代 AI：覆蓋為真人
+      // 同組重連：更新符號
       window.state.players[existingIndex].symbol = window.state.selectedSymbol;
-      window.state.players[existingIndex].isAI = false; // 真人取代 AI
-      // 更新 pStates
-      const pKey2 = Object.keys(window.pStates).find(k => window.pStates[k].group === groupName);
-      if (pKey2 && window.pStates[pKey2]) window.pStates[pKey2].isAI = false;
   } else {
-      // 新玩家加入：AI 佔位不算滿（可被取代），真實人數才算
-      const realCount = window.state.players.filter(p => !p.isAI).length;
-      if (realCount >= 5) { window.showToast('⚠️ 房間已滿'); window.goToJoin(); return; }
-      window.state.players.push({group: groupName, symbol: window.state.selectedSymbol, isAI: false});
+      if (window.state.players.length >= 5) { window.showToast('⚠️ 房間已滿'); window.goToJoin(); return; }
+      window.state.players.push({group: groupName, symbol: window.state.selectedSymbol});
   }
   
   window.state.takenSymbols = window.state.players.map(p => p.symbol);
@@ -1638,8 +1617,7 @@ function renderLobby() {
   const slots = Array.from({length:5}, (_,i) => {
     const p = window.state.players[i];
     if (p) {
-        const aiTag = p.isAI ? `<div style="font-size:8px;color:rgba(255,255,255,.4);font-family:'Nunito',sans-serif;font-weight:700;margin-top:1px">🤖AI</div>` : '';
-        return `<div class="kr-seat"><div class="kr-seat-emoji">${p.symbol}</div><div class="kr-seat-name">${p.group}</div>${aiTag}</div>`;
+        return `<div class="kr-seat"><div class="kr-seat-emoji">${p.symbol}</div><div class="kr-seat-name">${p.group}</div></div>`;
     }
     return `<div class="kr-seat" style="opacity:.2;border-style:dashed"><div class="kr-seat-emoji">＋</div><div class="kr-seat-name">空位</div></div>`;
   });
@@ -1709,21 +1687,18 @@ function simulateJoin() {
   if (gNum > 5) return;
 
   const sym = window.SYMBOLS[(gNum - 1) % window.SYMBOLS.length];
-  // AI 角色：標記為電腦 AI
-  const newPlayer = { group: `第 ${gNum} 組`, symbol: sym, isAI: true };
+  const newPlayer = { group: `第 ${gNum} 組`, symbol: sym };
   window.state.players.push(newPlayer);
   window.state.takenSymbols.push(sym);
-  
+
   let pKey = 's' + gNum;
   if (window.pStates[pKey] && !window.pStates[pKey].joined) {
-    window.pStates[pKey].joined  = true;
-    window.pStates[pKey].group   = `第 ${gNum} 組`;
-    window.pStates[pKey].symbol  = sym;
-    window.pStates[pKey].screen  = 'screen-student-wait';
-    window.pStates[pKey].isAI    = true;
+    window.pStates[pKey].joined = true;
+    window.pStates[pKey].group  = `第 ${gNum} 組`;
+    window.pStates[pKey].symbol = sym;
+    window.pStates[pKey].screen = 'screen-student-wait';
   }
-  
-  // 把 players 陣列寫入 rooms
+
   const rooms = window.getRooms();
   if (rooms[window.state.roomCode]) {
     rooms[window.state.roomCode].players = window.state.players;
@@ -1732,7 +1707,7 @@ function simulateJoin() {
   }
   window.renderLobby();
   updateStudentWaitDisplay();
-  window.showToast(`🤖 第 ${gNum} 組 (AI) 加入！`);
+  window.showToast(`✅ 第 ${gNum} 組加入！`);
 }
 
 function teacherLogin() {
