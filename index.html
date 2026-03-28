@@ -562,8 +562,12 @@ function startAllRoomsListener() {
     allRoomsUnsubscribe = fsOnSnap(colRef, (snapshot) => {
         const rooms = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
         const now = Date.now();
+
+        // 先用 Firebase 上現有的文件完整覆蓋本機
+        const firebaseRoomIds = new Set();
         snapshot.forEach(doc => {
             const data = doc.data();
+            firebaseRoomIds.add(doc.id);
             // 超過 2 小時自動刪除
             if (data.createdAt && (now - data.createdAt) > 2 * 60 * 60 * 1000) {
                 window.deleteRoom(doc.id);
@@ -571,10 +575,14 @@ function startAllRoomsListener() {
                 rooms[doc.id] = data;
             }
         });
-        snapshot.docChanges && snapshot.docChanges().forEach(change => {
-            if (change.type === 'removed') delete rooms[change.doc.id];
+
+        // 把本機有但 Firebase 已不存在的房間刪掉
+        Object.keys(rooms).forEach(id => {
+            if (!firebaseRoomIds.has(id)) delete rooms[id];
         });
+
         localStorage.setItem('playroom_rooms', JSON.stringify(rooms));
+
         // Firebase 資料到了，馬上重新渲染房間列表
         const p = window.state && window.state.perspective;
         const pData = p && window.pStates && window.pStates[p];
@@ -624,9 +632,9 @@ const TC = {
     level: 1, running: false, paused: false,
     scores: {},
     get gameFile() {
-        const g = window.state && window.state.selectedGame || 0;
-        if (g === 1) return 'W2_能源管線.html';
-        return 'W1_消除方塊.html'; // 預設 W1
+        const g = (window.state && window.state.selectedGame) || 0;
+        const files = ['W1_消除方塊.html', 'W2_能源管線.html'];
+        return files[g] || files[0];
     }
 };
 
@@ -702,6 +710,8 @@ function tcStartGame() {
     // 更新 header
     const badge = document.getElementById('tc-level-badge');
     if (badge) badge.textContent = '關卡 ' + TC.level;
+    const gameName = document.getElementById('tc-game-name');
+    if (gameName) { const g = GAMES[window.state.selectedGame] || GAMES[0]; gameName.textContent = g.icon + ' ' + g.name; }
     document.getElementById('tc-btn-pause').style.display  = '';
     document.getElementById('tc-btn-resume').style.display = 'none';
 
@@ -827,9 +837,7 @@ function tcEndGame() {
         rooms[window.state.roomCode].paused = false;
         window.saveRooms(rooms);
     }
-    Object.keys(window.pStates).forEach(k => {
-        if (k!=='teacher' && k!=='guest') window.pStates[k].screen = 'screen-student-wait';
-    });
+    // 不強制改學生 pState，讓學生 poll 偵測到 status='lobby' 自然跳回
     window.pStates['teacher'].screen = 'screen-lobby';
     window.renderLobby();
     window.goTo('screen-lobby');
@@ -949,6 +957,14 @@ setInterval(() => {
         pData.screen = 'screen-student-wait';
         window.goTo('screen-student-wait');
         window.showToast('🏁 遊戲結束！');
+    }
+    // 老師退回大廳 → 學生也跟著回等待畫面
+    if (r.status === 'lobby' && (pData.screen === 'screen-student-game' || pData.screen === 'screen-teacher-console')) {
+        const sgIframe = document.getElementById('sg-iframe');
+        if (sgIframe) sgIframe.src = 'about:blank';
+        pData.screen = 'screen-student-wait';
+        window.goTo('screen-student-wait');
+        window.showToast('⏹ 老師已暫停遊戲');
     }
 }, 1000);
 
@@ -1089,8 +1105,19 @@ function syncJoinDOM() {
     document.getElementById('join-step-password').style.display = step === 1.5 ? 'block' : 'none';
     document.getElementById('join-step-2').style.display = step === 2 ? 'block' : 'none';
     if (step === 2) {
+        // 進入選組步驟前先從 Firebase 同步最新玩家資料
+        const rooms = window.getRooms();
+        if (window.state.roomCode && rooms[window.state.roomCode]) {
+            const room = rooms[window.state.roomCode];
+            if (room.players) {
+                window.state.players = room.players;
+                window.state.takenSymbols = room.players.map(p => p.symbol);
+                window.state.takenGroups  = room.players.map(p => p.group);
+            }
+        }
         window.state.selectedGroup = ''; window.state.selectedSymbol = '';
         document.getElementById('group-select').value = '';
+        window.renderGroupSelect();
         window.renderSymbolPicker();
     }
 }
@@ -1146,6 +1173,19 @@ function verifyRoomPassword() {
 function backToStep1() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; window.syncJoinDOM(); }
 function backToPassword() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1.5; window.syncJoinDOM(); }
 function onGroupSelect(val) { window.state.selectedGroup = val; }
+function renderGroupSelect() {
+    const sel = document.getElementById('group-select');
+    if (!sel) return;
+    const takenGroups = window.state.takenGroups || [];
+    Array.from(sel.options).forEach(opt => {
+        if (!opt.value) return; // skip placeholder
+        const groupName = `第 ${opt.value} 組`;
+        const isTaken = takenGroups.includes(groupName);
+        opt.disabled = isTaken;
+        opt.textContent = isTaken ? `第 ${opt.value} 組（已佔用）` : `第 ${opt.value} 組`;
+    });
+}
+window.renderGroupSelect = renderGroupSelect;
 function renderSymbolPicker() {
   document.getElementById('symbol-picker').innerHTML = window.SYMBOLS.map(s => {
     const isTaken = window.state.takenSymbols.includes(s);
@@ -1159,20 +1199,22 @@ function joinRoom() {
   const rooms = window.getRooms();
   if (!rooms[window.state.roomCode] || !rooms[window.state.roomCode].open) { window.showToast('⚠️ 房間已關閉'); window.goToJoin(); return; }
 
-  // 同步最新玩家狀態，避免多開分頁時互相覆蓋
+  // 從 Firebase 同步最新玩家狀態（確保跨裝置不衝突）
   if (rooms[window.state.roomCode].players) {
       window.state.players = rooms[window.state.roomCode].players;
       window.state.takenSymbols = window.state.players.map(p => p.symbol);
+      // 同步已佔用的組別，讓其他裝置看到
+      window.state.takenGroups = window.state.players.map(p => p.group);
   }
 
   const groupName = `第 ${window.state.selectedGroup} 組`;
   const existingIndex = window.state.players.findIndex(p => p.group === groupName);
 
   if (existingIndex !== -1) {
-      // 允許中途重連：覆蓋原有的符號
+      // 同組重連：覆蓋符號（允許換符號重連）
       window.state.players[existingIndex].symbol = window.state.selectedSymbol;
   } else {
-      // 新玩家加入
+      // 新玩家加入：檢查是否已滿
       if (window.state.players.length >= 5) { window.showToast('⚠️ 房間已滿'); window.goToJoin(); return; }
       window.state.players.push({group: groupName, symbol: window.state.selectedSymbol});
   }
@@ -1534,7 +1576,7 @@ Object.assign(window, {
     openTeacherConsole, changeLevel, jumpToPhase, updateLevelDisplay,
     tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby,
     showToast, setViewTeacher, setViewStudent,
-    syncJoinDOM, renderLobby, renderSymbolPicker, updateStudentWaitDisplay,
+    syncJoinDOM, renderLobby, renderSymbolPicker, renderGroupSelect, updateStudentWaitDisplay,
     getRooms, saveRooms
 });
 </script>
