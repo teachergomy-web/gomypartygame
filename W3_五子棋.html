@@ -22,7 +22,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .role-spectator{background:rgba(46,204,64,.1);border-color:var(--green);color:var(--green);}
 .role-player{background:rgba(255,214,0,.15);border-color:var(--yellow);color:var(--yellow);}
 
-/* Scoreboard */
+/* Score bar */
 #score-bar{position:absolute;top:56px;left:0;right:0;background:rgba(26,10,74,.9);border-bottom:1px solid rgba(255,214,0,.15);padding:6px 12px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:15;}
 .sc{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.1);border-radius:10px;padding:4px 10px;transition:all .2s;}
 .sc.fighting{border-color:var(--yellow);background:rgba(255,214,0,.1);}
@@ -30,81 +30,84 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .sc-wins{font-family:'Fredoka One',sans-serif;font-size:16px;color:var(--yellow);}
 .sc-info{font-size:9px;color:rgba(255,255,255,.3);font-family:'Nunito',sans-serif;font-weight:700;}
 
-/* Main area: two boards side by side */
-#main{position:absolute;top:100px;left:0;right:0;bottom:0;display:flex;gap:0;overflow:hidden;}
-.match-col{flex:1;display:flex;flex-direction:column;align-items:center;padding:6px;gap:4px;position:relative;border-right:1px solid rgba(255,255,255,.06);}
-.match-col:last-child{border-right:none;}
+/* ── 抽籤/準備畫面 ── */
+#lobby-view{position:absolute;top:100px;left:0;right:0;bottom:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:12px 16px;overflow-y:auto;}
 
-/* Match header */
-.match-header{width:100%;display:flex;align-items:center;gap:6px;max-width:380px;}
-.ph{flex:1;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.1);border-radius:12px;padding:5px 8px;transition:all .3s;min-width:0;}
-.ph.active{border-color:var(--yellow);box-shadow:0 0 14px rgba(255,214,0,.3);}
-.ph.winner-side{border-color:var(--green);background:rgba(46,204,64,.15);}
-.stone-s{width:22px;height:22px;border-radius:50%;flex-shrink:0;}
-.stone-s.black{background:radial-gradient(circle at 35% 35%,#555,#000);border:1px solid rgba(255,255,255,.2);box-shadow:0 2px 6px rgba(0,0,0,.5);}
-.stone-s.white{background:radial-gradient(circle at 35% 35%,#fff,#ccc);border:1px solid rgba(0,0,0,.1);box-shadow:0 2px 6px rgba(0,0,0,.3);}
-.ph-name{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(10px,2.5vw,13px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ph-tag{font-size:8px;color:rgba(255,255,255,.35);font-family:'Nunito',sans-serif;font-weight:700;}
-.vs-s{font-family:'Fredoka One',sans-serif;font-size:13px;color:rgba(255,255,255,.2);flex-shrink:0;}
+/* 抽籤卡片（兩排） */
+#matches-panel{display:flex;flex-direction:column;gap:12px;width:100%;max-width:480px;}
+.match-card{background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.1);border-radius:16px;padding:12px 16px;}
+.match-card.rolling{border-color:rgba(0,229,255,.4);animation:borderPulse 1s ease-in-out infinite alternate;}
+.match-card.ready{border-color:rgba(255,214,0,.5);}
+.match-card.playing{border-color:var(--green);background:rgba(46,204,64,.06);}
+.match-card.idle-card{opacity:.45;}
+@keyframes borderPulse{from{border-color:rgba(0,229,255,.2)}to{border-color:rgba(0,229,255,.7)}}
+.match-label{font-family:'Nunito',sans-serif;font-weight:900;font-size:10px;color:rgba(255,255,255,.4);letter-spacing:.1em;margin-bottom:8px;}
+.match-vs-row{display:flex;align-items:center;gap:8px;}
+.player-chip{flex:1;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border-radius:12px;padding:7px 10px;}
+.player-chip.ready-chip{background:rgba(46,204,64,.15);border:1.5px solid var(--green);}
+.stone-sm{width:22px;height:22px;border-radius:50%;flex-shrink:0;}
+.stone-sm.black{background:radial-gradient(circle at 35% 35%,#555,#000);border:1.5px solid rgba(255,255,255,.2);}
+.stone-sm.white{background:radial-gradient(circle at 35% 35%,#fff,#ccc);border:1.5px solid rgba(0,0,0,.15);}
+.chip-name{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(12px,3vw,16px);}
+.chip-tag{font-size:9px;color:rgba(255,255,255,.4);font-family:'Nunito',sans-serif;font-weight:700;}
+.chip-ready{font-size:10px;color:var(--green);font-family:'Nunito',sans-serif;font-weight:900;white-space:nowrap;}
+.vs-label{font-family:'Fredoka One',sans-serif;font-size:16px;color:rgba(255,255,255,.25);flex-shrink:0;}
+.match-action{margin-top:8px;text-align:center;}
+.ready-btn{background:linear-gradient(160deg,#27ae60,#1a7a42);color:#fff;border:2px solid #4dff80;border-radius:12px;padding:8px 24px;font-family:'Fredoka One',sans-serif;font-size:15px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4);animation:readyPulse 1.2s ease-in-out infinite;}
+.ready-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.4);}
+@keyframes readyPulse{0%,100%{box-shadow:0 4px 0 rgba(0,0,0,.4),0 0 0 0 rgba(46,204,64,0)}50%{box-shadow:0 4px 0 rgba(0,0,0,.4),0 0 0 8px rgba(46,204,64,.2)}}
+.ready-status{font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;padding:6px 16px;border-radius:10px;}
+.rs-waiting{color:rgba(255,255,255,.4);}
+.rs-done{color:var(--green);}
+.rs-go{background:rgba(46,204,64,.15);border:2px solid var(--green);color:var(--green);animation:readyPulse 1s infinite;}
+.countdown-badge{font-family:'Fredoka One',sans-serif;font-size:28px;color:#00E5FF;animation:countPulse .5s ease-in-out infinite alternate;}
+@keyframes countPulse{from{transform:scale(.9);opacity:.7}to{transform:scale(1.1);opacity:1}}
 
-/* Board */
-.board-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0;}
-.board-outer{background:#dcb35c;padding:4px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 20px rgba(0,0,0,.8);aspect-ratio:1;}
-.board-grid{display:grid;width:100%;height:100%;}
+/* ── 遊戲畫面（單棋盤）── */
+#game-view{position:absolute;top:100px;left:0;right:0;bottom:60px;display:none;flex-direction:column;align-items:center;gap:6px;padding:6px 10px;overflow:hidden;}
+.play-header{width:100%;max-width:420px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.ph2{flex:1;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.1);border-radius:12px;padding:5px 9px;transition:all .3s;}
+.ph2.active{border-color:var(--yellow);box-shadow:0 0 14px rgba(255,214,0,.3);}
+.ph2.winner-side{border-color:var(--green);background:rgba(46,204,64,.12);}
+#solo-board-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;width:100%;}
+#solo-board-outer{background:#dcb35c;padding:5px;border-radius:10px;border:4px solid #8b4513;box-shadow:0 6px 28px rgba(0,0,0,.85);}
+#solo-board{display:grid;}
 .cell{position:relative;display:flex;align-items:center;justify-content:center;}
-.cell.can-move{cursor:pointer;}
-.cell.can-move:active{background:rgba(0,0,0,.18);}
 .cell::before{content:'';position:absolute;top:50%;left:0;width:100%;height:1px;background:rgba(0,0,0,.4);pointer-events:none;}
 .cell::after{content:'';position:absolute;left:50%;top:0;width:1px;height:100%;background:rgba(0,0,0,.4);pointer-events:none;}
+.cell.can-move{cursor:pointer;}
+.cell.can-move:active{background:rgba(0,0,0,.18);}
 .piece{position:absolute;width:88%;height:88%;border-radius:50%;z-index:2;animation:pop .18s cubic-bezier(.34,1.56,.64,1);}
-.piece.black{background:radial-gradient(circle at 35% 35%,#555,#000);box-shadow:2px 2px 6px rgba(0,0,0,.7);}
-.piece.white{background:radial-gradient(circle at 35% 35%,#fff,#ccc);box-shadow:1px 2px 5px rgba(0,0,0,.4);}
+.piece.black{background:radial-gradient(circle at 35% 35%,#555,#000);box-shadow:2px 3px 8px rgba(0,0,0,.7);}
+.piece.white{background:radial-gradient(circle at 35% 35%,#fff,#ccc);box-shadow:2px 3px 6px rgba(0,0,0,.4);}
 .piece.last{outline:2px solid var(--red);outline-offset:1px;}
 @keyframes pop{from{transform:scale(.15);opacity:0}to{transform:scale(1);opacity:1}}
 
-/* Status bar under each board */
-.match-status{font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;padding:4px 12px;border-radius:14px;border:2px solid;white-space:nowrap;flex-shrink:0;}
-.ms-waiting{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.35);}
-.ms-countdown{background:rgba(255,214,0,.15);border-color:var(--yellow);color:var(--yellow);animation:pulse 1s infinite;}
-.ms-your-turn{background:rgba(46,204,64,.2);border-color:var(--green);color:var(--green);animation:pulse 1.2s infinite;}
-.ms-wait-turn{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.4);}
-.ms-finished{background:rgba(255,214,0,.1);border-color:rgba(255,214,0,.3);color:var(--yellow);}
-@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+/* ── Winner overlay on solo board ── */
+#solo-winner{position:absolute;inset:0;background:rgba(13,17,23,.88);z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;}
+#solo-winner.show{display:flex;}
+.wo-big{font-size:64px;animation:pop .5s cubic-bezier(.34,1.56,.64,1);}
+.wo-group{font-family:'Fredoka One',sans-serif;font-size:clamp(26px,7vw,44px);color:var(--yellow);text-shadow:0 0 24px rgba(255,214,0,.6);}
+.wo-sub2{font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:rgba(255,255,255,.6);}
+.wo-hint2{font-family:'Nunito',sans-serif;font-weight:700;font-size:11px;color:rgba(255,255,255,.3);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
 
-/* Idle overlay per column */
-.idle-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(26,10,74,.5);z-index:5;}
-.idle-overlay.hidden{display:none!important;}
-
-/* Rolling overlay */
-.roll-overlay{position:absolute;inset:0;background:rgba(26,10,74,.92);z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
-.roll-overlay.hidden{display:none!important;}
-.roll-box{width:min(35vw,140px);aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:16px;border:4px solid;font-family:'Fredoka One',sans-serif;font-size:clamp(18px,5vw,28px);animation:rBounce .55s ease-in-out infinite alternate;}
-.roll-box.b{background:linear-gradient(160deg,#333,#000);border-color:#777;color:#fff;}
-.roll-box.w{background:linear-gradient(160deg,#fff,#ccc);border-color:#aaa;color:#000;}
-@keyframes rBounce{from{transform:scale(.92)}to{transform:scale(1.08)}}
-
-/* Winner overlay on board */
-.winner-overlay{position:absolute;inset:0;background:rgba(13,7,35,.85);z-index:8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;}
-.winner-overlay.hidden{display:none!important;}
-.wo-icon{font-size:52px;animation:woPop .5s cubic-bezier(.34,1.56,.64,1);}
-.wo-name{font-family:'Fredoka One',sans-serif;font-size:clamp(20px,5vw,32px);color:var(--yellow);text-shadow:0 0 24px rgba(255,214,0,.6);animation:woPop .4s .1s both cubic-bezier(.34,1.56,.64,1);}
-.wo-sub{font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;color:rgba(255,255,255,.6);animation:woPop .4s .2s both cubic-bezier(.34,1.56,.64,1);}
-.wo-hint{font-size:10px;color:rgba(255,255,255,.25);font-family:'Nunito',sans-serif;font-weight:700;margin-top:4px;}
-@keyframes woPop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+/* Bottom bar */
+#bottom{position:absolute;bottom:0;left:0;width:100%;background:rgba(26,10,74,.97);border-top:2px solid rgba(255,214,0,.2);padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:10px;z-index:20;}
+.turn-badge{font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;padding:6px 16px;border-radius:20px;border:2px solid;}
+.tb-wait{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.4);}
+.tb-your{background:rgba(46,204,64,.2);border-color:var(--green);color:var(--green);animation:pulse 1.2s infinite;}
 
 /* Teacher ctrl */
 #teacher-ctrl{position:absolute;bottom:0;left:0;right:0;display:none;align-items:center;justify-content:center;padding:8px;gap:10px;background:rgba(26,10,74,.95);border-top:2px solid rgba(255,214,0,.2);z-index:25;}
-.tc-btn{padding:10px 20px;font-family:'Fredoka One',sans-serif;font-size:clamp(13px,3vw,16px);color:#fff;cursor:pointer;border:3px solid;border-radius:12px;box-shadow:0 4px 0 rgba(0,0,0,.4);transition:transform .1s,box-shadow .1s;}
+.tc-btn{padding:10px 24px;font-family:'Fredoka One',sans-serif;font-size:16px;color:#fff;cursor:pointer;border:3px solid #fff;border-radius:14px;box-shadow:0 4px 0 rgba(0,0,0,.4);}
 .tc-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.4);}
 .tc-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
 .tc-btn-blue{background:linear-gradient(160deg,#1a6fc4,#0d4a8a);border-color:var(--blue);}
-.tc-btn-green{background:linear-gradient(160deg,#27ae60,#1a7a42);border-color:#4dff80;}
 
-/* Pause overlay */
+/* Pause */
 #pause-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
 #pause-overlay.show{display:flex;}
-
-/* Toast */
 #toast-w3{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A0A4A;border:3px solid var(--yellow);border-radius:12px;padding:10px 22px;font-family:'Nunito',sans-serif;font-weight:900;color:var(--yellow);opacity:0;transition:.25s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:500;white-space:nowrap;}
 #toast-w3.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .hidden{display:none!important;}
@@ -122,77 +125,77 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
   <div id="role-badge" class="role-badge role-spectator">觀眾</div>
 </div>
 
-<!-- Scoreboard -->
+<!-- Score bar -->
 <div id="score-bar"></div>
 
-<!-- Main: two match columns -->
-<div id="main">
-  <!-- Match 0 -->
-  <div class="match-col" id="col-0">
-    <div class="match-header" id="header-0">
-      <div class="ph" id="ph-black-0"><div class="stone-s black"></div><div><div class="ph-name" id="pname-black-0">—</div><div class="ph-tag">先手</div></div></div>
-      <div class="vs-s">VS</div>
-      <div class="ph" id="ph-white-0"><div class="stone-s white"></div><div><div class="ph-name" id="pname-white-0">—</div><div class="ph-tag">後手</div></div></div>
-    </div>
-    <div class="board-wrap" id="bwrap-0">
-      <div class="board-outer" id="board-outer-0"><div class="board-grid" id="board-0"></div></div>
-    </div>
-    <div class="match-status ms-waiting" id="status-0">等待對戰</div>
-    <!-- Idle overlay -->
-    <div class="idle-overlay" id="idle-0">
-      <div style="font-size:28px;opacity:.5;margin-bottom:6px">⏳</div>
-      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;color:rgba(255,255,255,.5)">等待配對中...</div>
-      <div id="idle-scores-0" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:8px;max-width:200px"></div>
-    </div>
-    <!-- Roll overlay -->
-    <div class="roll-overlay hidden" id="roll-0">
-      <div style="font-family:'Fredoka One',sans-serif;font-size:15px;color:#00E5FF;animation:pulse 1s infinite">⚡ 配對中</div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="roll-box b" id="rb-black-0">???</div>
-        <div style="font-family:'Fredoka One',sans-serif;font-size:20px;color:rgba(255,255,255,.2)">VS</div>
-        <div class="roll-box w" id="rb-white-0">???</div>
+<!-- ══ 抽籤/準備畫面（老師+觀賽組+等待組） ══ -->
+<div id="lobby-view">
+  <div id="matches-panel">
+    <!-- Match 0 card -->
+    <div class="match-card idle-card" id="mc-0">
+      <div class="match-label" id="mlabel-0">第一場</div>
+      <div class="match-vs-row">
+        <div class="player-chip" id="pc-black-0">
+          <div class="stone-sm black"></div>
+          <div><div class="chip-name" id="cn-black-0">—</div><div class="chip-tag">先手</div></div>
+          <div id="cr-black-0" class="chip-ready" style="display:none">✅</div>
+        </div>
+        <div class="vs-label">VS</div>
+        <div class="player-chip" id="pc-white-0">
+          <div class="stone-sm white"></div>
+          <div><div class="chip-name" id="cn-white-0">—</div><div class="chip-tag">後手</div></div>
+          <div id="cr-white-0" class="chip-ready" style="display:none">✅</div>
+        </div>
       </div>
+      <div class="match-action" id="ma-0"></div>
     </div>
-    <!-- Winner overlay -->
-    <div class="winner-overlay hidden" id="winner-ov-0" onclick="dismissWinner(0)">
-      <div class="wo-icon">🏆</div>
-      <div class="wo-name" id="wo-name-0"></div>
-      <div class="wo-sub" id="wo-sub-0">獲勝！</div>
-      <div class="wo-hint">點擊繼續</div>
+    <!-- Match 1 card -->
+    <div class="match-card idle-card" id="mc-1">
+      <div class="match-label" id="mlabel-1">第二場</div>
+      <div class="match-vs-row">
+        <div class="player-chip" id="pc-black-1">
+          <div class="stone-sm black"></div>
+          <div><div class="chip-name" id="cn-black-1">—</div><div class="chip-tag">先手</div></div>
+          <div id="cr-black-1" class="chip-ready" style="display:none">✅</div>
+        </div>
+        <div class="vs-label">VS</div>
+        <div class="player-chip" id="pc-white-1">
+          <div class="stone-sm white"></div>
+          <div><div class="chip-name" id="cn-white-1">—</div><div class="chip-tag">後手</div></div>
+          <div id="cr-white-1" class="chip-ready" style="display:none">✅</div>
+        </div>
+      </div>
+      <div class="match-action" id="ma-1"></div>
     </div>
   </div>
+</div>
 
-  <!-- Match 1 -->
-  <div class="match-col" id="col-1">
-    <div class="match-header" id="header-1">
-      <div class="ph" id="ph-black-1"><div class="stone-s black"></div><div><div class="ph-name" id="pname-black-1">—</div><div class="ph-tag">先手</div></div></div>
-      <div class="vs-s">VS</div>
-      <div class="ph" id="ph-white-1"><div class="stone-s white"></div><div><div class="ph-name" id="pname-white-1">—</div><div class="ph-tag">後手</div></div></div>
-    </div>
-    <div class="board-wrap" id="bwrap-1">
-      <div class="board-outer" id="board-outer-1"><div class="board-grid" id="board-1"></div></div>
-    </div>
-    <div class="match-status ms-waiting" id="status-1">等待對戰</div>
-    <div class="idle-overlay" id="idle-1">
-      <div style="font-size:28px;opacity:.5;margin-bottom:6px">⏳</div>
-      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;color:rgba(255,255,255,.5)">等待配對中...</div>
-      <div id="idle-scores-1" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:8px;max-width:200px"></div>
-    </div>
-    <div class="roll-overlay hidden" id="roll-1">
-      <div style="font-family:'Fredoka One',sans-serif;font-size:15px;color:#00E5FF;animation:pulse 1s infinite">⚡ 配對中</div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="roll-box b" id="rb-black-1">???</div>
-        <div style="font-family:'Fredoka One',sans-serif;font-size:20px;color:rgba(255,255,255,.2)">VS</div>
-        <div class="roll-box w" id="rb-white-1">???</div>
+<!-- ══ 遊戲畫面（參賽組 playing 時顯示自己的棋盤） ══ -->
+<div id="game-view">
+  <!-- 對戰標題 -->
+  <div class="play-header" id="play-header">
+    <div class="ph2" id="play-black"><div class="stone-sm black"></div><div><div class="chip-name" id="play-name-black"></div><div class="chip-tag">先手</div></div></div>
+    <div class="vs-label">VS</div>
+    <div class="ph2" id="play-white"><div class="stone-sm white"></div><div><div class="chip-name" id="play-name-white"></div><div class="chip-tag">後手</div></div></div>
+  </div>
+  <!-- 棋盤 -->
+  <div id="solo-board-wrap">
+    <div id="solo-board-outer" style="position:relative">
+      <div id="solo-board"></div>
+      <!-- 勝利遮罩 -->
+      <div id="solo-winner" onclick="dismissSoloWinner()">
+        <div class="wo-big">🏆</div>
+        <div class="wo-group" id="solo-winner-name"></div>
+        <div class="wo-sub2" id="solo-winner-sub"></div>
+        <div class="wo-hint2">點擊繼續</div>
       </div>
     </div>
-    <div class="winner-overlay hidden" id="winner-ov-1" onclick="dismissWinner(1)">
-      <div class="wo-icon">🏆</div>
-      <div class="wo-name" id="wo-name-1"></div>
-      <div class="wo-sub" id="wo-sub-1">獲勝！</div>
-      <div class="wo-hint">點擊繼續</div>
-    </div>
   </div>
+</div>
+
+<!-- Bottom bar -->
+<div id="bottom">
+  <div id="turn-indicator" class="turn-badge tb-wait">等待對戰開始</div>
 </div>
 
 <!-- Teacher controls -->
@@ -206,7 +209,6 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
   <div style="font-family:'Fredoka One',sans-serif;font-size:1.8rem;color:var(--yellow)">暫停中</div>
 </div>
 <div id="toast-w3"></div>
-
 <script>
 const GRID = 15;
 
@@ -253,33 +255,29 @@ function showToast(m){const el=document.getElementById('toast-w3');el.textConten
 // ══════════════════════════════════════
 // 棋盤 DOM 初始化
 // ══════════════════════════════════════
+let _myMi = -1; // 我參與的 match index
+
 function buildBoards(){
-    [0,1].forEach(mi=>{
-        const b=document.getElementById('board-'+mi);
-        b.style.gridTemplateColumns=`repeat(${GRID},minmax(0,1fr))`;
-        b.innerHTML='';
-        for(let i=0;i<GRID*GRID;i++){
-            const c=document.createElement('div');c.className='cell';c.dataset.idx=i;c.dataset.mi=mi;
-            c.addEventListener('click',()=>handleCellClick(mi,i));
-            b.appendChild(c);
-        }
-    });
-    resizeBoards();
+    // 建立唯一的 solo 棋盤
+    const b=document.getElementById('solo-board');
+    b.style.gridTemplateColumns=`repeat(${GRID},minmax(0,1fr))`;
+    b.innerHTML='';
+    for(let i=0;i<GRID*GRID;i++){
+        const cell=document.createElement('div');
+        cell.className='cell';cell.dataset.idx=i;
+        cell.addEventListener('click',()=>handleCellClick(_myMi,i));
+        b.appendChild(cell);
+    }
+    resizeSoloBoard();
 }
-function resizeBoards(){
-    [0,1].forEach(mi=>{
-        const wrap=document.getElementById('bwrap-'+mi);
-        if(!wrap)return;
-        const col=document.getElementById('col-'+mi);
-        const colH=col.clientHeight;
-        const headerH=col.querySelector('.match-header')?.offsetHeight||40;
-        const statusH=28;
-        const maxSz=Math.min(wrap.clientWidth, colH-headerH-statusH-16);
-        const outer=document.getElementById('board-outer-'+mi);
-        if(outer&&maxSz>60){outer.style.width=maxSz+'px';outer.style.height=maxSz+'px';}
-    });
+function resizeSoloBoard(){
+    const wrap=document.getElementById('solo-board-wrap');
+    const outer=document.getElementById('solo-board-outer');
+    if(!wrap||!outer)return;
+    const sz=Math.min(wrap.clientWidth-16, wrap.clientHeight-16);
+    if(sz>60){outer.style.width=sz+'px';outer.style.height=sz+'px';}
 }
-window.addEventListener('resize',resizeBoards);
+window.addEventListener('resize',resizeSoloBoard);
 
 // ══════════════════════════════════════
 // 抽籤（只在第一次或特殊情況由老師觸發）
@@ -485,7 +483,9 @@ function updateMyRole(){
 function renderAll(){
     renderHUD();
     renderScoreboard();
-    [0,1].forEach(renderMatch);
+    renderLobbyCards();
+    renderGameView();
+    renderBottom();
     renderTeacherCtrl();
 }
 
@@ -494,11 +494,11 @@ function renderHUD(){
     if(myRole==='teacher'){badge.textContent='🎓 老師';badge.className='role-badge role-teacher';}
     else if(myRole==='player'){badge.textContent='⚔️ '+myGroup;badge.className='role-badge role-player';}
     else{badge.textContent='👁 觀眾';badge.className='role-badge role-spectator';}
-
-    const fighting=state.matches.filter(m=>m.status==='playing'||m.status==='countdown');
+    const playing=state.matches.filter(m=>m.status==='playing'||m.status==='countdown');
     document.getElementById('hud-title').textContent=
-        fighting.length===0?'等待對戰開始':
-        fighting.length===1?`${state.matches.find(m=>m.status==='playing'||m.status==='countdown')?.black||''} VS ${state.matches.find(m=>m.status==='playing'||m.status==='countdown')?.white||''}`:
+        !state.started?'等待老師開始':
+        playing.length===0?'準備階段':
+        playing.length===1?`${playing[0].black} VS ${playing[0].white}`:
         '兩場同時進行中';
 }
 
@@ -620,8 +620,83 @@ function renderTeacherCtrl(){
     }
 }
 
+function renderLobbyCards(){
+    const showLobby = myRole==='teacher' || !isMyMatchPlaying();
+    document.getElementById('lobby-view').style.display = showLobby ? 'flex' : 'none';
+    document.getElementById('game-view').style.display = showLobby ? 'none' : 'flex';
+    [0,1].forEach(mi=>{
+        const m=state.matches[mi];const s=m.status;
+        const mc=document.getElementById('mc-'+mi);if(!mc)return;
+        mc.className='match-card '+(s==='idle'?'idle-card':s==='rolling'?'rolling':s==='ready'?'ready':(s==='playing'||s==='countdown')?'playing':'idle-card');
+        const lbl=document.getElementById('mlabel-'+mi);
+        if(lbl)lbl.textContent=s==='idle'?`第${mi===0?'一':'二'}場（等待配對）`:s==='rolling'?`⚡ 配對中...`:s==='ready'?`第${mi===0?'一':'二'}場 — 準備`:s==='countdown'?`⚡ 倒數 ${m.countdown} 秒`:s==='playing'?`第${mi===0?'一':'二'}場 — 進行中`:s==='finished'?`第${mi===0?'一':'二'}場 — 結束`:`第${mi===0?'一':'二'}場`;
+        const cnB=document.getElementById('cn-black-'+mi);const cnW=document.getElementById('cn-white-'+mi);
+        if(cnB)cnB.textContent=m.black||'—';if(cnW)cnW.textContent=m.white||'—';
+        const crB=document.getElementById('cr-black-'+mi);const crW=document.getElementById('cr-white-'+mi);
+        const pcB=document.getElementById('pc-black-'+mi);const pcW=document.getElementById('pc-white-'+mi);
+        if(crB)crB.style.display=m.blackReady?'':'none';if(crW)crW.style.display=m.whiteReady?'':'none';
+        if(pcB)pcB.className='player-chip'+(m.blackReady?' ready-chip':'');if(pcW)pcW.className='player-chip'+(m.whiteReady?' ready-chip':'');
+        const ma=document.getElementById('ma-'+mi);if(!ma)return;
+        if(s==='ready'){
+            const iAmB=myGroup===m.black,iAmW=myGroup===m.white;
+            const myRdy=(iAmB&&m.blackReady)||(iAmW&&m.whiteReady);
+            const cnt=(m.blackReady?1:0)+(m.whiteReady?1:0);
+            if((iAmB||iAmW)&&!myRdy) ma.innerHTML=`<button class="ready-btn" onclick="handleReady(${mi})">✋ 我準備好了！</button>`;
+            else if((iAmB||iAmW)&&myRdy) ma.innerHTML=`<div class="ready-status rs-done">✅ 已準備 (${cnt}/2)</div>`;
+            else ma.innerHTML=`<div class="ready-status rs-waiting">等待雙方準備 ${cnt}/2</div>`;
+        }else if(s==='countdown'){ma.innerHTML=`<div class="countdown-badge">${m.countdown}</div>`;}
+        else if(s==='playing'){ma.innerHTML=`<div class="ready-status rs-go">🔴 對戰中</div>`;}
+        else if(s==='finished'){const wG=m.winner==='black'?m.black:m.white;ma.innerHTML=`<div class="ready-status rs-done">🏆 ${wG} 獲勝</div>`;}
+        else ma.innerHTML='';
+    });
+}
+function isMyMatchPlaying(){
+    if(myRole!=='player')return false;
+    return state.matches.some(m=>(m.black===myGroup||m.white===myGroup)&&(m.status==='playing'||m.status==='countdown'));
+}
+function renderGameView(){
+    const showGame=myRole==='player'&&isMyMatchPlaying();
+    document.getElementById('game-view').style.display=showGame?'flex':'none';
+    document.getElementById('lobby-view').style.display=showGame?'none':'flex';
+    if(!showGame)return;
+    const mi=state.matches.findIndex(m=>m.black===myGroup||m.white===myGroup);
+    if(mi<0)return;
+    _myMi=mi;const m=state.matches[mi];
+    document.getElementById('play-name-black').textContent=m.black;
+    document.getElementById('play-name-white').textContent=m.white;
+    document.getElementById('play-black').className='ph2'+(m.turn==='black'&&m.status==='playing'&&!m.winner?' active':'')+(m.winner==='black'?' winner-side':'');
+    document.getElementById('play-white').className='ph2'+(m.turn==='white'&&m.status==='playing'&&!m.winner?' active':'')+(m.winner==='white'?' winner-side':'');
+    resizeSoloBoard();
+    const cells=document.querySelectorAll('#solo-board .cell');
+    cells.forEach((cell,i)=>{
+        const val=m.cells[i];
+        const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');
+        const canMove=myRole==='player'&&m.status==='playing'&&!m.winner&&val===0&&myTurn;
+        cell.className='cell'+(canMove?' can-move':'');
+        cell.innerHTML=val===0?'':`<div class="piece ${val===1?'black':'white'}${m.lastMove===i?' last':''}"></div>`;
+    });
+    const wo=document.getElementById('solo-winner');
+    if(m.winner&&m.status==='finished'){
+        document.getElementById('solo-winner-name').textContent=m.winner==='black'?m.black:m.white;
+        document.getElementById('solo-winner-sub').textContent=(m.winner==='black'?'⚫':'⚪')+' 獲勝！';
+        wo.classList.add('show');
+    }else wo.classList.remove('show');
+}
+function renderBottom(){
+    const ind=document.getElementById('turn-indicator');if(!ind)return;
+    if(myRole!=='player'){ind.className='turn-badge tb-wait';ind.textContent=state.started?'觀賽中':'等待老師抽籤';return;}
+    const mi=state.matches.findIndex(m=>m.black===myGroup||m.white===myGroup);
+    if(mi<0){ind.className='turn-badge tb-wait';ind.textContent='等待配對';return;}
+    const m=state.matches[mi];
+    if(m.status==='ready'){const myRdy=(myGroup===m.black&&m.blackReady)||(myGroup===m.white&&m.whiteReady);ind.className='turn-badge '+(myRdy?'tb-wait':'tb-your');ind.textContent=myRdy?'✅ 已準備，等待對方...':'請按準備！';}
+    else if(m.status==='countdown'){ind.className='turn-badge tb-your';ind.textContent=`⚡ ${m.countdown} 秒後開始！`;}
+    else if(m.status==='playing'){const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');ind.className='turn-badge '+(myTurn?'tb-your':'tb-wait');ind.textContent=myTurn?'⚔️ 你的回合！請落子':'等待對方落子...';}
+    else if(m.status==='finished'){ind.className='turn-badge tb-wait';ind.textContent='比賽結束';}
+    else{ind.className='turn-badge tb-wait';ind.textContent='等待配對';}
+}
+function dismissSoloWinner(){document.getElementById('solo-winner').classList.remove('show');}
 function dismissWinner(mi){
-    document.getElementById('winner-ov-'+mi).classList.add('hidden');
+    document.getElementById('winner-ov-'+mi)?.classList.add('hidden');
 }
 
 // ══════════════════════════════════════
