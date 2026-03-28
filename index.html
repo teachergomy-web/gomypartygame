@@ -1101,6 +1101,9 @@ setInterval(() => {
         window.state.players = r.players;
         window.state.takenSymbols = r.players.map(p => p.symbol);
         window.renderLobby();
+        // 學生等待畫面也同步更新玩家列表
+        const perspective = window.state.perspective;
+        if (perspective !== 'teacher') window.updateStudentWaitDisplay();
     }
 
     // 同步老師選擇的遊戲
@@ -1452,6 +1455,9 @@ function joinRoom() {
   window.renderLobby();
   window.updateStudentWaitDisplay();
   window.goTo('screen-student-wait');
+  // 更新 sw-code 顯示（確保真實裝置也正確）
+  const swCodeEl = document.getElementById('sw-code');
+  if (swCodeEl) swCodeEl.textContent = window.state.roomCode;
   // 儲存 session 讓重整可以恢復
   localStorage.setItem('game_session', JSON.stringify({ perspective: window.state.perspective, roomCode: window.state.roomCode, group: groupName, symbol: window.state.selectedSymbol }));
   window.showToast(`✅ ${groupName} 已加入房間！`);
@@ -1521,15 +1527,32 @@ function renderLobby() {
   `;
 }
 function updateStudentWaitDisplay() {
-  // 更新目前視角學生的頭像和組別
   const p = window.state.perspective;
-  if (!p || p === 'teacher' || p === 'guest') return;
+  if (!p || p === 'teacher') return;
   const pData = window.pStates[p];
   if (!pData || !pData.joined) return;
   const symEl  = document.getElementById('sw-my-symbol');
   const grpEl  = document.getElementById('sw-my-group');
+  const swCode = document.getElementById('sw-code');
+  const swName = document.getElementById('sw-room-name');
+  const swCnt  = document.getElementById('sw-count');
   if (symEl) symEl.textContent = pData.symbol || '🎮';
   if (grpEl) grpEl.textContent = pData.group  || '—';
+  if (swCode) swCode.textContent = window.state.roomCode || '';
+  // 更新玩家列表和人數
+  const rooms = window.getRooms();
+  const room = rooms[window.state.roomCode];
+  if (room) {
+      if (swName) swName.textContent = `誰是遊戲王 — 房間 #${room.roomNum || ''}`;
+      if (swCnt) swCnt.textContent = `${(room.players||[]).length}/5`;
+      // 玩家座位
+      const seatEl = document.getElementById('sw-lobby-players');
+      if (seatEl && room.players) {
+          seatEl.innerHTML = room.players.map(pl =>
+              `<div class="seat-card filled"><div class="seat-symbol">${pl.symbol}</div><div class="seat-name">${pl.group}</div></div>`
+          ).join('');
+      }
+  }
 }
 
 function simulateJoin() {
@@ -1750,7 +1773,7 @@ function testSetPerspective(p) {
     window.syncJoinDOM();
     window.goTo(pData.screen);
     window.updateBroadcastVisibility();
-    if (p !== 'teacher' && p !== 'guest') window.updateStudentWaitDisplay();
+    if (p !== 'teacher') window.updateStudentWaitDisplay();
     window.isSwitchingPerspective = false;
     
     if (!window._initLoad) {
@@ -1829,19 +1852,18 @@ function tryRestoreSession() {
         pData.group  = saved.group;
         pData.symbol = saved.symbol || '';
 
-        // 更新等待畫面的顯示
-        const swCode = document.getElementById('sw-code');
-        const swName = document.getElementById('sw-room-name');
+        // 更新狀態文字
         const swStatus = document.getElementById('sw-my-group-status');
-        if (swCode) swCode.textContent = saved.roomCode;
-        if (swName) swName.textContent = `誰是遊戲王 — 房間 #${room.roomNum || ''}`;
         if (swStatus) swStatus.innerHTML = `✅ <b>${saved.group}</b> 已連線，等待老師啟動...`;
 
         startSyncListener();
-        window.updateStudentWaitDisplay();
+        window.updateStudentWaitDisplay(); // 更新 sw-code、sw-name、symbol、players
 
         if (room.status === 'playing') {
             tcLaunchStudentIfNeeded();
+        } else if (room.status === 'settlement') {
+            pData.screen = 'screen-settlement';
+            window.goTo('screen-settlement');
         } else {
             pData.screen = 'screen-student-wait';
             window.goTo('screen-student-wait');
