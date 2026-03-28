@@ -1624,19 +1624,18 @@ function joinRoom() {
           if (!room.open) throw new Error('房間已關閉');
 
           const players = [...(room.players || [])];
-          const existingIdx = players.findIndex(p => p.group === groupName);
 
-          if (existingIdx !== -1) {
-              // 組別已存在：只有符號完全一致才允許（同裝置重連）
-              if (players[existingIdx].symbol !== symbol) {
-                  throw new Error('組別已被佔用');
-              }
-              // 同裝置重連：不修改，直接通過
-          } else {
-              if (players.length >= 5) throw new Error('房間已滿');
-              players.push({ group: groupName, symbol });
-              tx.update(ref, { players, playerCount: players.length });
+          // 組別或符號已存在 → 一律拒絕（重連走 tryRestoreSession，不走 joinRoom）
+          if (players.some(p => p.group === groupName)) {
+              throw new Error('組別已被佔用');
           }
+          if (players.some(p => p.symbol === symbol)) {
+              throw new Error('符號已被使用');
+          }
+          if (players.length >= 5) throw new Error('房間已滿');
+
+          players.push({ group: groupName, symbol });
+          tx.update(ref, { players, playerCount: players.length });
           return players;
       }).then((players) => {
           window._joinRetry = 0;
@@ -1647,7 +1646,7 @@ function joinRoom() {
       }).catch((err) => {
           window._joinRetry = 0;
           restoreBtn();
-          if (err.message === '組別已被佔用') {
+          if (err.message === '組別已被佔用' || err.message === '符號已被使用') {
               window.showToast('⚠️ 該組已被其他人搶先加入，請重新選擇！');
               if (fsGetDoc) {
                   fsGetDoc(fsDoc(db, 'rooms', roomCode)).then(snap => {
@@ -1679,8 +1678,11 @@ function joinRoom() {
   const rooms = window.getRooms();
   if (!rooms[roomCode] || !rooms[roomCode].open) { window.showToast('⚠️ 房間已關閉'); window.goToJoin(); return; }
   const latestPlayers = rooms[roomCode].players || [];
-  if (latestPlayers.some(p => p.group === groupName && p.symbol !== symbol)) {
+  if (latestPlayers.some(p => p.group === groupName)) {
       restoreBtn(); window.showToast('⚠️ 組別已被佔用'); return;
+  }
+  if (latestPlayers.some(p => p.symbol === symbol)) {
+      restoreBtn(); window.showToast('⚠️ 符號已被使用'); return;
   }
   if (!latestPlayers.some(p => p.group === groupName)) {
       if (latestPlayers.length >= 5) { restoreBtn(); window.showToast('⚠️ 房間已滿'); return; }
