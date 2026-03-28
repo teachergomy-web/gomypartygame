@@ -725,11 +725,20 @@ const TC = {
 function openTeacherConsole() {
     if (!window.state.roomCode) { showToast('⚠️ 請先建立房間'); return; }
     TC.level = 1; TC.running = false; TC.paused = false; TC.scores = {};
+
+    const g = GAMES[window.state.selectedGame] || GAMES[0];
+    const isW3 = window.state.selectedGame === 2;
+
+    if (isW3) {
+        // W3 沒有關卡選擇，直接啟動遊戲
+        tcStartGame();
+        return;
+    }
+
     updateLevelDisplay();
     const lsCount = document.getElementById('ls-count');
     if (lsCount) lsCount.textContent = window.state.players.length + ' 組';
     // 更新左上角遊戲名稱
-    const g = GAMES[window.state.selectedGame] || GAMES[0];
     const lsIcon = document.getElementById('ls-game-icon');
     if (lsIcon) lsIcon.textContent = g.icon + ' ' + g.name;
     // 根據遊戲切換選關 UI
@@ -842,23 +851,30 @@ function tcStartGame() {
     }
 
     if (window.state.selectedGame === 2) {
-        // W3：控制台顯示對戰監控
+        // W3：老師控制台嵌入 W3 iframe（導播/老師視角）
         const sa = document.getElementById('tc-scores-area');
-        if (sa) sa.innerHTML = `<div style="color:rgba(255,255,255,.4);font-family:'Nunito',sans-serif;font-size:.9rem;text-align:center">
-            <div style="font-size:3rem;margin-bottom:8px">⚔️</div>
-            W3 五子棋對戰進行中<br>
-            <span style="font-size:.75rem;opacity:.6">棋局狀態同步中，學生端即時顯示棋盤</span>
-        </div>`;
-        // 老師端也開啟 W3 iframe（導播視角）
-        const iframe = document.getElementById('sg-iframe');
-        if (iframe) {
-            iframe.src = 'W3_五子棋.html?teacher=1&group=';
-            iframe.style.display = 'block';
+        if (sa) {
+            sa.style.padding = '0';
+            sa.innerHTML = `<iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="width:100%;height:100%;border:none;border-radius:0"></iframe>`;
+            // 等 iframe 載入後傳入現有 w3state
+            const w3iframe = document.getElementById('tc-w3-iframe');
+            if (w3iframe) {
+                w3iframe.onload = () => setTimeout(() => {
+                    try {
+                        const rooms2 = window.getRooms();
+                        const r2 = rooms2[window.state.roomCode] || {};
+                        w3iframe.contentWindow.postMessage({
+                            type: 'PLATFORM_START', isTeacher: true, group: '',
+                            state: r2.w3state || null
+                        }, '*');
+                    } catch(e) {}
+                }, 300);
+            }
         }
     } else {
         tcRenderScores();
-        const iframe = document.getElementById('sg-iframe');
-        if (iframe) iframe.style.display = 'none';
+        const sa = document.getElementById('tc-scores-area');
+        if (sa) sa.style.padding = '';
     }
     window.pStates['teacher'].screen = 'screen-teacher-console';
     window.goTo('screen-teacher-console');
@@ -1109,6 +1125,11 @@ window.addEventListener('message', (e) => {
         if (rooms[window.state.roomCode]) {
             rooms[window.state.roomCode].w3state = e.data.data;
             window.saveRooms(rooms);
+        }
+        // 也推給老師控制台的 W3 iframe（如果存在）
+        const tcW3 = document.getElementById('tc-w3-iframe');
+        if (tcW3 && tcW3.contentWindow) {
+            try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: e.data.data }, '*'); } catch(e2) {}
         }
     }
 });
