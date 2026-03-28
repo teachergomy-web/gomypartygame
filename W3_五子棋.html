@@ -1049,7 +1049,12 @@ window.addEventListener('message',(e)=>{
     const isTeacher=params.get('teacher')==='1';
     if(group){myGroup=group;window.GROUP_ID=group;}
     if(isTeacher){myRole='teacher';}
-    // activePlayers 由 PLATFORM_START 傳入，不在此設定預設值
+    // activePlayers 由 PLATFORM_START 傳入
+    // 如果是老師且直接開啟（非 iframe），給預設組別讓按鈕可用
+    if(isTeacher && state.activePlayers.length===0 && !window.parent.postMessage){
+        state.activePlayers=['第1組','第2組'];
+        state.activePlayers.forEach(g=>{state.scores[g]={wins:0,matches:0};});
+    }
     buildBoards();
     renderAll();
     window.parent.postMessage({type:'W3_READY',group:myGroup},'*');

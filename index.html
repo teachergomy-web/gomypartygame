@@ -898,13 +898,8 @@ function tcStartGame() {
         const sa = document.getElementById('tc-scores-area');
         if (sa) {
             sa.style.padding = '0';
-            sa.style.flexDirection = 'column';
             sa.innerHTML = `
-                <div id="tc-w3-draw-bar" style="flex-shrink:0;padding:8px 16px;background:rgba(26,10,74,.97);border-bottom:2px solid rgba(255,214,0,.2);display:flex;align-items:center;justify-content:center;gap:12px;">
-                  <button id="tc-w3-draw-btn" onclick="tcW3DrawLots()" style="background:linear-gradient(160deg,#1a6fc4,#0d4a8a);color:#fff;border:2px solid #2D8FFF;border-radius:12px;padding:10px 28px;font-family:'Fredoka One',sans-serif;font-size:1rem;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.4);">🎲 抽籤開始</button>
-                  <span id="tc-w3-player-count" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;color:rgba(255,255,255,.5)"></span>
-                </div>
-                <iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="flex:1;width:100%;border:none;min-height:0;"></iframe>`;
+                <iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="width:100%;height:100%;border:none;border-radius:0"></iframe>`;
             const w3iframe = document.getElementById('tc-w3-iframe');
             if (w3iframe) {
                 w3iframe.onload = () => setTimeout(() => {
