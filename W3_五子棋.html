@@ -194,20 +194,22 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 
 <!-- ══ 遊戲畫面（參賽組 playing 時顯示自己的棋盤） ══ -->
 <div id="game-view">
-  <!-- 對戰標題 -->
-  <div class="play-header" id="play-header">
-    <div class="ph2" id="play-black"><div class="stone-sm black"></div><div><div class="chip-name" id="play-name-black"></div><div class="chip-tag">先手</div></div></div>
-    <div class="vs-label">VS</div>
-    <div class="ph2" id="play-white"><div class="stone-sm white"></div><div><div class="chip-name" id="play-name-white"></div><div class="chip-tag">後手</div></div></div>
-  </div>
-  <!-- 落子提示 -->
-  <div id="turn-banner" style="display:none;width:100%;justify-content:center;flex-shrink:0;padding:4px 0;">
-    <div class="tb-banner tb-banner-wait" id="turn-banner-text">等待對方落子...</div>
-  </div>
-  <!-- 棋盤 -->
-  <div id="solo-board-wrap">
+  <!-- 棋盤區（左黑右白直書標題）-->
+  <div id="solo-board-wrap" style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;min-height:0;width:100%;padding:4px 44px;">
+    <!-- 左側黑方直書 -->
+    <div id="side-black" style="position:absolute;left:0;top:0;bottom:0;width:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+      <div class="stone-sm black" style="flex-shrink:0;"></div>
+      <div id="side-name-black" style="writing-mode:vertical-rl;font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(11px,3vw,16px);color:rgba(255,255,255,.85);letter-spacing:.1em;"></div>
+      <div style="writing-mode:vertical-rl;font-size:9px;color:rgba(255,255,255,.3);font-family:'Nunito',sans-serif;font-weight:700;">先手</div>
+    </div>
+    <!-- 棋盤 -->
     <div id="solo-board-outer" style="position:relative">
       <div id="solo-board"></div>
+      <!-- 倒數遮罩（棋盤中央）-->
+      <div id="solo-countdown" style="display:none;position:absolute;inset:0;background:rgba(10,5,40,.85);z-index:60;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-radius:6px;">
+        <div id="solo-cd-num" style="font-family:'Fredoka One',sans-serif;font-size:min(35vw,35vh);color:#00E5FF;line-height:1;text-shadow:0 0 50px rgba(0,229,255,.9);"></div>
+        <div id="solo-cd-vs" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(11px,2.5vw,16px);color:rgba(255,255,255,.55);"></div>
+      </div>
       <!-- 勝利遮罩 -->
       <div id="solo-winner" onclick="dismissSoloWinner()">
         <div class="wo-big">🏆</div>
@@ -215,6 +217,12 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
         <div class="wo-sub2" id="solo-winner-sub"></div>
         <div class="wo-hint2">點擊繼續</div>
       </div>
+    </div>
+    <!-- 右側白方直書 -->
+    <div id="side-white" style="position:absolute;right:0;top:0;bottom:0;width:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+      <div class="stone-sm white" style="flex-shrink:0;"></div>
+      <div id="side-name-white" style="writing-mode:vertical-rl;font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(11px,3vw,16px);color:rgba(255,255,255,.85);letter-spacing:.1em;"></div>
+      <div style="writing-mode:vertical-rl;font-size:9px;color:rgba(255,255,255,.3);font-family:'Nunito',sans-serif;font-weight:700;">後手</div>
     </div>
   </div>
 </div>
@@ -224,17 +232,14 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 
   <!-- 場0 左欄 -->
   <div id="tv-col-0" style="flex:1;display:flex;flex-direction:column;padding:8px;gap:6px;min-width:0;">
-    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-      <div style="flex:1;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border-radius:10px;padding:4px 8px;min-width:0;">
-        <div class="stone-sm black"></div>
-        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="tv-black-0">—</span>
-      </div>
-      <span style="font-family:'Fredoka One',sans-serif;font-size:12px;color:rgba(255,255,255,.25);flex-shrink:0;">VS</span>
-      <div style="flex:1;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border-radius:10px;padding:4px 8px;min-width:0;">
-        <div class="stone-sm white"></div>
-        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="tv-white-0">—</span>
-      </div>
-      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.45);flex-shrink:0;" id="tv-status-0"></span>
+    <!-- 場0 頂部狀態 -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;padding:2px 40px;">
+      <div class="stone-sm black"></div>
+      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;" id="tv-black-0">—</span>
+      <span style="font-family:'Fredoka One',sans-serif;font-size:12px;color:rgba(255,255,255,.25);">VS</span>
+      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;" id="tv-white-0">—</span>
+      <div class="stone-sm white"></div>
+      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.45);" id="tv-status-0"></span>
     </div>
     <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;">
       <div id="tv-board-outer-0" style="background:#dcb35c;padding:5px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);width:min(calc(50vw - 24px),calc(100vh - 200px));height:min(calc(50vw - 24px),calc(100vh - 200px));">
@@ -248,17 +253,14 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 
   <!-- 場1 右欄 -->
   <div id="tv-col-1" style="flex:1;display:flex;flex-direction:column;padding:8px;gap:6px;min-width:0;">
-    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-      <div style="flex:1;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border-radius:10px;padding:4px 8px;min-width:0;">
-        <div class="stone-sm black"></div>
-        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="tv-black-1">—</span>
-      </div>
-      <span style="font-family:'Fredoka One',sans-serif;font-size:12px;color:rgba(255,255,255,.25);flex-shrink:0;">VS</span>
-      <div style="flex:1;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border-radius:10px;padding:4px 8px;min-width:0;">
-        <div class="stone-sm white"></div>
-        <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="tv-white-1">—</span>
-      </div>
-      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.45);flex-shrink:0;" id="tv-status-1"></span>
+    <!-- 場1 頂部狀態 -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;padding:2px 40px;">
+      <div class="stone-sm black"></div>
+      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;" id="tv-black-1">—</span>
+      <span style="font-family:'Fredoka One',sans-serif;font-size:12px;color:rgba(255,255,255,.25);">VS</span>
+      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;" id="tv-white-1">—</span>
+      <div class="stone-sm white"></div>
+      <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.45);" id="tv-status-1"></span>
     </div>
     <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;">
       <div id="tv-board-outer-1" style="background:#dcb35c;padding:5px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);width:min(calc(50vw - 24px),calc(100vh - 200px));height:min(calc(50vw - 24px),calc(100vh - 200px));">
@@ -439,22 +441,48 @@ function startRolling(mi, blackFinal, whiteFinal){
         if(m2.status!=='rolling')return; // 已被其他操作中斷
         m2.status='ready';
         broadcast();
-    },3000); // 3秒後進入準備階段
+    },6000); // 6秒後進入準備階段
 }
 
 function runCountdown(mi){
     clearInterval(countdownTimers[mi]);
+    countdownTimers[mi] = null;
+    // 只有觸發者（黑方）負責倒數，白方/觀眾透過 applyState 收到更新
     countdownTimers[mi]=setInterval(()=>{
         const m=state.matches[mi];
-        if(m.status!=='countdown'){clearInterval(countdownTimers[mi]);hideCountdownOverlay();return;}
-        playSound('beep');
+        if(m.status!=='countdown'){
+            clearInterval(countdownTimers[mi]);
+            countdownTimers[mi]=null;
+            hideCountdownOverlay();
+            return;
+        }
         m.countdown--;
+        playSound('beep');
         if(m.countdown<=0){
             clearInterval(countdownTimers[mi]);
+            countdownTimers[mi]=null;
             m.status='playing';m.countdown=0;
             hideCountdownOverlay();
         }
         broadcast();
+    },1000);
+}
+
+// applyState 收到 countdown 狀態時，如果本機沒在跑 timer 就啟動
+function ensureCountdown(mi){
+    const m=state.matches[mi];
+    if(m.status!=='countdown')return;
+    if(countdownTimers[mi])return; // 已在跑
+    // 這個裝置不是觸發者，只做本機倒數顯示（不廣播）
+    countdownTimers[mi]=setInterval(()=>{
+        const m2=state.matches[mi];
+        if(m2.status!=='countdown'){
+            clearInterval(countdownTimers[mi]);
+            countdownTimers[mi]=null;
+            hideCountdownOverlay();
+        }
+        // 不 broadcast！只更新本機顯示
+        renderAll();
     },1000);
 }
 
@@ -541,8 +569,12 @@ function handleReady(mi){
     else return;
     // 雙方都準備好 → 開始倒數
     if(m.blackReady&&m.whiteReady){
+        // 清除可能殘留的舊 timer
+        clearInterval(countdownTimers[mi]);
+        countdownTimers[mi]=null;
         m.status='countdown';m.countdown=3;
         broadcast();
+        // 只有觸發這次準備完成的裝置負責廣播倒數
         runCountdown(mi);
     } else {
         broadcast();
@@ -613,12 +645,23 @@ function broadcast(){
 }
 
 function applyState(newState){
-    const prev=state.matches.map(m=>m.status);
+    const prev=state.matches.map(m=>({status:m.status,countdown:m.countdown}));
     state=Object.assign({},state,newState);
-    // 角色更新
     updateMyRole();
-    // 對新變成 finished 的場次啟動倒數 autoNext（只有一個裝置做，避免重複）
-    // 由 handleCellClick 處理，不在 applyState 做
+
+    state.matches.forEach((m,mi)=>{
+        const p=prev[mi];
+        if(m.status==='countdown'){
+            // 收到倒數狀態：確保本機有 timer（不廣播版本）
+            ensureCountdown(mi);
+        } else if(p && p.status==='countdown' && m.status!=='countdown'){
+            // 倒數結束或被中斷：清除本機 timer
+            clearInterval(countdownTimers[mi]);
+            countdownTimers[mi]=null;
+            hideCountdownOverlay();
+        }
+    });
+
     renderAll();
 }
 
@@ -760,15 +803,6 @@ function renderMatch(mi){
 function renderBoard(mi){
     const m=state.matches[mi];
     const s=m.status;
-    // 更新 idle 畫面的積分顯示
-    const idleScores=document.getElementById('idle-scores-'+mi);
-    if(idleScores){
-        const active=state.activePlayers.length>0?state.activePlayers:Object.keys(state.scores);
-        idleScores.innerHTML=active.filter(id=>state.scores[id]).map(id=>{
-            const d=state.scores[id]||{wins:0,matches:0};
-            return `<span style="font-family:'Nunito',sans-serif;font-size:10px;background:rgba(255,255,255,.08);border-radius:6px;padding:2px 6px;color:rgba(255,255,255,.6)">${id} <b style="color:var(--yellow)">${d.wins}</b></span>`;
-        }).join('');
-    }
     if(s==='idle'||s==='rolling')return;
     const cells=document.querySelectorAll('#board-'+mi+' .cell');
     cells.forEach((cell,i)=>{
@@ -823,6 +857,10 @@ function renderTeacherView(){
         const tw=document.getElementById('tv-white-'+mi);
         if(tb)tb.textContent=m.black||'—';
         if(tw)tw.textContent=m.white||'—';
+        const tsb=document.getElementById('tv-side-black-'+mi);
+        const tsw=document.getElementById('tv-side-white-'+mi);
+        if(tsb)tsb.textContent=m.black||'';
+        if(tsw)tsw.textContent=m.white||'';
         const tst=document.getElementById('tv-status-'+mi);
         if(tst) tst.textContent=
             s==='idle'?'等待':s==='rolling'?'配對中':s==='ready'?'準備中':
@@ -866,22 +904,41 @@ function renderLobbyCards(){
         }else if(s==='countdown'){ma.innerHTML=`<div class="countdown-badge">${m.countdown}</div>`;}
         else if(s==='playing'){ma.innerHTML=`<div class="ready-status rs-go">🔴 對戰中</div>`;}
         else if(s==='finished'){const wG=m.winner==='black'?m.black:m.white;ma.innerHTML=`<div class="ready-status rs-done">🏆 ${wG} 獲勝</div>`;}
-        else ma.innerHTML='';
+        else ma.innerHTML=`<div class="ready-status rs-waiting" style="font-size:11px">⏳ 棋局進行中，等待下一局配對</div>`;
     });
 }
 function isMyMatchPlaying(){
     if(myRole!=='player')return false;
-    return state.matches.some(m=>(m.black===myGroup||m.white===myGroup)&&(m.status==='playing'||m.status==='countdown'));
+    return state.matches.some(m=>(m.black===myGroup||m.white===myGroup)&&
+        (m.status==='playing'||m.status==='countdown'||m.status==='finished'));
 }
 function renderGameView(){
-    if(!(myRole==='player'&&isMyMatchPlaying()))return; // showView 已控制顯示
+    if(!(myRole==='player'&&isMyMatchPlaying()))return;
     const mi=state.matches.findIndex(m=>m.black===myGroup||m.white===myGroup);
     if(mi<0)return;
     _myMi=mi;const m=state.matches[mi];
-    document.getElementById('play-name-black').textContent=m.black;
-    document.getElementById('play-name-white').textContent=m.white;
-    document.getElementById('play-black').className='ph2'+(m.turn==='black'&&m.status==='playing'&&!m.winner?' active':'')+(m.winner==='black'?' winner-side':'');
-    document.getElementById('play-white').className='ph2'+(m.turn==='white'&&m.status==='playing'&&!m.winner?' active':'')+(m.winner==='white'?' winner-side':'');
+
+    // 更新側邊直書名稱
+    const snB=document.getElementById('side-name-black');
+    const snW=document.getElementById('side-name-white');
+    if(snB)snB.textContent=m.black;
+    if(snW)snW.textContent=m.white;
+
+    // 倒數 overlay
+    const scd=document.getElementById('solo-countdown');
+    if(scd){
+        if(m.status==='countdown'){
+            scd.style.display='flex';
+            const numEl=document.getElementById('solo-cd-num');
+            const vsEl=document.getElementById('solo-cd-vs');
+            if(numEl){ numEl.textContent=m.countdown; numEl.style.animation='none'; numEl.offsetHeight; numEl.style.animation='cdBounce .35s cubic-bezier(.34,1.56,.64,1)'; }
+            if(vsEl) vsEl.textContent=`${m.black} ⚔️ ${m.white}`;
+        }else{
+            scd.style.display='none';
+        }
+    }
+
+    // 棋盤
     resizeSoloBoard();
     const cells=document.querySelectorAll('#solo-board .cell');
     cells.forEach((cell,i)=>{
@@ -891,6 +948,8 @@ function renderGameView(){
         cell.className='cell'+(canMove?' can-move':'');
         cell.innerHTML=val===0?'':`<div class="piece ${val===1?'black':'white'}${m.lastMove===i?' last':''}"></div>`;
     });
+
+    // 勝利 overlay
     const wo=document.getElementById('solo-winner');
     if(m.winner&&m.status==='finished'){
         document.getElementById('solo-winner-name').textContent=m.winner==='black'?m.black:m.white;
@@ -898,10 +957,10 @@ function renderGameView(){
         wo.classList.add('show');
     }else wo.classList.remove('show');
 }
+
+
 function renderBottom(){
     const ind=document.getElementById('turn-indicator');if(!ind)return;
-    const banner=document.getElementById('turn-banner');
-    const bannerText=document.getElementById('turn-banner-text');
 
     if(myRole!=='player'){
         ind.className='turn-badge tb-wait';ind.textContent=state.started?'觀賽中':'等待老師抽籤';
@@ -916,23 +975,6 @@ function renderBottom(){
     }
     const m=state.matches[mi];
     const inGame=m.status==='playing'||m.status==='countdown';
-
-    // turn-banner：只在 game-view（參賽中）顯示
-    if(banner){
-        const gv=document.getElementById('game-view');
-        const showBanner=inGame&&gv&&gv.style.display!=='none';
-        banner.style.display=showBanner?'flex':'none';
-        if(showBanner&&bannerText){
-            if(m.status==='countdown'){
-                bannerText.className='tb-banner tb-banner-your';
-                bannerText.textContent=`⚡ ${m.countdown} 秒後開始！`;
-            }else{
-                const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');
-                bannerText.className='tb-banner '+(myTurn?'tb-banner-your':'tb-banner-wait');
-                bannerText.textContent=myTurn?'⚔️ 你的回合！請落子':'等待對方落子...';
-            }
-        }
-    }
 
     // 底部小標籤
     if(m.status==='ready'){const myRdy=(myGroup===m.black&&m.blackReady)||(myGroup===m.white&&m.whiteReady);ind.className='turn-badge '+(myRdy?'tb-wait':'tb-your');ind.textContent=myRdy?'✅ 已準備，等待對方...':'請按準備！';}
