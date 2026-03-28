@@ -112,6 +112,22 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 .tv-status{font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;color:rgba(255,255,255,.5);flex-shrink:0;white-space:nowrap;}
 .tv-board-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:4px;}
 .tv-board-outer{background:#dcb35c;padding:4px;border-radius:8px;border:3px solid #8b4513;box-shadow:0 4px 16px rgba(0,0,0,.7);}
+
+/* ── 倒數全螢幕 Overlay ── */
+#countdown-overlay{display:none;position:fixed;inset:0;background:rgba(10,5,40,.88);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:16px;pointer-events:none;}
+#countdown-overlay.show{display:flex;}
+.cd-match-title{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(14px,3vw,20px);color:rgba(255,255,255,.6);letter-spacing:.08em;}
+.cd-number{font-family:'Fredoka One',sans-serif;font-size:clamp(100px,22vw,180px);color:#00E5FF;line-height:1;text-shadow:0 0 60px rgba(0,229,255,.8);}
+@keyframes cdBounce{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.cd-vs{font-family:'Fredoka One',sans-serif;font-size:clamp(18px,4vw,28px);color:rgba(255,255,255,.5);}
+
+/* ── 棋盤上方落子提示 ── */
+#turn-banner{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:30;}
+.tb-banner{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(14px,3.5vw,20px);padding:8px 24px;border-radius:24px;backdrop-filter:blur(4px);box-shadow:0 4px 16px rgba(0,0,0,.5);}
+.tb-banner-your{background:rgba(46,204,64,.25);border:2px solid var(--green);color:var(--green);animation:tbPulse 1.2s ease-in-out infinite;}
+.tb-banner-wait{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);}
+@keyframes tbPulse{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 0 rgba(46,204,64,0)}50%{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 8px rgba(46,204,64,.2)}}
+
 #pause-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
 #pause-overlay.show{display:flex;}
 #toast-w3{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);background:#1A0A4A;border:3px solid var(--yellow);border-radius:12px;padding:10px 22px;font-family:'Nunito',sans-serif;font-weight:900;color:var(--yellow);opacity:0;transition:.25s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:500;white-space:nowrap;}
@@ -183,6 +199,10 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
     <div class="ph2" id="play-black"><div class="stone-sm black"></div><div><div class="chip-name" id="play-name-black"></div><div class="chip-tag">先手</div></div></div>
     <div class="vs-label">VS</div>
     <div class="ph2" id="play-white"><div class="stone-sm white"></div><div><div class="chip-name" id="play-name-white"></div><div class="chip-tag">後手</div></div></div>
+  </div>
+  <!-- 落子提示 -->
+  <div id="turn-banner" style="display:none;width:100%;justify-content:center;flex-shrink:0;padding:4px 0;">
+    <div class="tb-banner tb-banner-wait" id="turn-banner-text">等待對方落子...</div>
   </div>
   <!-- 棋盤 -->
   <div id="solo-board-wrap">
@@ -257,6 +277,13 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 <!-- Teacher controls -->
 <div id="teacher-ctrl">
   <button class="tc-btn tc-btn-blue" id="btn-draw" onclick="drawLots()">🎲 抽籤開始</button>
+</div>
+
+<!-- 倒數全螢幕 Overlay -->
+<div id="countdown-overlay">
+  <div class="cd-match-title" id="cd-match-title"></div>
+  <div class="cd-number" id="cd-number">3</div>
+  <div class="cd-vs" id="cd-vs"></div>
 </div>
 
 <!-- Pause overlay -->
@@ -419,15 +446,34 @@ function runCountdown(mi){
     clearInterval(countdownTimers[mi]);
     countdownTimers[mi]=setInterval(()=>{
         const m=state.matches[mi];
-        if(m.status!=='countdown'){clearInterval(countdownTimers[mi]);return;}
+        if(m.status!=='countdown'){clearInterval(countdownTimers[mi]);hideCountdownOverlay();return;}
         playSound('beep');
         m.countdown--;
         if(m.countdown<=0){
             clearInterval(countdownTimers[mi]);
             m.status='playing';m.countdown=0;
+            hideCountdownOverlay();
         }
         broadcast();
     },1000);
+}
+
+function showCountdownOverlay(mi){
+    const m=state.matches[mi];
+    const ov=document.getElementById('countdown-overlay');
+    if(!ov)return;
+    document.getElementById('cd-match-title').textContent=`第${mi===0?'一':'二'}場`;
+    document.getElementById('cd-vs').textContent=`${m.black} ⚔️ ${m.white}`;
+    const numEl=document.getElementById('cd-number');
+    numEl.textContent=m.countdown;
+    // 重新觸發動畫
+    numEl.style.animation='none';
+    numEl.offsetHeight; // reflow
+    numEl.style.animation='cdBounce .35s cubic-bezier(.34,1.56,.64,1)';
+    ov.classList.add('show');
+}
+function hideCountdownOverlay(){
+    document.getElementById('countdown-overlay')?.classList.remove('show');
 }
 
 // 賽局結束後自動配對閒置組
@@ -854,13 +900,44 @@ function renderGameView(){
 }
 function renderBottom(){
     const ind=document.getElementById('turn-indicator');if(!ind)return;
-    if(myRole!=='player'){ind.className='turn-badge tb-wait';ind.textContent=state.started?'觀賽中':'等待老師抽籤';return;}
+    const banner=document.getElementById('turn-banner');
+    const bannerText=document.getElementById('turn-banner-text');
+
+    if(myRole!=='player'){
+        ind.className='turn-badge tb-wait';ind.textContent=state.started?'觀賽中':'等待老師抽籤';
+        if(banner)banner.style.display='none';
+        return;
+    }
     const mi=state.matches.findIndex(m=>m.black===myGroup||m.white===myGroup);
-    if(mi<0){ind.className='turn-badge tb-wait';ind.textContent='等待配對';return;}
+    if(mi<0){
+        ind.className='turn-badge tb-wait';ind.textContent='等待配對';
+        if(banner)banner.style.display='none';
+        return;
+    }
     const m=state.matches[mi];
+    const inGame=m.status==='playing'||m.status==='countdown';
+
+    // turn-banner：只在 game-view（參賽中）顯示
+    if(banner){
+        const gv=document.getElementById('game-view');
+        const showBanner=inGame&&gv&&gv.style.display!=='none';
+        banner.style.display=showBanner?'flex':'none';
+        if(showBanner&&bannerText){
+            if(m.status==='countdown'){
+                bannerText.className='tb-banner tb-banner-your';
+                bannerText.textContent=`⚡ ${m.countdown} 秒後開始！`;
+            }else{
+                const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');
+                bannerText.className='tb-banner '+(myTurn?'tb-banner-your':'tb-banner-wait');
+                bannerText.textContent=myTurn?'⚔️ 你的回合！請落子':'等待對方落子...';
+            }
+        }
+    }
+
+    // 底部小標籤
     if(m.status==='ready'){const myRdy=(myGroup===m.black&&m.blackReady)||(myGroup===m.white&&m.whiteReady);ind.className='turn-badge '+(myRdy?'tb-wait':'tb-your');ind.textContent=myRdy?'✅ 已準備，等待對方...':'請按準備！';}
-    else if(m.status==='countdown'){ind.className='turn-badge tb-your';ind.textContent=`⚡ ${m.countdown} 秒後開始！`;}
-    else if(m.status==='playing'){const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');ind.className='turn-badge '+(myTurn?'tb-your':'tb-wait');ind.textContent=myTurn?'⚔️ 你的回合！請落子':'等待對方落子...';}
+    else if(m.status==='countdown'){ind.className='turn-badge tb-your';ind.textContent=`⚡ ${m.countdown} 秒後`;}
+    else if(m.status==='playing'){const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');ind.className='turn-badge '+(myTurn?'tb-your':'tb-wait');ind.textContent=myTurn?'⚔️ 你的回合！':'等待對方...';}
     else if(m.status==='finished'){ind.className='turn-badge tb-wait';ind.textContent='比賽結束';}
     else{ind.className='turn-badge tb-wait';ind.textContent='等待配對';}
 }
