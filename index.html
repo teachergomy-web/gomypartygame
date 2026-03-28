@@ -1569,6 +1569,11 @@ function joinRoom() {
   const symbol    = window.state.selectedSymbol;
   const roomCode  = window.state.roomCode;
 
+  // 按下後立即鎖定按鈕，防止重複點擊
+  const joinBtn = document.querySelector('#screen-join .btn-green');
+  if (joinBtn) { joinBtn.disabled = true; joinBtn.textContent = '確認中...'; }
+  const restoreBtn = () => { if (joinBtn) { joinBtn.disabled = false; joinBtn.textContent = '準備完成！→'; } };
+
   // ── 用 Firebase Transaction 保證原子性，防止同時加入同組 ──
   if (isFirebase && db && fsTransaction && isFirebaseAuthComplete) {
       const ref = fsDoc(db, 'rooms', roomCode);
@@ -1582,10 +1587,10 @@ function joinRoom() {
           const existingIdx = players.findIndex(p => p.group === groupName);
 
           if (existingIdx !== -1) {
-              // 重連：更新符號
+              // 同組重連：更新符號
               players[existingIdx].symbol = symbol;
           } else {
-              // 新加入：檢查是否已被佔用
+              // 新加入：以 Firebase 最新資料確認組別未被佔用
               if (players.some(p => p.group === groupName)) {
                   throw new Error('組別已被佔用');
               }
@@ -1596,19 +1601,36 @@ function joinRoom() {
           tx.update(ref, { players, playerCount: players.length });
           return players;
       }).then((players) => {
-          // Transaction 成功
           window.state.players      = players;
           window.state.takenSymbols = players.map(p => p.symbol);
           window.state.takenGroups  = players.map(p => p.group);
           _finishJoin(groupName, symbol, roomCode);
+          // 不需要 restoreBtn，因為已跳轉頁面
       }).catch((err) => {
+          restoreBtn();
           if (err.message === '組別已被佔用') {
-              window.showToast('⚠️ 該組已被其他人選走，請重新選擇');
-              window.syncJoinDOM();
+              window.showToast('⚠️ 該組已被其他人搶先加入，請重新選擇！');
+              // 重新整理組別選擇，標示已佔用
+              if (fsGetDoc) {
+                  fsGetDoc(fsDoc(db, 'rooms', roomCode)).then(snap => {
+                      if (snap.exists()) {
+                          const latest = snap.data();
+                          window.state.players     = latest.players || [];
+                          window.state.takenGroups = window.state.players.map(p => p.group);
+                          window.state.selectedGroup  = null;
+                          window.state.selectedSymbol = null;
+                          window.renderGroupSelect();
+                      }
+                  });
+              } else {
+                  window.state.selectedGroup  = null;
+                  window.state.selectedSymbol = null;
+                  window.syncJoinDOM();
+              }
           } else if (err.message === '房間已滿') {
               window.showToast('⚠️ 房間已滿');
               window.goToJoin();
-          } else if (err.message === '房間已關閉') {
+          } else if (err.message === '房間已關閉' || err.message === '房間不存在') {
               window.showToast('⚠️ 房間已關閉');
               window.goToJoin();
           } else {
@@ -1616,12 +1638,12 @@ function joinRoom() {
               window.showToast('❌ 加入失敗，請重試');
           }
       });
-      return; // 等 transaction 完成
+      return;
   }
 
   // ── fallback：無 Firebase 時用本機邏輯 ──
   const rooms = window.getRooms();
-  if (!rooms[roomCode] || !rooms[roomCode].open) { window.showToast('⚠️ 房間已關閉'); window.goToJoin(); return; }
+  if (!rooms[roomCode] || !rooms[roomCode].open) { restoreBtn(); window.showToast('⚠️ 房間已關閉'); window.goToJoin(); return; }
   if (rooms[roomCode].players) {
       window.state.players      = rooms[roomCode].players;
       window.state.takenSymbols = window.state.players.map(p => p.symbol);
@@ -1631,8 +1653,15 @@ function joinRoom() {
   if (existingIndex !== -1) {
       window.state.players[existingIndex].symbol = symbol;
   } else {
-      if (window.state.players.some(p => p.group === groupName)) { window.showToast('⚠️ 組別已被佔用'); return; }
-      if (window.state.players.length >= 5) { window.showToast('⚠️ 房間已滿'); window.goToJoin(); return; }
+      if (window.state.players.some(p => p.group === groupName)) {
+          restoreBtn();
+          window.showToast('⚠️ 該組已被佔用，請重新選擇！');
+          window.state.selectedGroup  = null;
+          window.state.selectedSymbol = null;
+          window.renderGroupSelect();
+          return;
+      }
+      if (window.state.players.length >= 5) { restoreBtn(); window.showToast('⚠️ 房間已滿'); window.goToJoin(); return; }
       window.state.players.push({ group: groupName, symbol });
   }
   window.state.takenSymbols = window.state.players.map(p => p.symbol);
@@ -1658,7 +1687,10 @@ function _finishJoin(groupName, symbol, roomCode) {
   window.renderLobby();
   window.updateStudentWaitDisplay();
   window.goTo('screen-student-wait');
-  localStorage.setItem('game_session', JSON.stringify({ perspective: window.state.perspective, roomCode, group: groupName, symbol }));
+  // 學生 session：只儲存學生資訊，不含 teacher 標記
+  if (groupName) {
+      localStorage.setItem('game_session', JSON.stringify({ perspective: window.state.perspective, roomCode, group: groupName, symbol }));
+  }
   window.showToast(`✅ ${groupName} 已加入房間！`);
 }
 
@@ -1852,7 +1884,7 @@ function teacherLogin() {
   // 先設 roomCode，讓 saveRooms 知道要存哪個房間
   window.state.roomCode = code;
   window.state.players = []; window.state.takenSymbols = [];
-  localStorage.setItem('game_session', JSON.stringify({ perspective:'teacher', roomCode:code }));
+  localStorage.setItem('game_session', JSON.stringify({ perspective:'teacher', roomCode:code, _teacherToken: true }));
 
   window.saveRooms(rooms);
   // 直接寫入 Firebase（不管 auth 狀態，等連線後自動重試）
@@ -2040,14 +2072,28 @@ function tryRestoreSession() {
     if (!saved || !saved.perspective || !saved.roomCode) return;
     window._pendingRestore = null;
 
+    const hideLoading = () => {
+        const ld = document.getElementById('restore-loading');
+        if (ld) ld.style.display = 'none';
+    };
+
+    // ── 安全性：學生 session 必須有 group 才有效 ──
+    // 若 perspective=teacher 但沒有特殊 teacher token，視為無效（防止誤恢復老師端）
+    if (saved.perspective === 'teacher' && !saved._teacherToken) {
+        localStorage.removeItem('game_session');
+        hideLoading(); return;
+    }
+    // 學生 session 必須有 group
+    if (saved.perspective !== 'teacher' && !saved.group) {
+        localStorage.removeItem('game_session');
+        hideLoading(); return;
+    }
+
     const rooms = window.getRooms();
     const room  = rooms[saved.roomCode];
     if (!room || !room.open) {
-        // 房間已不存在，清除 session
         localStorage.removeItem('game_session');
-        const loading = document.getElementById('restore-loading');
-        if (loading) loading.style.display = 'none';
-        return;
+        hideLoading(); return;
     }
 
     // 恢復共用狀態
@@ -2070,21 +2116,27 @@ function tryRestoreSession() {
             window.goTo('screen-lobby');
         }
     } else {
-        // 學生恢復
+        // 學生恢復：驗證 group 確實在房間的 players 裡
+        const groupInRoom = (room.players || []).some(p => p.group === saved.group);
+        if (!groupInRoom) {
+            // 組別不在房間裡（可能被清除），清除 session 回首頁
+            localStorage.removeItem('game_session');
+            hideLoading(); return;
+        }
+
         window.state.perspective = saved.perspective;
         const pData = window.pStates[saved.perspective];
-        if (!pData || !saved.group) { localStorage.removeItem('game_session'); const ld=document.getElementById('restore-loading'); if(ld) ld.style.display='none'; return; }
+        if (!pData) { localStorage.removeItem('game_session'); hideLoading(); return; }
 
         pData.joined = true;
         pData.group  = saved.group;
         pData.symbol = saved.symbol || '';
 
-        // 更新狀態文字
         const swStatus = document.getElementById('sw-my-group-status');
         if (swStatus) swStatus.innerHTML = `✅ <b>${saved.group}</b> 已連線，等待老師啟動...`;
 
         startSyncListener();
-        window.updateStudentWaitDisplay(); // 更新 sw-code、sw-name、symbol、players
+        window.updateStudentWaitDisplay();
 
         if (room.status === 'playing') {
             tcLaunchStudentIfNeeded();
@@ -2097,8 +2149,7 @@ function tryRestoreSession() {
         }
     }
     showToast('🔄 已恢復上次連線');
-    const loading = document.getElementById('restore-loading');
-    if (loading) loading.style.display = 'none';
+    hideLoading();
 }
 
 // ==========================================
