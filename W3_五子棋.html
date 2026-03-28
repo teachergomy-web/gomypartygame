@@ -69,7 +69,7 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 @keyframes pop{from{transform:scale(.15);opacity:0}to{transform:scale(1);opacity:1}}
 
 /* Roll animation */
-.roll-box{flex:1;aspect-ratio:1;max-width:110px;display:flex;align-items:center;justify-content:center;border-radius:14px;border:3px solid;font-family:'Fredoka One',sans-serif;font-size:clamp(13px,4vw,20px);animation:rBounce .55s ease-in-out infinite alternate;}
+.roll-box{flex:1;aspect-ratio:1;max-width:140px;display:flex;align-items:center;justify-content:center;border-radius:18px;border:4px solid;font-family:'Fredoka One',sans-serif;font-size:clamp(20px,6vw,32px);animation:rBounce .55s ease-in-out infinite alternate;font-weight:900;}
 .roll-box.b{background:linear-gradient(160deg,#333,#000);border-color:#666;color:#fff;}
 .roll-box.w{background:linear-gradient(160deg,#fff,#ccc);border-color:#aaa;color:#000;}
 @keyframes rBounce{from{transform:scale(.93)}to{transform:scale(1.07)}}
@@ -135,10 +135,10 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
 
     <!-- 抽籤 -->
     <div id="s-rolling" class="hidden" style="width:100%;max-width:380px;text-align:center;">
-      <div style="font-family:'Fredoka One',sans-serif;font-size:16px;color:#00E5FF;margin-bottom:16px;animation:pulse 1s infinite">⚡ 系統配對中...</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+      <div style="font-family:'Fredoka One',sans-serif;font-size:18px;color:#00E5FF;margin-bottom:20px;animation:pulse 1s infinite;letter-spacing:.08em">⚡ 系統配對中...</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;width:100%;max-width:340px;">
         <div class="roll-box b" id="roll-b">???</div>
-        <div style="font-family:'Fredoka One',sans-serif;font-size:20px;color:rgba(255,255,255,.2)">VS</div>
+        <div style="font-family:'Fredoka One',sans-serif;font-size:28px;color:rgba(255,255,255,.3);flex-shrink:0">VS</div>
         <div class="roll-box w" id="roll-w">???</div>
       </div>
     </div>
@@ -193,10 +193,19 @@ body,html{margin:0;padding:0;width:100%;height:100%;background:var(--bg);font-fa
     <!-- 老師控制列 -->
     <div id="teacher-ctrl" class="hidden" style="width:100%;max-width:360px;">
       <button class="mp-btn btn-blue" id="btn-schedule" onclick="scheduleMatch()">🎲 隨機抽籤排賽</button>
-
+      <button class="mp-btn btn-green" id="btn-next-match" class="hidden" onclick="nextMatch()" style="display:none;margin-bottom:0">▶ 下一局</button>
     </div>
 
   </div>
+</div>
+
+<!-- 勝負遮罩（棋盤上方，點擊關閉）-->
+<div id="winner-overlay" class="hidden" onclick="dismissWinner()" style="position:absolute;top:64px;left:0;right:0;bottom:60px;background:rgba(13,17,23,.88);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer;">
+  <div id="wo-icon" style="font-size:80px;animation:woPop .5s cubic-bezier(.34,1.56,.64,1)">🏆</div>
+  <div id="wo-group" style="font-family:'Fredoka One',sans-serif;font-size:clamp(28px,8vw,48px);color:var(--yellow);text-shadow:0 0 30px rgba(255,214,0,.6);animation:woPop .5s .1s both cubic-bezier(.34,1.56,.64,1)"></div>
+  <div id="wo-label" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(16px,4vw,24px);color:rgba(255,255,255,.7);animation:woPop .5s .2s both cubic-bezier(.34,1.56,.64,1)">獲勝！</div>
+  <div style="font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:rgba(255,255,255,.3);margin-top:8px;animation:pulse 1.5s infinite">點擊畫面繼續</div>
+  <style>@keyframes woPop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}</style>
 </div>
 
 <!-- Bottom bar -->
@@ -428,7 +437,10 @@ function broadcast(){
 // ═══════════════════════════════════════
 function applyState(newState){
     const prevStatus=state.matchStatus;
+    const prevWinner=state.winner;
     state=Object.assign({},state,newState);
+    // 如果狀態重設（新局）則清除勝負遮罩
+    if(prevWinner&&!state.winner) hideWinnerOverlay();
     // 角色重新判定
     if(myRole!=='teacher'){
         if(myGroup&&state.black&&state.black===myGroup)myRole='black';
@@ -497,10 +509,13 @@ function renderCentre(){
     // 老師控制（遊戲進行中只顯示重置，不顯示抽籤）
     const tc=document.getElementById('teacher-ctrl');
     if(myRole==='teacher'){
-        const isPlaying=(s==='playing'||s==='finished');
+        const isPlaying=(s==='playing');
+        const isFinished=(s==='finished');
         tc.classList.remove('hidden');
-        document.getElementById('btn-schedule').style.display = isPlaying ? 'none' : '';
+        document.getElementById('btn-schedule').style.display = (isPlaying||isFinished) ? 'none' : '';
         document.getElementById('btn-schedule').disabled=(s==='rolling');
+        const nextBtn=document.getElementById('btn-next-match');
+        if(nextBtn) nextBtn.style.display = isFinished ? '' : 'none';
     }else tc.classList.add('hidden');
 
     // 抽籤動畫
@@ -577,9 +592,12 @@ function renderBottom(){
         const wGroup=state.winner==='black'?state.black:state.white;
         tb.className='turn-badge wait';tb.textContent='比賽結束';
         wb.classList.remove('hidden');wb.textContent=`🏆 ${wGroup} 獲勝！`;
+        // 中央大型勝負遮罩
+        showWinnerOverlay(wGroup);
         return;
     }
     wb.classList.add('hidden');
+    hideWinnerOverlay();
     // finished 無 winner（平局）
     if(state.matchStatus==='finished'){
         tb.className='turn-badge wait';tb.textContent='比賽結束';return;
@@ -601,6 +619,38 @@ function renderBottom(){
         tb.className='turn-badge wait';
         tb.textContent=`等待 ${turnGroup} 落子...`;
     }
+}
+
+let _winnerShown = '';
+function showWinnerOverlay(group){
+    if(_winnerShown===group)return; // 避免重複顯示
+    _winnerShown=group;
+    const ov=document.getElementById('winner-overlay');
+    if(!ov)return;
+    document.getElementById('wo-group').textContent=group;
+    const stone=state.winner==='black'?'⚫':'⚪';
+    document.getElementById('wo-label').textContent=stone+' 獲勝！';
+    ov.classList.remove('hidden');
+    ov.style.display='flex';
+}
+function hideWinnerOverlay(){
+    _winnerShown='';
+    const ov=document.getElementById('winner-overlay');
+    if(ov){ov.classList.add('hidden');ov.style.display='';}
+}
+function dismissWinner(){
+    const ov=document.getElementById('winner-overlay');
+    if(ov){ov.classList.add('hidden');ov.style.display='';}
+}
+function nextMatch(){
+    // 重置棋局，回到 idle 讓老師重新抽籤
+    hideWinnerOverlay();
+    state.matchStatus='idle';
+    state.black='';state.white='';
+    state.blackReady=false;state.whiteReady=false;
+    state.cells=Array(GRID*GRID).fill(0);
+    state.turn='black';state.lastMove=-1;state.winner=null;
+    broadcast();
 }
 
 // ═══════════════════════════════════════
