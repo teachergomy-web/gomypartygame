@@ -880,6 +880,12 @@ function tcStartGame() {
     }
 
     if (window.state.selectedGame === 2) {
+        // W3：新遊戲開始時清空上次的 w3state，確保抽籤按鈕顯示
+        const rooms0 = window.getRooms();
+        if (rooms0[window.state.roomCode]) {
+            rooms0[window.state.roomCode].w3state = null;
+            window.saveRooms(rooms0);
+        }
         // W3：老師控制台嵌入 W3 iframe + 頂部抽籤按鈕
         const settleBtn = document.getElementById('tc-btn-settle');
         const levelBadge = document.getElementById('tc-level-badge');

@@ -221,7 +221,7 @@
             <div class="hud-val text-cyan" id="level-txt">1/28</div>
         </div>
         <div class="hud-box" style="align-items:center">
-            <button class="back-btn" onclick="backToMenu()">🏠 主選單</button>
+            <button class="back-btn" id="hud-menu-btn" onclick="backToMenu()" style="display:none">🏠 主選單</button>
         </div>
         <div class="hud-box" style="align-items:flex-end">
             <div class="hud-label">狀態</div>
@@ -950,12 +950,10 @@
                 totalScore = 0;
                 gameStarted = true;
                 loadLevel(Math.max(0, Math.min(autoLevel, maxLevels - 1)));
-                // 平台模式：隱藏所有「回主選單」按鈕
-                const hudBtn = document.getElementById('hud-menu-btn');
+                // 平台模式：隱藏回主選單按鈕（HUD已預設隱藏）
                 const rulesBtn = document.getElementById('rules-cancel-btn');
                 const goMenuBtn = document.getElementById('gameover-menu-btn');
                 const goMsgEl = document.getElementById('gameover-platform-msg');
-                if (hudBtn) hudBtn.style.display = 'none';
                 if (rulesBtn) rulesBtn.style.display = 'none';
                 if (goMenuBtn) goMenuBtn.style.display = 'none';
                 if (goMsgEl) goMsgEl.style.display = 'block';
