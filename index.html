@@ -125,10 +125,18 @@ body::before {
 /* ═══════════════════════════════════════════
    JOIN FLOW
    ═══════════════════════════════════════════ */
-.join-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
-.field-label { display: block; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: .9rem; color: var(--ink); margin-bottom: 12px; }
+.join-layout { display: grid; grid-template-columns: 1fr; gap: 12px; width: 100%; }
+@media (min-width: 520px) { .join-layout { grid-template-columns: 1fr 1fr; gap: 16px; } }
+#screen-join { justify-content: flex-start; padding: 20px 14px 100px; overflow-y: auto; }
 .input-select { width: 100%; background: white; border: 4px solid var(--outline); border-radius: 14px; padding: 14px 16px; font-family: 'Nunito','Noto Sans TC',sans-serif; font-weight: 900; font-size: 1rem; color: var(--ink); appearance: none; cursor: pointer; box-shadow: 0 4px 0 var(--outline); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%231a1200' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 .symbol-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+@media (max-width: 480px) {
+  .symbol-grid { gap: 7px; }
+  .symbol-opt { font-size: 1.3rem; border-radius: 10px; }
+  .card { padding: 16px 14px !important; }
+  #join-step-2 { padding: 0 2px; }
+  .btn.btn-green { font-size: 1rem !important; padding: 14px !important; }
+}
 .symbol-opt { aspect-ratio: 1; border-radius: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; border: 3px solid var(--outline); background: white; box-shadow: 0 4px 0 var(--outline); transition: all .12s; }
 .symbol-opt.selected { background: var(--yellow); transform: translateY(3px); box-shadow: 0 1px 0 var(--outline); }
 .symbol-opt.taken { opacity: .3; filter: grayscale(1); cursor: not-allowed; background: #ddd; border-color: #bbb; box-shadow: none; pointer-events: none; }
@@ -478,7 +486,8 @@ body::before {
     <button class="kr-btn kr-btn-start" style="font-size:1.2rem;padding:18px 60px" onclick="tcStartGame()">▶ 全班開始！</button>
   </div>
 
-
+  <style>
+    @keyframes lsGridMove { 0%{background-position:0 0} 100%{background-position:36px 36px} }
     @keyframes lsSlideIn  { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
     @keyframes lsSlideInL { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:translateX(0)} }
 
@@ -2324,9 +2333,9 @@ function teacherLogin() {
   // 記住這次的房間密碼，下次登入時自動清除
   localStorage.setItem('my_last_room_code', code);
 
-  // 取得房間編號
-  let roomNum = parseInt(localStorage.getItem('playroom_counter') || '0') + 1;
-  localStorage.setItem('playroom_counter', roomNum);
+  // 取得房間編號：用目前已存在的房間數量 +1，不再累積遞增
+  const existingCount = Object.keys(rooms).filter(c => rooms[c] && rooms[c].open).length;
+  let roomNum = existingCount + 1;
 
   rooms[code] = { 
       open: true, teacherName: tName, roomNum: roomNum, createdAt: Date.now(),

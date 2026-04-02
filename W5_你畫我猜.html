@@ -186,11 +186,34 @@
     <button id="t-main-btn" class="btn btn-yellow" onclick="teacherAction()">隨機出題 · 開始作畫</button>
   </div>
 
+  <!-- Teacher rules card (shown in IDLE) -->
+  <div id="t-rules-card" style="width:100%;max-width:700px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px 32px;display:none">
+    <div style="font-size:15px;font-weight:900;color:var(--accent);margin-bottom:18px;font-family:'Space Mono',monospace;">📋 遊戲說明</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="background:var(--surface2);border-radius:10px;padding:14px 16px;border-left:3px solid var(--accent)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">🎨 作畫階段</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">各組依隨機題目作畫，限時 <strong style="color:var(--text)">60 秒</strong>，可提早交卷。</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px 16px;border-left:3px solid var(--accent3)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent3);margin-bottom:6px">🤔 猜題階段</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">畫作自動傳給下一組猜，各組輸入答案後鎖定。</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px 16px;border-left:3px solid var(--accent4)">
+        <div style="font-size:12px;font-weight:700;color:var(--accent4);margin-bottom:6px">🎯 公布答案</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">老師統一開獎，猜對雙方得分：猜題組 <strong style="color:var(--text)">+2</strong>，出題組 <strong style="color:var(--text)">+1</strong>。</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px 16px;border-left:3px solid var(--green)">
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">🔄 輪流</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">可多輪進行，老師按「隨機出題」開始每一輪，結束時統一結算。</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scores -->
-  <div class="t-scores" id="t-scores"></div>
+  <div class="t-scores" id="t-scores" style="display:none"></div>
 
   <!-- Canvas grid -->
-  <div id="t-canvas-grid"></div>
+  <div id="t-canvas-grid" style="display:none"></div>
 
   <div style="height:20px;"></div>
 </div>
@@ -289,32 +312,45 @@
 </div>
 
 <script>
-// ═══════════════════════════════════════════
-// DATA & STATE
-// ═══════════════════════════════════════════
 const TOPICS = [
   "大象","火車","電腦","珍珠奶茶","長頸鹿","麥當勞","機器人","太空船","警察局",
   "烤肉","彩虹","腳踏車","直升機","鬼屋","冰淇淋","蜘蛛人","聖誕樹","滑水道",
   "潛水艇","比薩斜塔","柯基犬","熱氣球","恐龍","花椰菜","消防車","釣魚","溜冰"
 ];
-const GROUP_NAMES = ["第 1 組","第 2 組","第 3 組","第 4 組"];
 const GROUP_COLORS = ["#f7c948","#ff5c5c","#4ecdc4","#a78bfa"];
 const DRAW_TIME = 60;
+const LS_KEY = 'w5_game_state';
 
-let state = {
-  phase: 'IDLE',   // IDLE DRAWING GUESSING REVEAL
-  round: 0,
-  time: DRAW_TIME,
-  groups: [
-    { id:0, name:"第 1 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
-    { id:1, name:"第 2 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
-    { id:2, name:"第 3 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
-    { id:3, name:"第 4 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
-  ]
-};
+function defaultState() {
+  return {
+    phase: 'IDLE', round: 0, time: DRAW_TIME,
+    groups: [
+      { id:0, name:"第 1 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
+      { id:1, name:"第 2 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
+      { id:2, name:"第 3 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
+      { id:3, name:"第 4 組", score:0, topic:'', imgData:'', submitted:false, guess:'', guessSubmitted:false, guessFrom:-1 },
+    ]
+  };
+}
+let state = defaultState();
 let timer = null;
-let currentView = 'teacher';    // 'teacher' | 's-g0' | 's-g1' | 's-g2' | 's-g3'
-let currentGroupIdx = -1;       // for student view
+let currentGroupIdx = -1;
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
+}
+function loadState() {
+  try { const r = localStorage.getItem(LS_KEY); if (r) state = JSON.parse(r); }
+  catch(e) { state = defaultState(); }
+}
+// Students listen for teacher-pushed state changes
+window.addEventListener('storage', (e) => {
+  if (e.key !== LS_KEY || currentGroupIdx < 0) return;
+  loadState();
+  renderStudent();
+  if (state.phase === 'DRAWING' && !state.groups[currentGroupIdx]?.submitted)
+    setTimeout(resizeCanvas, 60);
+});
 
 // ═══════════════════════════════════════════
 // CANVAS
@@ -386,8 +422,6 @@ function startRound() {
   state.round++;
   state.phase = 'DRAWING';
   state.time = DRAW_TIME;
-
-  // Shuffle topics, assign unique to each group
   const shuffled = [...TOPICS].sort(()=>Math.random()-.5);
   state.groups.forEach((g,i) => {
     g.topic = shuffled[i % shuffled.length];
@@ -396,22 +430,20 @@ function startRound() {
     g.guess = '';
     g.guessSubmitted = false;
   });
-
-  // Assign who-guesses-whom: rotate +1
   state.groups.forEach((g,i) => {
     g.guessFrom = (i + state.groups.length - 1) % state.groups.length;
   });
-
   clearCanvas();
+  saveState();
   startTimer();
   renderTeacher();
-  if (currentGroupIdx >= 0) renderStudent();
 }
 
 function startTimer() {
   clearInterval(timer);
   timer = setInterval(() => {
     state.time--;
+    saveState();
     updateTimerUI();
     if (state.time <= 0) { clearInterval(timer); forceCollect(); }
   }, 1000);
@@ -420,37 +452,29 @@ function startTimer() {
 function forceCollect() {
   clearInterval(timer);
   state.phase = 'GUESSING';
-  // capture canvas for current student
   if (currentGroupIdx >= 0 && !state.groups[currentGroupIdx].submitted) {
     state.groups[currentGroupIdx].imgData = canvas.toDataURL('image/png');
     state.groups[currentGroupIdx].submitted = true;
   }
+  saveState();
   renderTeacher();
-  if (currentGroupIdx >= 0) renderStudent();
 }
 
 function revealAnswers() {
   state.phase = 'REVEAL';
-  // Score
   state.groups.forEach(g => {
     const painter = state.groups[g.guessFrom];
     const correct = g.guess.trim() === painter.topic.trim();
-    if (correct) {
-      g.score += 2;       // guesser
-      painter.score += 1; // painter
-    }
+    if (correct) { g.score += 2; painter.score += 1; }
   });
-  // Report scores to parent (lobby platform)
   try {
     state.groups.forEach(g => {
-      // Map group name to lobby group format e.g. "第一組" → "第 1 組"
-      const groupLabel = `第 ${g.id + 1} 組`;
-      window.parent.postMessage({ type: 'W5_SCORE', group: groupLabel, score: g.score }, '*');
+      window.parent.postMessage({ type: 'W5_SCORE', group: g.name, score: g.score }, '*');
     });
   } catch(e) {}
+  saveState();
   renderTeacher();
   showRevealModal();
-  if (currentGroupIdx >= 0) renderStudent();
 }
 
 function showRevealModal() {
@@ -484,6 +508,7 @@ function closeReveal() {
 function nextRound() {
   closeReveal();
   state.phase = 'IDLE';
+  saveState();
   renderTeacher();
   if (currentGroupIdx >= 0) renderStudent();
 }
@@ -497,7 +522,7 @@ function studentSubmitDrawing() {
   if (state.phase !== 'DRAWING' || g.submitted) return;
   g.imgData = canvas.toDataURL('image/png');
   g.submitted = true;
-  clearInterval(timer);
+  saveState();
   renderTeacher();
   renderStudent();
 }
@@ -510,6 +535,7 @@ function studentSubmitGuess() {
   if (!val) { document.getElementById('s-guess-input').focus(); return; }
   g.guess = val;
   g.guessSubmitted = true;
+  saveState();
   renderTeacher();
   renderStudent();
 }
@@ -518,11 +544,8 @@ document.getElementById('s-guess-input').addEventListener('keypress', e => {
   if (e.key === 'Enter') { studentSubmitGuess(); e.target.blur(); }
 });
 
-// ═══════════════════════════════════════════
-// RENDER
-// ═══════════════════════════════════════════
+// ═══════ INIT (called after all functions defined below) ═══════
 function renderTeacher() {
-  // Phase pill
   const phases = { IDLE:'待開始', DRAWING:'限時作畫中', GUESSING:'猜題中', REVEAL:'開獎完畢' };
   const pillCls = { IDLE:'', DRAWING:'live', GUESSING:'wait', REVEAL:'ok' };
   const pEl = document.getElementById('t-phase-pill');
@@ -543,42 +566,50 @@ function renderTeacher() {
   }
 
   // Round badge
-  if (state.round > 0) {
-    document.getElementById('round-badge').style.display = 'block';
-    document.getElementById('round-badge').textContent = `Round ${state.round}`;
+  const rb = document.getElementById('round-badge');
+  if (rb) { rb.style.display = state.round > 0 ? 'block' : 'none'; rb.textContent = `Round ${state.round}`; }
+
+  // Teacher IDLE: show rules card instead of grid
+  const rulesCard = document.getElementById('t-rules-card');
+  const scoresEl  = document.getElementById('t-scores');
+  const gridEl    = document.getElementById('t-canvas-grid');
+  if (state.phase === 'IDLE') {
+    if (rulesCard) rulesCard.style.display = 'block';
+    if (scoresEl)  scoresEl.style.display  = 'none';
+    if (gridEl)    gridEl.style.display    = 'none';
+    return;
   }
+  if (rulesCard) rulesCard.style.display = 'none';
+  if (scoresEl)  scoresEl.style.display  = 'grid';
+  if (gridEl)    gridEl.style.display    = 'grid';
 
   // Scores
-  const sc = document.getElementById('t-scores');
-  sc.innerHTML = '';
+  scoresEl.innerHTML = '';
   state.groups.forEach(g => {
-    sc.innerHTML += `<div class="score-card"><div class="sc-name" style="color:${GROUP_COLORS[g.id]}">${g.name}</div><div class="sc-pts">${g.score}</div></div>`;
+    scoresEl.innerHTML += `<div class="score-card"><div class="sc-name" style="color:${GROUP_COLORS[g.id]}">${g.name}</div><div class="sc-pts">${g.score}</div></div>`;
   });
 
   // Canvas grid
-  const grid = document.getElementById('t-canvas-grid');
-  grid.innerHTML = '';
-  if (state.phase === 'DRAWING' || state.phase === 'GUESSING' || state.phase === 'REVEAL') {
-    state.groups.forEach(g => {
-      const guesser = state.groups.find(x => x.guessFrom === g.id);
-      let guessHtml = '';
-      if (state.phase === 'GUESSING' || state.phase === 'REVEAL') {
-        const pending = !guesser.guessSubmitted;
-        const cls = state.phase === 'REVEAL' ? (guesser.guess.trim() === g.topic.trim() ? 'correct' : 'wrong') : (pending ? 'pending' : 'ok');
-        const txt = state.phase === 'REVEAL' ? `${guesser.name}: ${guesser.guess || '未作答'}` : (pending ? `${guesser.name} 思考中...` : `${guesser.name} 已答`);
-        guessHtml = `<div class="dc-guess ${cls}">${txt}</div>`;
-      }
-      grid.innerHTML += `
-        <div class="t-drawing-card">
-          <div class="dc-head">
-            <span class="dc-group" style="color:${GROUP_COLORS[g.id]}">${g.name}</span>
-            <span class="dc-topic">${state.phase === 'REVEAL' ? g.topic : (g.submitted ? '已交卷 ✓' : '畫中...')}</span>
-          </div>
-          <img src="${g.imgData || 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='}" alt="">
-          <div class="dc-foot">${guessHtml}</div>
-        </div>`;
-    });
-  }
+  gridEl.innerHTML = '';
+  state.groups.forEach(g => {
+    const guesser = state.groups.find(x => x.guessFrom === g.id);
+    let guessHtml = '';
+    if (state.phase === 'GUESSING' || state.phase === 'REVEAL') {
+      const pending = !guesser.guessSubmitted;
+      const cls = state.phase === 'REVEAL' ? (guesser.guess.trim() === g.topic.trim() ? 'correct' : 'wrong') : (pending ? 'pending' : 'ok');
+      const txt = state.phase === 'REVEAL' ? `${guesser.name}: ${guesser.guess || '未作答'}` : (pending ? `${guesser.name} 思考中...` : `${guesser.name} 已答`);
+      guessHtml = `<div class="dc-guess ${cls}">${txt}</div>`;
+    }
+    gridEl.innerHTML += `
+      <div class="t-drawing-card">
+        <div class="dc-head">
+          <span class="dc-group" style="color:${GROUP_COLORS[g.id]}">${g.name}</span>
+          <span class="dc-topic">${state.phase === 'REVEAL' ? g.topic : (g.submitted ? '已交卷 ✓' : '畫中...')}</span>
+        </div>
+        <img src="${g.imgData || 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='}" alt="">
+        <div class="dc-foot">${guessHtml}</div>
+      </div>`;
+  });
 }
 
 function renderStudent() {
@@ -693,30 +724,34 @@ function initRole() {
   const role = params.get('role') || 'teacher';
 
   if (role === 'teacher') {
+    // Teacher: reset to fresh state each time (new game session)
+    state = defaultState();
+    saveState();
     document.getElementById('teacher-screen').classList.add('on');
     currentGroupIdx = -1;
-    currentView = 'teacher';
+    renderTeacher();
   } else {
     const idx = parseInt(role.replace('g', ''));
     if (!isNaN(idx) && idx >= 0 && idx < state.groups.length) {
+      // Student: load current state from localStorage
+      loadState();
       document.getElementById('student-screen').classList.add('on');
       currentGroupIdx = idx;
-      currentView = 's-g' + idx;
       renderStudent();
-      setTimeout(resizeCanvas, 80);
+      if (state.phase === 'DRAWING' && !state.groups[idx]?.submitted)
+        setTimeout(resizeCanvas, 80);
     } else {
-      // fallback to teacher
+      state = defaultState();
+      saveState();
       document.getElementById('teacher-screen').classList.add('on');
       currentGroupIdx = -1;
+      renderTeacher();
     }
   }
 }
 
-// ═══════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════
+// ── Run ──
 initRole();
-renderTeacher();
 </script>
 </body>
 </html>
