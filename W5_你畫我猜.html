@@ -319,7 +319,13 @@ const TOPICS = [
 ];
 const GROUP_COLORS = ["#f7c948","#ff5c5c","#4ecdc4","#a78bfa"];
 const DRAW_TIME = 60;
-const LS_KEY = 'w5_game_state';
+
+// ── 角色與狀態 ─────────────────────────────
+// isTeacher: 由 PLATFORM_START 的 isTeacher 決定
+// myGroup:   由 PLATFORM_START 的 group 決定
+let isTeacher = false;
+let myGroup = '';           // 學生自己的組名，e.g. "第 1 組"
+let currentGroupIdx = -1;  // 學生在 state.groups 的 index
 
 function defaultState() {
   return {
@@ -334,39 +340,60 @@ function defaultState() {
 }
 let state = defaultState();
 let timer = null;
-let currentGroupIdx = -1;
 
-function saveState() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
-}
-function loadState() {
-  try { const r = localStorage.getItem(LS_KEY); if (r) state = JSON.parse(r); }
-  catch(e) { state = defaultState(); }
-}
-// Students listen for teacher-pushed state changes (cross-tab)
-window.addEventListener('storage', (e) => {
-  if (e.key !== LS_KEY || currentGroupIdx < 0) return;
-  loadState();
-  renderStudent();
-  if (state.phase === 'DRAWING' && !state.groups[currentGroupIdx]?.submitted)
-    setTimeout(resizeCanvas, 60);
-});
-
-// Polling fallback — catches changes within same origin (e.g. iframe context)
-let _lastStateJson = '';
-setInterval(() => {
-  if (currentGroupIdx < 0) return; // teacher tab skips
+// ── 傳送狀態給父頁面（index.html → Firebase） ──
+function pushState() {
   try {
-    const raw = localStorage.getItem(LS_KEY) || '';
-    if (raw && raw !== _lastStateJson) {
-      _lastStateJson = raw;
-      state = JSON.parse(raw);
+    window.parent.postMessage({ type: 'W5_STATE', data: JSON.parse(JSON.stringify(state)) }, '*');
+  } catch(e) {}
+}
+
+// ── 收到父頁面/Firebase 的訊息 ──────────────
+window.addEventListener('message', (e) => {
+  if (!e.data || !e.data.type) return;
+
+  // 老師 / 學生初始化
+  if (e.data.type === 'PLATFORM_START') {
+    isTeacher = !!e.data.isTeacher;
+    myGroup   = e.data.group || '';
+
+    if (isTeacher) {
+      // 老師：重設狀態，顯示老師畫面
+      state = defaultState();
+      document.getElementById('teacher-screen').classList.add('on');
+      document.getElementById('student-screen').classList.remove('on');
+      currentGroupIdx = -1;
+      renderTeacher();
+    } else {
+      // 學生：找到自己的 group index
+      document.getElementById('student-screen').classList.add('on');
+      document.getElementById('teacher-screen').classList.remove('on');
+      currentGroupIdx = state.groups.findIndex(g => g.name === myGroup);
+      if (currentGroupIdx < 0) currentGroupIdx = 0; // fallback
       renderStudent();
       if (state.phase === 'DRAWING' && !state.groups[currentGroupIdx]?.submitted)
         setTimeout(resizeCanvas, 60);
     }
-  } catch(e) {}
-}, 500);
+    return;
+  }
+
+  // 父頁面從 Firebase 推送最新 w5state 給學生
+  if (e.data.type === 'W5_STATE' && !isTeacher && e.data.data) {
+    const incoming = e.data.data;
+    // 保留學生自己畫的內容（imgData），不讓 Firebase 的空值覆蓋
+    if (state.groups && incoming.groups) {
+      incoming.groups.forEach((ig, i) => {
+        if (state.groups[i] && state.groups[i].imgData && !ig.imgData)
+          ig.imgData = state.groups[i].imgData;
+      });
+    }
+    state = incoming;
+    renderStudent();
+    if (state.phase === 'DRAWING' && currentGroupIdx >= 0 && !state.groups[currentGroupIdx]?.submitted)
+      setTimeout(resizeCanvas, 60);
+    return;
+  }
+});
 
 // ═══════════════════════════════════════════
 // CANVAS
@@ -380,8 +407,9 @@ let touches = {};
 
 function resizeCanvas() {
   const wrap = document.getElementById('canvas-wrap');
+  if (!wrap) return;
   const prev = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  canvas.width = wrap.clientWidth;
+  canvas.width  = wrap.clientWidth;
   canvas.height = wrap.clientHeight;
   ctx.putImageData(prev, 0, 0);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -390,27 +418,18 @@ window.addEventListener('resize', resizeCanvas);
 
 function getPos(e, touch) {
   const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
-  return { x: (touch.clientX - r.left) * scaleX, y: (touch.clientY - r.top) * scaleY };
+  return { x: (touch.clientX - r.left) * (canvas.width / r.width),
+           y: (touch.clientY - r.top)  * (canvas.height / r.height) };
 }
+function dot(p) { ctx.beginPath(); ctx.arc(p.x,p.y,curSize/2,0,Math.PI*2); ctx.fillStyle=curColor; ctx.fill(); }
+function line(a,b) { ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineWidth=curSize; ctx.strokeStyle=curColor; ctx.stroke(); }
 
-function dot(p) {
-  ctx.beginPath(); ctx.arc(p.x, p.y, curSize/2, 0, Math.PI*2);
-  ctx.fillStyle = curColor; ctx.fill();
-}
-function line(a, b) {
-  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-  ctx.lineWidth = curSize; ctx.strokeStyle = curColor; ctx.stroke();
-}
-
-canvas.addEventListener('touchstart', e => { e.preventDefault(); for (const t of e.changedTouches) { const p = getPos(e,t); touches[t.identifier]=p; dot(p); } }, {passive:false});
-canvas.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) { const prev=touches[t.identifier]; if(prev){const p=getPos(e,t); line(prev,p); touches[t.identifier]=p;} } }, {passive:false});
-canvas.addEventListener('touchend', e => { e.preventDefault(); for (const t of e.changedTouches) delete touches[t.identifier]; }, {passive:false});
-
-canvas.addEventListener('mousedown', e => { painting=true; const p=getPos(e,e); touches.mouse=p; dot(p); });
-canvas.addEventListener('mousemove', e => { if(!painting) return; const p=getPos(e,e); line(touches.mouse,p); touches.mouse=p; });
-window.addEventListener('mouseup', () => { painting=false; delete touches.mouse; });
+canvas.addEventListener('touchstart', e=>{e.preventDefault();for(const t of e.changedTouches){const p=getPos(e,t);touches[t.identifier]=p;dot(p);}},{passive:false});
+canvas.addEventListener('touchmove',  e=>{e.preventDefault();for(const t of e.changedTouches){const prev=touches[t.identifier];if(prev){const p=getPos(e,t);line(prev,p);touches[t.identifier]=p;}}},{passive:false});
+canvas.addEventListener('touchend',   e=>{e.preventDefault();for(const t of e.changedTouches)delete touches[t.identifier];},{passive:false});
+canvas.addEventListener('mousedown',  e=>{painting=true;const p=getPos(e,e);touches.mouse=p;dot(p);});
+canvas.addEventListener('mousemove',  e=>{if(!painting)return;const p=getPos(e,e);line(touches.mouse,p);touches.mouse=p;});
+window.addEventListener('mouseup',    ()=>{painting=false;delete touches.mouse;});
 
 function clearCanvas() { ctx.clearRect(0,0,canvas.width,canvas.height); }
 function pickColor(el) {
@@ -418,39 +437,30 @@ function pickColor(el) {
   document.querySelectorAll('.s-color').forEach(b=>b.classList.remove('sel'));
   el.classList.add('sel');
 }
-document.getElementById('s-size-slider').addEventListener('input', e => curColor === '#ffffff' ? curSize = +e.target.value : curSize = +e.target.value);
+document.getElementById('s-size-slider').addEventListener('input', e => { curSize = +e.target.value; });
 
 // ═══════════════════════════════════════════
 // TEACHER LOGIC
 // ═══════════════════════════════════════════
 function teacherAction() {
-  if (state.phase === 'IDLE' || state.phase === 'REVEAL') {
-    startRound();
-  } else if (state.phase === 'DRAWING') {
-    forceCollect();
-  } else if (state.phase === 'GUESSING') {
-    revealAnswers();
-  }
+  if (state.phase === 'IDLE' || state.phase === 'REVEAL') startRound();
+  else if (state.phase === 'DRAWING') forceCollect();
+  else if (state.phase === 'GUESSING') revealAnswers();
 }
 
 function startRound() {
   clearInterval(timer);
   state.round++;
   state.phase = 'DRAWING';
-  state.time = DRAW_TIME;
+  state.time  = DRAW_TIME;
   const shuffled = [...TOPICS].sort(()=>Math.random()-.5);
   state.groups.forEach((g,i) => {
+    g.topic=''; g.imgData=''; g.submitted=false; g.guess=''; g.guessSubmitted=false;
     g.topic = shuffled[i % shuffled.length];
-    g.imgData = '';
-    g.submitted = false;
-    g.guess = '';
-    g.guessSubmitted = false;
-  });
-  state.groups.forEach((g,i) => {
     g.guessFrom = (i + state.groups.length - 1) % state.groups.length;
   });
   clearCanvas();
-  saveState();
+  pushState();
   startTimer();
   renderTeacher();
 }
@@ -459,7 +469,7 @@ function startTimer() {
   clearInterval(timer);
   timer = setInterval(() => {
     state.time--;
-    saveState();
+    pushState();          // 每秒同步給學生
     updateTimerUI();
     if (state.time <= 0) { clearInterval(timer); forceCollect(); }
   }, 1000);
@@ -468,11 +478,7 @@ function startTimer() {
 function forceCollect() {
   clearInterval(timer);
   state.phase = 'GUESSING';
-  if (currentGroupIdx >= 0 && !state.groups[currentGroupIdx].submitted) {
-    state.groups[currentGroupIdx].imgData = canvas.toDataURL('image/png');
-    state.groups[currentGroupIdx].submitted = true;
-  }
-  saveState();
+  pushState();
   renderTeacher();
 }
 
@@ -480,15 +486,16 @@ function revealAnswers() {
   state.phase = 'REVEAL';
   state.groups.forEach(g => {
     const painter = state.groups[g.guessFrom];
-    const correct = g.guess.trim() === painter.topic.trim();
+    const correct = painter && g.guess.trim() === painter.topic.trim();
     if (correct) { g.score += 2; painter.score += 1; }
   });
+  // 分數回報給大廳
   try {
-    state.groups.forEach(g => {
-      window.parent.postMessage({ type: 'W5_SCORE', group: g.name, score: g.score }, '*');
-    });
-  } catch(e) {}
-  saveState();
+    state.groups.forEach(g =>
+      window.parent.postMessage({ type:'W5_SCORE', group:g.name, score:g.score }, '*')
+    );
+  } catch(e){}
+  pushState();
   renderTeacher();
   showRevealModal();
 }
@@ -498,6 +505,7 @@ function showRevealModal() {
   grid.innerHTML = '';
   state.groups.forEach(g => {
     const painter = state.groups[g.guessFrom];
+    if (!painter) return;
     const correct = g.guess.trim() === painter.topic.trim();
     const card = document.createElement('div');
     card.className = 'reveal-card ' + (correct ? 'correct' : 'wrong');
@@ -506,27 +514,23 @@ function showRevealModal() {
         <span style="color:${GROUP_COLORS[g.guessFrom]}">${painter.name}</span>
         <span class="rc-verdict">${correct ? '✅' : '❌'}</span>
       </div>
-      <img src="${painter.imgData || ''}" alt="" style="height:100px;">
+      <img src="${painter.imgData||''}" alt="" style="height:100px;">
       <div class="rc-body">
         <div class="rc-ans">題目：${painter.topic}</div>
-        <div class="rc-guess">${g.name} 猜：<strong>${g.guess || '(未作答)'}</strong></div>
-      </div>
-    `;
+        <div class="rc-guess">${g.name} 猜：<strong>${g.guess||'(未作答)'}</strong></div>
+      </div>`;
     grid.appendChild(card);
   });
   document.getElementById('reveal-modal').classList.add('on');
 }
 
-function closeReveal() {
-  document.getElementById('reveal-modal').classList.remove('on');
-}
+function closeReveal() { document.getElementById('reveal-modal').classList.remove('on'); }
 
 function nextRound() {
   closeReveal();
   state.phase = 'IDLE';
-  saveState();
+  pushState();
   renderTeacher();
-  if (currentGroupIdx >= 0) renderStudent();
 }
 
 // ═══════════════════════════════════════════
@@ -536,10 +540,9 @@ function studentSubmitDrawing() {
   if (currentGroupIdx < 0) return;
   const g = state.groups[currentGroupIdx];
   if (state.phase !== 'DRAWING' || g.submitted) return;
-  g.imgData = canvas.toDataURL('image/png');
+  g.imgData   = canvas.toDataURL('image/png');
   g.submitted = true;
-  saveState();
-  renderTeacher();
+  pushState();   // 把畫作推給老師端
   renderStudent();
 }
 
@@ -549,10 +552,9 @@ function studentSubmitGuess() {
   if (state.phase !== 'GUESSING' || g.guessSubmitted) return;
   const val = document.getElementById('s-guess-input').value.trim();
   if (!val) { document.getElementById('s-guess-input').focus(); return; }
-  g.guess = val;
+  g.guess          = val;
   g.guessSubmitted = true;
-  saveState();
-  renderTeacher();
+  pushState();
   renderStudent();
 }
 
@@ -560,214 +562,177 @@ document.getElementById('s-guess-input').addEventListener('keypress', e => {
   if (e.key === 'Enter') { studentSubmitGuess(); e.target.blur(); }
 });
 
-// ═══════ INIT (called after all functions defined below) ═══════
+// ═══════════════════════════════════════════
+// RENDER — TEACHER
+// ═══════════════════════════════════════════
 function renderTeacher() {
-  const phases = { IDLE:'待開始', DRAWING:'限時作畫中', GUESSING:'猜題中', REVEAL:'開獎完畢' };
+  if (!isTeacher) return;
+  const phases  = { IDLE:'待開始', DRAWING:'限時作畫中', GUESSING:'猜題中', REVEAL:'開獎完畢' };
   const pillCls = { IDLE:'', DRAWING:'live', GUESSING:'wait', REVEAL:'ok' };
   const pEl = document.getElementById('t-phase-pill');
-  pEl.textContent = phases[state.phase] || state.phase;
-  pEl.className = 'pill ' + (pillCls[state.phase] || '');
+  pEl.textContent = phases[state.phase]||state.phase;
+  pEl.className   = 'pill '+(pillCls[state.phase]||'');
 
-  // Main button
   const btn = document.getElementById('t-main-btn');
-  if (state.phase === 'IDLE' || state.phase === 'REVEAL') {
-    btn.textContent = `隨機出題 · 開始第 ${state.round+1} 輪`;
-    btn.className = 'btn btn-yellow';
-  } else if (state.phase === 'DRAWING') {
-    btn.textContent = `⏱ 強制收卷 (${state.time}s)`;
-    btn.className = 'btn btn-red';
-  } else if (state.phase === 'GUESSING') {
-    btn.textContent = '🎯 公布答案';
-    btn.className = 'btn btn-purple';
-  }
+  if      (state.phase==='IDLE'||state.phase==='REVEAL') { btn.textContent=`隨機出題 · 開始第 ${state.round+1} 輪`; btn.className='btn btn-yellow'; }
+  else if (state.phase==='DRAWING')  { btn.textContent=`⏱ 強制收卷 (${state.time}s)`;  btn.className='btn btn-red'; }
+  else if (state.phase==='GUESSING') { btn.textContent='🎯 公布答案';                   btn.className='btn btn-purple'; }
 
-  // Round badge
   const rb = document.getElementById('round-badge');
-  if (rb) { rb.style.display = state.round > 0 ? 'block' : 'none'; rb.textContent = `Round ${state.round}`; }
+  if (rb) { rb.style.display = state.round>0?'block':'none'; rb.textContent=`Round ${state.round}`; }
 
-  // Teacher IDLE: show rules card instead of grid
   const rulesCard = document.getElementById('t-rules-card');
   const scoresEl  = document.getElementById('t-scores');
   const gridEl    = document.getElementById('t-canvas-grid');
-  if (state.phase === 'IDLE') {
-    if (rulesCard) rulesCard.style.display = 'block';
-    if (scoresEl)  scoresEl.style.display  = 'none';
-    if (gridEl)    gridEl.style.display    = 'none';
+  if (state.phase==='IDLE') {
+    if (rulesCard) rulesCard.style.display='block';
+    if (scoresEl)  scoresEl.style.display='none';
+    if (gridEl)    gridEl.style.display='none';
     return;
   }
-  if (rulesCard) rulesCard.style.display = 'none';
-  if (scoresEl)  scoresEl.style.display  = 'grid';
-  if (gridEl)    gridEl.style.display    = 'grid';
+  if (rulesCard) rulesCard.style.display='none';
+  if (scoresEl)  scoresEl.style.display='grid';
+  if (gridEl)    gridEl.style.display='grid';
 
-  // Scores
-  scoresEl.innerHTML = '';
-  state.groups.forEach(g => {
-    scoresEl.innerHTML += `<div class="score-card"><div class="sc-name" style="color:${GROUP_COLORS[g.id]}">${g.name}</div><div class="sc-pts">${g.score}</div></div>`;
+  scoresEl.innerHTML='';
+  state.groups.forEach(g=>{
+    scoresEl.innerHTML+=`<div class="score-card"><div class="sc-name" style="color:${GROUP_COLORS[g.id]}">${g.name}</div><div class="sc-pts">${g.score}</div></div>`;
   });
 
-  // Canvas grid
-  gridEl.innerHTML = '';
-  state.groups.forEach(g => {
-    const guesser = state.groups.find(x => x.guessFrom === g.id);
-    let guessHtml = '';
-    if (state.phase === 'GUESSING' || state.phase === 'REVEAL') {
+  gridEl.innerHTML='';
+  state.groups.forEach(g=>{
+    const guesser = state.groups.find(x=>x.guessFrom===g.id);
+    let guessHtml='';
+    if ((state.phase==='GUESSING'||state.phase==='REVEAL') && guesser) {
       const pending = !guesser.guessSubmitted;
-      const cls = state.phase === 'REVEAL' ? (guesser.guess.trim() === g.topic.trim() ? 'correct' : 'wrong') : (pending ? 'pending' : 'ok');
-      const txt = state.phase === 'REVEAL' ? `${guesser.name}: ${guesser.guess || '未作答'}` : (pending ? `${guesser.name} 思考中...` : `${guesser.name} 已答`);
-      guessHtml = `<div class="dc-guess ${cls}">${txt}</div>`;
+      const cls = state.phase==='REVEAL' ? (guesser.guess.trim()===g.topic.trim()?'correct':'wrong') : (pending?'pending':'ok');
+      const txt = state.phase==='REVEAL' ? `${guesser.name}: ${guesser.guess||'未作答'}` : (pending?`${guesser.name} 思考中...`:`${guesser.name} 已答`);
+      guessHtml=`<div class="dc-guess ${cls}">${txt}</div>`;
     }
-    gridEl.innerHTML += `
+    gridEl.innerHTML+=`
       <div class="t-drawing-card">
         <div class="dc-head">
           <span class="dc-group" style="color:${GROUP_COLORS[g.id]}">${g.name}</span>
-          <span class="dc-topic">${state.phase === 'REVEAL' ? g.topic : (g.submitted ? '已交卷 ✓' : '畫中...')}</span>
+          <span class="dc-topic">${state.phase==='REVEAL'?g.topic:(g.submitted?'已交卷 ✓':'畫中...')}</span>
         </div>
-        <img src="${g.imgData || 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='}" alt="">
+        <img src="${g.imgData||'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='}" alt="">
         <div class="dc-foot">${guessHtml}</div>
       </div>`;
   });
 }
 
+// ═══════════════════════════════════════════
+// RENDER — STUDENT
+// ═══════════════════════════════════════════
 function renderStudent() {
+  if (currentGroupIdx < 0) return;
   const g = state.groups[currentGroupIdx];
-  const hideAll = () => {
-    document.getElementById('s-rules').style.display = 'none';
-    document.getElementById('s-draw').style.display = 'none';
-    document.getElementById('s-guess').style.display = 'none';
-    document.getElementById('s-result').style.display = 'none';
-    document.getElementById('s-wait').style.display = 'none';
-  };
+  if (!g) return;
 
-  hideAll();
+  const hide = (id) => { const el=document.getElementById(id); if(el) el.style.display='none'; };
+  ['s-rules','s-draw','s-guess','s-result','s-wait'].forEach(hide);
 
-  if (state.phase === 'IDLE') {
-    document.getElementById('s-rules').style.display = 'flex';
-    document.getElementById('s-group-label').textContent = g.name;
+  if (state.phase==='IDLE') {
+    const r=document.getElementById('s-rules'); if(r){r.style.display='flex';}
+    const lbl=document.getElementById('s-group-label'); if(lbl) lbl.textContent=g.name;
     return;
   }
-
-  if (state.phase === 'DRAWING') {
+  if (state.phase==='DRAWING') {
     if (!g.submitted) {
-      document.getElementById('s-draw').style.display = 'flex';
-      document.getElementById('s-draw-topic').textContent = g.topic;
+      const d=document.getElementById('s-draw'); if(d) d.style.display='flex';
+      const t=document.getElementById('s-draw-topic'); if(t) t.textContent=g.topic;
       updateTimerUI();
-      setTimeout(resizeCanvas, 50);
+      setTimeout(resizeCanvas,50);
     } else {
-      showStudentWait('✅','已交卷！', `等待其他組完成作畫...\n剩餘 ${state.time} 秒`, null);
+      showStudentWait('✅','已交卷！',`等待其他組完成作畫...\n剩餘 ${state.time} 秒`,null);
     }
     return;
   }
-
-  if (state.phase === 'GUESSING') {
+  if (state.phase==='GUESSING') {
     if (!g.guessSubmitted) {
-      document.getElementById('s-guess').style.display = 'flex';
-      const painter = state.groups[g.guessFrom];
-      document.getElementById('s-guess-img').src = painter.imgData || '';
-      document.getElementById('s-guess-from').textContent = `來自 ${painter.name} 的畫作`;
-      document.getElementById('s-guess-input').value = '';
+      const gs=document.getElementById('s-guess'); if(gs) gs.style.display='flex';
+      const painter=state.groups[g.guessFrom];
+      const img=document.getElementById('s-guess-img'); if(img&&painter) img.src=painter.imgData||'';
+      const from=document.getElementById('s-guess-from'); if(from&&painter) from.textContent=`來自 ${painter.name} 的畫作`;
+      const inp=document.getElementById('s-guess-input'); if(inp) inp.value='';
     } else {
-      showStudentWait('🔒','答案已鎖定', '等待老師公布答案...', `你的答案：${g.guess}`);
+      showStudentWait('🔒','答案已鎖定','等待老師公布答案...',`你的答案：${g.guess}`);
     }
     return;
   }
-
-  if (state.phase === 'REVEAL') {
-    const painter = state.groups[g.guessFrom];
-    const correct = g.guess.trim() === painter.topic.trim();
-    document.getElementById('s-result').style.display = 'flex';
-    document.getElementById('res-emoji').textContent = correct ? '🎉' : '😅';
-    document.getElementById('res-text').textContent = correct ? '答對了！' : '答錯了！';
-    document.getElementById('res-sub').innerHTML = `
-      ${painter.name} 畫的是：<strong style="color:var(--accent)">${painter.topic}</strong><br>
-      你猜的是：<strong>${g.guess || '(未作答)'}</strong>
-    `;
-    document.getElementById('res-pts').textContent = correct ? '+2 分！' : '+0 分';
-    document.getElementById('res-pts').style.color = correct ? 'var(--green)' : 'var(--muted)';
-    return;
+  if (state.phase==='REVEAL') {
+    const painter=state.groups[g.guessFrom];
+    const correct=painter&&g.guess.trim()===painter.topic.trim();
+    const r=document.getElementById('s-result'); if(r) r.style.display='flex';
+    const em=document.getElementById('res-emoji'); if(em) em.textContent=correct?'🎉':'😅';
+    const tx=document.getElementById('res-text'); if(tx) tx.textContent=correct?'答對了！':'答錯了！';
+    const sb=document.getElementById('res-sub');
+    if(sb&&painter) sb.innerHTML=`${painter.name} 畫的是：<strong style="color:var(--accent)">${painter.topic}</strong><br>你猜的是：<strong>${g.guess||'(未作答)'}</strong>`;
+    const pt=document.getElementById('res-pts');
+    if(pt){ pt.textContent=correct?'+2 分！':'+0 分'; pt.style.color=correct?'var(--green)':'var(--muted)'; }
   }
 }
 
-function showStudentWait(icon, title, msg, locked) {
-  const el = document.getElementById('s-wait');
-  el.style.display = 'flex';
-  document.getElementById('sw-icon').textContent = icon;
-  document.getElementById('sw-title').textContent = title;
-  document.getElementById('sw-msg').textContent = msg;
-  const lck = document.getElementById('sw-locked');
-  if (locked) { lck.style.display = 'block'; lck.textContent = locked; }
-  else lck.style.display = 'none';
+function showStudentWait(icon,title,msg,locked) {
+  const el=document.getElementById('s-wait'); if(!el) return;
+  el.style.display='flex';
+  const ic=document.getElementById('sw-icon'); if(ic) ic.textContent=icon;
+  const tt=document.getElementById('sw-title'); if(tt) tt.textContent=title;
+  const mg=document.getElementById('sw-msg'); if(mg) mg.textContent=msg;
+  const lk=document.getElementById('sw-locked');
+  if(lk){ if(locked){lk.style.display='block';lk.textContent=locked;}else lk.style.display='none'; }
 }
 
 function updateTimerUI() {
-  // Teacher button text
-  if (state.phase === 'DRAWING') {
-    const btn = document.getElementById('t-main-btn');
-    btn.textContent = `⏱ 強制收卷 (${state.time}s)`;
+  if (isTeacher) {
+    const btn=document.getElementById('t-main-btn');
+    if(btn&&state.phase==='DRAWING') btn.textContent=`⏱ 強制收卷 (${state.time}s)`;
   }
-  // Student timer ring
-  const num = document.getElementById('s-timer-num');
-  const fg = document.getElementById('t-ring-fg');
-  if (num) {
-    num.textContent = state.time;
-    const circumference = 163.4;
-    const offset = circumference * (1 - state.time / DRAW_TIME);
-    fg.style.strokeDashoffset = offset;
-    const warn = state.time <= 10;
-    fg.style.stroke = warn ? 'var(--accent2)' : 'var(--accent)';
-    num.parentElement.style.color = warn ? 'var(--accent2)' : 'var(--accent)';
-    const timerNum = document.getElementById('s-timer-num');
-    if (warn) timerNum.classList.add('warn'); else timerNum.classList.remove('warn');
+  const num=document.getElementById('s-timer-num');
+  const fg =document.getElementById('t-ring-fg');
+  if(num&&fg){
+    num.textContent=state.time;
+    const offset=163.4*(1-state.time/DRAW_TIME);
+    fg.style.strokeDashoffset=offset;
+    const warn=state.time<=10;
+    fg.style.stroke=warn?'var(--accent2)':'var(--accent)';
+    warn?num.classList.add('warn'):num.classList.remove('warn');
   }
-  // Update wait screen countdown if submitted
-  if (currentGroupIdx >= 0) {
-    const g = state.groups[currentGroupIdx];
-    if (g && g.submitted && state.phase === 'DRAWING') {
-      document.getElementById('sw-msg').textContent = `等待其他組完成作畫...\n剩餘 ${state.time} 秒`;
+  if(!isTeacher&&currentGroupIdx>=0){
+    const g=state.groups[currentGroupIdx];
+    if(g&&g.submitted&&state.phase==='DRAWING'){
+      const mg=document.getElementById('sw-msg'); if(mg) mg.textContent=`等待其他組完成作畫...\n剩餘 ${state.time} 秒`;
     }
   }
 }
 
-// ═══════════════════════════════════════════
-// ROLE DETECTION via URL param
-// ?role=teacher  → 老師端
-// ?role=g0       → 第一組
-// ?role=g1       → 第二組
-// ?role=g2       → 第三組
-// ?role=g3       → 第四組
-// ═══════════════════════════════════════════
-function initRole() {
+// ── 預設顯示學生規則頁（等待 PLATFORM_START）──
+document.getElementById('student-screen').classList.add('on');
+document.getElementById('teacher-screen').classList.remove('on');
+// 若在獨立分頁直接開啟（非 iframe），偵測 URL 參數做相容
+(function(){
   const params = new URLSearchParams(window.location.search);
-  const role = params.get('role') || 'teacher';
-
+  const role   = params.get('role');
+  if (!role) return; // 沒有 role 就等 PLATFORM_START
   if (role === 'teacher') {
-    // Teacher: reset to fresh state each time (new game session)
+    isTeacher = true;
     state = defaultState();
-    saveState();
     document.getElementById('teacher-screen').classList.add('on');
+    document.getElementById('student-screen').classList.remove('on');
     currentGroupIdx = -1;
     renderTeacher();
   } else {
-    const idx = parseInt(role.replace('g', ''));
+    // role=g0~g3：獨立分頁測試用
+    const idx = parseInt(role.replace('g',''));
     if (!isNaN(idx) && idx >= 0 && idx < state.groups.length) {
-      // Student: load current state from localStorage
-      loadState();
-      document.getElementById('student-screen').classList.add('on');
+      isTeacher = false;
+      myGroup = state.groups[idx].name;
       currentGroupIdx = idx;
       renderStudent();
-      if (state.phase === 'DRAWING' && !state.groups[idx]?.submitted)
-        setTimeout(resizeCanvas, 80);
-    } else {
-      state = defaultState();
-      saveState();
-      document.getElementById('teacher-screen').classList.add('on');
-      currentGroupIdx = -1;
-      renderTeacher();
     }
   }
-}
-
-// ── Run ──
-initRole();
+})();
 </script>
+
 </body>
 </html>

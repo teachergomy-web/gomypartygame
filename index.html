@@ -874,6 +874,13 @@ function startSyncListener() {
                 try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: data.w3state }, '*'); } catch(e2) {}
             }
         }
+        // 老師端：W5 狀態更新推給學生 sg-iframe（學生開著遊戲的那個 iframe）
+        if (p !== 'teacher' && data.w5state) {
+            const sgIframe = document.getElementById('sg-iframe');
+            if (sgIframe && sgIframe.contentWindow) {
+                try { sgIframe.contentWindow.postMessage({ type: 'W5_STATE', data: data.w5state }, '*'); } catch(e2) {}
+            }
+        }
     }, err => console.error('Room sync error:', err));
     console.log('✅ 監聽房間:', roomCode);
 }
@@ -1242,7 +1249,21 @@ function tcStartGame() {
         const sa = document.getElementById('tc-scores-area');
         if (sa) {
             sa.style.padding = '0';
-            sa.innerHTML = `<iframe id="tc-w5-iframe" src="W5_你畫我猜.html?role=teacher" style="flex:1; width:100%; height:100%; border:none; border-radius:0"></iframe>`;
+            sa.innerHTML = `<iframe id="tc-w5-iframe" src="W5_你畫我猜.html" style="flex:1; width:100%; height:100%; border:none; border-radius:0"></iframe>`;
+            const w5iframe = document.getElementById('tc-w5-iframe');
+            if (w5iframe) {
+                w5iframe.onload = () => setTimeout(() => {
+                    try {
+                        const rooms2 = window.getRooms();
+                        const r2 = rooms2[window.state.roomCode] || {};
+                        w5iframe.contentWindow.postMessage({
+                            type: 'PLATFORM_START', isTeacher: true, group: '',
+                            state: r2.w5state || null,
+                            players: window.state.players || []
+                        }, '*');
+                    } catch(e) {}
+                }, 300);
+            }
         }
     } else {
         const nextContainer = document.getElementById('tc-next-level-container');
@@ -1372,18 +1393,15 @@ function tcLaunchStudentIfNeeded() {
             const w4level = r.w4level || 1;
             url = gameFile + '?mode=' + w4mode + '&level=' + w4level + '&group=' + encodeURIComponent(myGroup) + '&student=1';
         } else if (isW5) {
-            // W5：用組別名稱映射到 role 參數 (第 N 組 → gN-1)
-            const groupNum = parseInt((myGroup || '').replace(/[^0-9]/g, '')) - 1;
-            const role = (!isNaN(groupNum) && groupNum >= 0) ? 'g' + groupNum : 'g0';
-            url = gameFile + '?role=' + role;
+            url = gameFile + '?student=1';
         } else {
             url = gameFile + '?autostart=' + level + '&group=' + encodeURIComponent(myGroup);
         }
         iframe.src = url;
         
         iframe.onload = () => setTimeout(() => {
-            // W4 / W5 已透過 URL 參數直接啟動，跳過 PLATFORM_START
-            if (isW4 || isW5) return; 
+            // W4 已透過 URL 參數直接啟動，跳過 PLATFORM_START
+            if (isW4) return; 
             
             try {
                 const rooms2 = window.getRooms();
@@ -1636,7 +1654,20 @@ window.addEventListener('message', (e) => {
         if (tcW3 && tcW3.contentWindow) {
             try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: w3d }, '*'); } catch(e2) {}
         }
+    }
 
+    // W5 你畫我猜：老師 iframe 廣播遊戲狀態 → 存入 Firebase → 推送給學生 iframe
+    if (type === 'W5_STATE' && e.data.data && window.state.perspective === 'teacher') {
+        const w5d = e.data.data;
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            rooms[window.state.roomCode].w5state = w5d;
+            window.saveRooms(rooms);
+        }
+        // 更新老師控制台分數顯示（若在 REVEAL 階段）
+        if (w5d.phase === 'REVEAL' && w5d.groups) {
+            w5d.groups.forEach(g => tcUpdateScore(g.name, g.score));
+        }
     }
 });
 
