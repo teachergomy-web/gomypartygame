@@ -543,12 +543,11 @@ body::before {
       <div style="color:var(--red);font-size:.6rem;font-weight:900;letter-spacing:.08em">🔴 LIVE</div>
       <div class="kr-room-name" id="tc-game-name" style="font-size:clamp(.82rem,2.5vw,1rem);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⭐ 星際採礦</div>
     </div>
-    <!-- 中：回合 badge + 操作按鈕 -->
+    <!-- 中：回合 badge + 操作按鈕 (移除了原本的下一關按鈕) -->
     <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
       <span id="tc-level-badge" style="background:rgba(245,200,0,.2);border:2px solid #f5c800;border-radius:8px;padding:3px 8px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.75rem;color:#f5c800;white-space:nowrap">第 1 回合</span>
       <button id="tc-btn-pause"  class="kr-btn kr-btn-ghost"  onclick="tcPauseGame()"  style="font-size:.8rem;padding:7px 10px">⏸</button>
       <button id="tc-btn-resume" class="kr-btn kr-btn-ghost"  onclick="tcResumeGame()" style="display:none;font-size:.8rem;padding:7px 10px">▶</button>
-      <button id="tc-btn-next-level" class="kr-btn kr-btn-blue" onclick="tcW4NextLevel()" style="display:none;font-size:.8rem;padding:7px 10px">🎵 下一關</button>
       <button id="tc-btn-settle" class="kr-btn kr-btn-start"  onclick="tcSettleGame()" style="font-size:.8rem;padding:7px 10px">🏆 結算</button>
     </div>
     <!-- 右：房間密碼 + 返回大廳 -->
@@ -563,6 +562,11 @@ body::before {
 
   <div id="tc-scores-area" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;overflow:hidden">
     <div style="color:rgba(255,255,255,.25);font-family:'Nunito',sans-serif;font-size:.9rem">按「全班開始」後顯示即時分數</div>
+  </div>
+
+  <!-- 新增: 移到分數區下方的直接進行下一關按鈕容器 -->
+  <div id="tc-next-level-container" style="display:none; padding-bottom: 24px; text-align: center; flex-shrink:0;">
+      <button class="kr-btn kr-btn-blue" onclick="tcW4NextLevel()" style="font-size:1.1rem;padding:14px 40px;box-shadow:0 4px 0 var(--blue2);border-radius:16px;font-weight:900;">🎵 直接進行下一關 (M<span id="nl-mode"></span>-LV<span id="nl-level"></span>)</button>
   </div>
 
 </div>
@@ -871,6 +875,7 @@ initReset();
 const TC = {
     level: 1, running: false, paused: false,
     scores: {},
+    isNextLevel: false, // 標記是否為點擊「下一關」進入的狀態
     get gameFile() {
         const g = (window.state && window.state.selectedGame) || 0;
         const files = ['W1_消除方塊.html', 'W2_能源管線.html'];
@@ -1066,7 +1071,21 @@ function tcUpdateScore(group, score) {
 function tcStartGame() {
     const players = window.state.players;
     if (!players.length) { showToast('⚠️ 還沒有學生加入！'); return; }
-    TC.running = true; TC.paused = false; TC._lastPaused = false; TC.scores = {};
+    TC.running = true; TC.paused = false; TC._lastPaused = false;
+
+    // 修改: 支援分數累加邏輯
+    const rooms = window.getRooms();
+    if (rooms[window.state.roomCode]) {
+        if (!TC.isNextLevel) {
+            TC.scores = {};
+            rooms[window.state.roomCode].scores = {};
+            rooms[window.state.roomCode].baseScores = {}; // 第一關，基底分數歸零
+        } else {
+            // 是下一關，將目前成績備份為 baseScores
+            rooms[window.state.roomCode].baseScores = JSON.parse(JSON.stringify(rooms[window.state.roomCode].scores || {}));
+        }
+    }
+    TC.isNextLevel = false;
 
     // 更新 header
     const badge = document.getElementById('tc-level-badge');
@@ -1081,12 +1100,10 @@ function tcStartGame() {
     document.getElementById('tc-btn-resume').style.display = 'none';
 
     // 更新 rooms
-    const rooms = window.getRooms();
     if (rooms[window.state.roomCode]) {
         rooms[window.state.roomCode].status    = 'playing';
         rooms[window.state.roomCode].gameLevel = TC.level;
-        rooms[window.state.roomCode].gameMode  = 'SINGLE'; // W2 固定單管模式
-        rooms[window.state.roomCode].scores    = {};
+        rooms[window.state.roomCode].gameMode  = 'SINGLE'; 
         // W4 額外存 mode / level
         if (window.state.selectedGame === 3) {
             rooms[window.state.roomCode].w4mode  = lsW4SelectedMode || 1;
@@ -1107,11 +1124,13 @@ function tcStartGame() {
         const levelBadge = document.getElementById('tc-level-badge');
         const pauseBtn = document.getElementById('tc-btn-pause');
         const resumeBtn = document.getElementById('tc-btn-resume');
+        const nextContainer = document.getElementById('tc-next-level-container');
         if (settleBtn) { settleBtn.style.display = ''; }
         if (levelBadge) levelBadge.style.display = 'none';
         if (pauseBtn) pauseBtn.style.display = 'none';
         if (resumeBtn) resumeBtn.style.display = 'none';
-       const sa = document.getElementById('tc-scores-area');
+        if (nextContainer) nextContainer.style.display = 'none'; // W3 隱藏
+        const sa = document.getElementById('tc-scores-area');
         if (sa) {
             sa.style.padding = '0';
             sa.innerHTML = `<iframe id="tc-w3-iframe" src="W3_五子棋.html?teacher=1" style="flex:1; width:100%; border:none; border-radius:0"></iframe>`;
@@ -1138,15 +1157,23 @@ function tcStartGame() {
             badge.textContent = `M${lsW4SelectedMode||1} · LV${lsW4SelectedLevel||TC.level||1}`;
             badge.style.display = '';
         }
-        // 顯示「下一關」按鈕
-        const nextBtn = document.getElementById('tc-btn-next-level');
-        if (nextBtn) nextBtn.style.display = '';
+        // 顯示底部「下一關」按鈕容器 (若未達滿關10關)
+        const nextContainer = document.getElementById('tc-next-level-container');
+        if (nextContainer) {
+            nextContainer.style.display = (lsW4SelectedLevel < 10) ? 'block' : 'none';
+            document.getElementById('nl-mode').textContent = lsW4SelectedMode || 1;
+            document.getElementById('nl-level').textContent = (lsW4SelectedLevel || TC.level || 1) + 1;
+        }
+        
         tcRenderScores();
         const sa = document.getElementById('tc-scores-area');
         if (sa) sa.style.padding = '';
         const settleBtn = document.getElementById('tc-btn-settle');
         if (settleBtn) settleBtn.style.display = '';
     } else {
+        const nextContainer = document.getElementById('tc-next-level-container');
+        if (nextContainer) nextContainer.style.display = 'none';
+
         tcRenderScores();
         const sa = document.getElementById('tc-scores-area');
         if (sa) sa.style.padding = '';
@@ -1173,32 +1200,27 @@ function tcStartGame() {
             : '🎮 遊戲開始！關卡 ' + TC.level);
 }
 
+// 修改: 下一關邏輯，直接啟動下一關，不回選關畫面
 function tcW4NextLevel() {
-    // 回到選關畫面讓老師選下一關（分數保留）
-    const nextBtn = document.getElementById('tc-btn-next-level');
-    if (nextBtn) nextBtn.style.display = 'none';
-    // 更新 rooms 狀態為暫停，通知學生等待
-    const rooms = window.getRooms();
-    if (rooms[window.state.roomCode]) {
-        rooms[window.state.roomCode].status = 'lobby';
-        window.saveRooms(rooms);
+    if (lsW4SelectedLevel < 10) {
+        lsW4SelectedLevel++;
+        TC.level = lsW4SelectedLevel;
+        TC.isNextLevel = true; // 告知 tcStartGame 這是下一關，保留分數
+        
+        // 瞬間將狀態切為 lobby，讓學生端能卸載 iframe，再立即啟動遊戲
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            rooms[window.state.roomCode].status = 'lobby';
+            window.saveRooms(rooms);
+        }
+        
+        // 延遲 200ms 等待學生端抓到 lobby 狀態並切換畫面後，直接進入下一關
+        setTimeout(() => {
+            tcStartGame();
+        }, 200);
+    } else {
+        showToast('已是最後一關！');
     }
-    // 回到 W4 選關畫面（保留 rooms 和玩家）
-    TC.running = false;
-    const lsIcon = document.getElementById('ls-game-icon');
-    const g = GAMES[3];
-    if (lsIcon) lsIcon.textContent = g.icon + ' ' + g.name;
-    const lsCount = document.getElementById('ls-count');
-    if (lsCount) lsCount.textContent = window.state.players.length + ' 組';
-    const lsCode = document.getElementById('ls-room-code-badge');
-    if (lsCode) lsCode.textContent = window.state.roomCode || '0000';
-    document.getElementById('ls-w1').style.display = 'none';
-    document.getElementById('ls-w2').style.display = 'none';
-    document.getElementById('ls-w4').style.display = 'flex';
-    lsW4Render();
-    window.pStates['teacher'].screen = 'screen-level-select';
-    window.goTo('screen-level-select');
-    showToast('🎵 選擇下一關！');
 }
 
 function studentLeaveGame() {
@@ -1429,29 +1451,38 @@ function exitToLobby() {
     }
 }
 
-// 接收遊戲 postMessage（W1 / W2 通用）
+// 修改: 接收遊戲 postMessage，處理累加分數
 window.addEventListener('message', (e) => {
     if (!e.data || !e.data.type) return;
     const { type, score, group } = e.data;
     const isScore   = type==='W1_SCORE' || type==='W2_SCORE' || type==='W3_SCORE' || type==='W4_SCORE';
     const isGameover= type==='W1_GAMEOVER' || type==='W2_GAMEOVER' || type==='W4_GAMEOVER';
 
-    // ── W4 學生端：sg-iframe 發來分數 → 直接寫入 Firebase（老師在不同裝置收不到 postMessage）──
+    // ── W4 學生端：直接寫入 Firebase (加上過往累積的 baseScores) ──
     if ((type === 'W4_SCORE' || type === 'W4_GAMEOVER') && group && window.state.perspective !== 'teacher') {
         const rooms = window.getRooms();
         if (rooms[window.state.roomCode]) {
             if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
-            rooms[window.state.roomCode].scores[group] = score;
+            const base = rooms[window.state.roomCode].baseScores || {};
+            // 單關分數 + 過往累積
+            rooms[window.state.roomCode].scores[group] = (base[group] || 0) + score;
             window.saveRooms(rooms);
         }
-        return; // 學生端不需要繼續往下執行老師端邏輯
+        return; 
     }
+    
+    // 老師端處理
     if ((isScore || isGameover) && group) {
-        tcUpdateScore(group, score);
         const rooms = window.getRooms();
+        let finalScore = score;
+        
         if (rooms[window.state.roomCode]) {
+            const base = rooms[window.state.roomCode].baseScores || {};
+            finalScore = (base[group] || 0) + score;
+            
             if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
-            rooms[window.state.roomCode].scores[group] = score;
+            rooms[window.state.roomCode].scores[group] = finalScore;
+            
             // W3 額外存 wins/matches
             if (type === 'W3_SCORE') {
                 if (!rooms[window.state.roomCode].w3scores) rooms[window.state.roomCode].w3scores = {};
@@ -1462,10 +1493,14 @@ window.addEventListener('message', (e) => {
             }
             window.saveRooms(rooms);
         }
+        
+        tcUpdateScore(group, finalScore);
+        
         if (isGameover && window.state.perspective === 'teacher') {
-            showToast(`🏁 ${group} 完成！得分：${score}`);
+            showToast(`🏁 ${group} 完成！累積得分：${finalScore}`);
         }
     }
+    
     // W3 五子棋：老師 iframe 廣播棋局狀態 → 存入 Firebase → 推送給所有學生
     if (type === 'W3_STATE' && e.data.data) {
         const w3d = e.data.data;
