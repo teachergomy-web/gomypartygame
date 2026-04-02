@@ -650,16 +650,7 @@
         <div id="time-progress-bar" style="width:100%"></div>
     </div>
 
-    <!-- 靜音按鈕 -->
-    <button id="mute-btn" onclick="toggleMute()" style="
-        position:absolute; top:50%; right:64px; transform:translateY(-50%);
-        background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
-        border-radius:8px; padding:7px 12px; font-size:16px; cursor:pointer;
-        transition:all 0.2s; z-index:60; line-height:1;
-    ">🔊</button>
 
-    <!-- 放棄按鈕 (獨立定位) -->
-    <button class="quit-btn" onclick="quitGame()">✕ QUIT</button>
 
     <div id="combo-pop">0 COMBO</div>
 </div>
@@ -686,13 +677,40 @@
             </div>
         </div>
 
-        <button class="lobby-btn" onclick="quitGame()">RETURN TO LOBBY</button>
+        <button class="lobby-btn" id="result-action-btn" onclick="quitGame()">RETURN TO LOBBY</button>
     </div>
 </div>
+
+<!-- ════ 學生等待畫面（平台模式）════ -->
+<div id="platform-wait" class="overlay hidden" style="background:radial-gradient(ellipse at center,rgba(0,30,50,0.97),rgba(6,10,16,0.99))">
+    <div style="text-align:center;padding:32px 24px;max-width:400px">
+        <div style="font-size:3.5rem;animation:heroPulse 2s ease-in-out infinite;display:block;margin-bottom:16px">🎵</div>
+        <div style="font-family:'Orbitron',monospace;font-weight:900;font-size:22px;color:#f1c40f;letter-spacing:2px;margin-bottom:8px;text-shadow:0 0 20px rgba(241,196,15,0.5)">節奏合鳴</div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;color:rgba(255,255,255,0.35);letter-spacing:3px;margin-bottom:28px">WEEKLY CHALLENGE · W4</div>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:20px 24px;margin-bottom:20px">
+            <div id="pw-group-badge" style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:#00f5ff;margin-bottom:8px"></div>
+            <div id="pw-status-msg" style="font-family:'Press Start 2P',monospace;font-size:8px;color:rgba(255,255,255,0.4);line-height:1.8">等待老師開始遊戲...</div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center">
+            <div style="width:8px;height:8px;border-radius:50%;background:#00f5ff;animation:dotBounce 1.2s ease-in-out infinite"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#00f5ff;animation:dotBounce 1.2s ease-in-out infinite 0.2s"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#00f5ff;animation:dotBounce 1.2s ease-in-out infinite 0.4s"></div>
+        </div>
+    </div>
+</div>
+<style>
+@keyframes heroPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
+@keyframes dotBounce { 0%,80%,100%{transform:translateY(0);opacity:0.4;} 40%{transform:translateY(-10px);opacity:1;} }
+</style>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+
+    // ── 平台橋接：前置宣告（實際初始化在 script 底部）──
+    var isPlatform    = new URLSearchParams(location.search).get('student') === '1';
+    var platformGroup = new URLSearchParams(location.search).get('group') || '';
+    function reportScore(isFinal) { /* 由底部橋接層覆寫 */ }
 
     let gameState = {
         mode: 1, level: 1, active: false,
@@ -897,10 +915,18 @@
         gameState.timeLeft -= dt / 1000;
         if (gameState.timeLeft <= 0) {
             gameState.active = false;
+            stopBGM();
             document.getElementById('result-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = gameState.score;
             document.getElementById('final-combo').innerText = gameState.maxCombo;
             document.getElementById('final-level').innerText = gameState.level;
+
+            // 平台模式：調整結算按鈕文字 + 上報分數
+            if (isPlatform) {
+                const btn = document.getElementById('result-action-btn');
+                if (btn) { btn.textContent = '⏳ 等待老師下一關...'; btn.style.cursor = 'default'; btn.onclick = null; btn.style.opacity = '0.5'; }
+            }
+            reportScore(true);
             return;
         }
 
@@ -1304,8 +1330,9 @@
     // 🔧 原有函式改造 (注入音效)
     // ══════════════════════════════════
 
-    // 覆寫 addScore — 加入 hit sfx
+    // 覆寫 addScore — 加入 hit sfx + 定期上報分數
     const _origAddScore = addScore;
+    let _lastScoreReport = 0;
     addScore = function(pts, x, y, color, label) {
         // 取得 trackIdx 估算（用 x 座標）
         const trackIdx = Math.floor(x / (trackWidth || 1)) % 4;
@@ -1316,6 +1343,12 @@
             setTimeout(() => playSfxComboMilestone(nextCombo), 80);
         }
         _origAddScore(pts, x, y, color, label);
+        // 每 5 秒向大廳同步一次分數
+        const now = Date.now();
+        if (isPlatform && now - _lastScoreReport > 5000) {
+            _lastScoreReport = now;
+            reportScore(false);
+        }
     };
 
     // 覆寫 startGame — 啟動 BGM
@@ -1325,11 +1358,22 @@
         startBGM();
     };
 
-    // 覆寫 quitGame — 停止 BGM
+    // 覆寫 quitGame — 停止 BGM + 平台模式回等待畫面
     const _origQuitGame = quitGame;
     quitGame = function() {
         stopBGM();
-        _origQuitGame();
+        if (isPlatform) {
+            // 平台模式：不顯示主選單，回到等待畫面
+            gameState.active = false;
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('platform-wait').classList.remove('hidden');
+            const statusMsg = document.getElementById('pw-status-msg');
+            if (statusMsg) statusMsg.textContent = '✅ 本關結束！等待老師下一關...';
+        } else {
+            _origQuitGame();
+        }
     };
 
     // ── 觸控 ──
@@ -1345,6 +1389,69 @@
     canvas.addEventListener('touchend',   e => { e.preventDefault(); updateTouchState(e); }, {passive:false});
     canvas.addEventListener('mousedown',  e => { const t = Math.floor(e.clientX / trackWidth); isTouching[t] = true; handleInput(e.clientX, e.clientY, true); });
     window.addEventListener('mouseup',    () => isTouching = [false,false,false,false]);
+
+    // ══════════════════════════════════
+    // 🔗 平台橋接層 — 放在最底部確保所有函式已宣告
+    // ══════════════════════════════════
+    const _urlP     = new URLSearchParams(location.search);
+    const _urlMode  = parseInt(_urlP.get('mode'))  || 0;
+    const _urlLevel = parseInt(_urlP.get('level')) || 0;
+
+    // 覆寫 reportScore 真實實作
+    reportScore = function(isFinal) {
+        if (!isPlatform || !platformGroup) return;
+        window.parent.postMessage({
+            type:  isFinal ? 'W4_GAMEOVER' : 'W4_SCORE',
+            score: gameState.score,
+            combo: gameState.maxCombo,
+            group: platformGroup,
+            level: gameState.level,
+            mode:  gameState.mode
+        }, '*');
+    };
+
+    // 啟動函式（URL 參數 or PLATFORM_START 皆呼叫此）
+    function platformLaunch(mode, level) {
+        document.getElementById('platform-wait').classList.add('hidden');
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('level-menu').classList.add('hidden');
+        gameState.mode = mode;
+        startGame(level);
+    }
+
+    // 接收大廳 postMessage
+    window.addEventListener('message', (e) => {
+        if (!e.data || !e.data.type) return;
+        if (e.data.type === 'PLATFORM_START') {
+            const mode  = e.data.w4mode  || _urlMode  || 1;
+            const level = e.data.w4level || _urlLevel || e.data.level || 1;
+            platformLaunch(mode, level);
+        }
+        if (e.data.type === 'PLATFORM_PAUSE')  { stopBGM(); gameState.active = false; }
+        if (e.data.type === 'PLATFORM_RESUME') {
+            if (!gameState.active && gameState.timeLeft > 0) {
+                gameState.active = true;
+                gameState.lastFrameTime = performance.now();
+                requestAnimationFrame(gameLoop);
+                startBGM();
+            }
+        }
+    });
+
+    // 平台模式初始化：隱藏主選單，顯示等待畫面或直接啟動
+    if (isPlatform) {
+        document.getElementById('main-menu').classList.add('hidden');
+        if (_urlMode > 0 && _urlLevel > 0) {
+            // URL 已帶參數 → 直接啟動
+            platformLaunch(_urlMode, _urlLevel);
+        } else {
+            // 等待 PLATFORM_START
+            document.getElementById('platform-wait').classList.remove('hidden');
+            const badge = document.getElementById('pw-group-badge');
+            if (badge && platformGroup) badge.textContent = platformGroup;
+        }
+    }
+
 </script>
 </body>
 </html>

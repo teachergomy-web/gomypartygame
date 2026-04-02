@@ -396,24 +396,139 @@ body::before {
     <button class="kr-btn kr-btn-start" style="font-size:1.1rem;padding:16px 50px;opacity:.4;cursor:not-allowed" id="ls-w2-start-btn" disabled onclick="tcStartGame()">▶ 全班開始！</button>
   </div>
 
-  <!-- W4 選關（模式 × 關卡） -->
-  <div id="ls-w4" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px 16px">
-    <!-- 模式選擇 -->
-    <div style="width:100%;max-width:480px">
-      <div style="color:rgba(245,200,0,.7);font-family:'Nunito',sans-serif;font-weight:900;font-size:.75rem;letter-spacing:.1em;margin-bottom:10px;text-align:center">選擇模式</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="ls-w4-mode-grid">
-        <button class="ls-w4-mode-btn" data-mode="1" onclick="lsW4SelectMode(1)" style="background:linear-gradient(135deg,#1a78e0,#0050a0);border:3px solid #00E5FF;border-radius:14px;padding:14px 6px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:white;cursor:pointer;transition:all .15s">◎<br><span style="font-size:.7rem">縮圈點擊</span></button>
-        <button class="ls-w4-mode-btn" data-mode="2" onclick="lsW4SelectMode(2)" style="background:linear-gradient(135deg,#9b59b6,#6c3483);border:3px solid rgba(255,255,255,.3);border-radius:14px;padding:14px 6px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:white;cursor:pointer;transition:all .15s">▬<br><span style="font-size:.7rem">鋼琴黑塊</span></button>
-        <button class="ls-w4-mode-btn" data-mode="3" onclick="lsW4SelectMode(3)" style="background:linear-gradient(135deg,#e74c3c,#a00000);border:3px solid rgba(255,255,255,.3);border-radius:14px;padding:14px 6px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:white;cursor:pointer;transition:all .15s">↓<br><span style="font-size:.7rem">底線軌道</span></button>
+  <!-- W4 選關（W4 遊戲同款風格：模式卡片 → 關卡網格） -->
+  <div id="ls-w4" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px;background:radial-gradient(ellipse at center,rgba(0,20,40,0.6),transparent 70%);position:relative;overflow:hidden">
+
+    <!-- 動態格線背景 -->
+    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(0,245,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,0.03) 1px,transparent 1px);background-size:36px 36px;animation:lsGridMove 18s linear infinite;pointer-events:none;z-index:0"></div>
+
+    <!-- 第一步：模式選擇 -->
+    <div id="ls-w4-step1" style="width:100%;max-width:440px;position:relative;z-index:1;animation:lsSlideIn .35s cubic-bezier(.34,1.56,.64,1) both">
+      <div style="text-align:center;margin-bottom:6px">
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;letter-spacing:3px;color:rgba(0,245,255,0.6);margin-bottom:10px">SELECT MODE</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.5rem;color:#f5c800;text-shadow:0 0 20px rgba(245,200,0,.4);margin-bottom:20px">選擇遊戲模式</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <div class="ls-w4-card ls-w4-card-blue" onclick="lsW4SelectMode(1)">
+          <span class="ls-w4-card-icon" style="color:#3498db">◎</span>
+          <div class="ls-w4-card-info">
+            <div class="ls-w4-card-name" style="color:#3498db">縮圈點擊</div>
+            <div class="ls-w4-card-desc">MODE 01 · TAP TO BEAT</div>
+          </div>
+          <span class="ls-w4-card-arrow">›</span>
+        </div>
+
+        <div class="ls-w4-card ls-w4-card-purple" onclick="lsW4SelectMode(2)">
+          <span class="ls-w4-card-icon" style="color:#9b59b6">▬</span>
+          <div class="ls-w4-card-info">
+            <div class="ls-w4-card-name" style="color:#9b59b6">鋼琴黑塊</div>
+            <div class="ls-w4-card-desc">MODE 02 · PIANO TILES</div>
+          </div>
+          <span class="ls-w4-card-arrow">›</span>
+        </div>
+
+        <div class="ls-w4-card ls-w4-card-red" onclick="lsW4SelectMode(3)">
+          <span class="ls-w4-card-icon" style="color:#e74c3c">↓</span>
+          <div class="ls-w4-card-info">
+            <div class="ls-w4-card-name" style="color:#e74c3c">底線軌道</div>
+            <div class="ls-w4-card-desc">MODE 03 · TRACK RUSH</div>
+          </div>
+          <span class="ls-w4-card-arrow">›</span>
+        </div>
+
       </div>
     </div>
-    <!-- 關卡選擇 -->
-    <div style="width:100%;max-width:480px">
-      <div style="color:rgba(245,200,0,.7);font-family:'Nunito',sans-serif;font-weight:900;font-size:.75rem;letter-spacing:.1em;margin-bottom:10px;text-align:center">選擇關卡（1–10）</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="ls-w4-level-grid"></div>
+
+    <!-- 第二步：關卡選擇（選完模式後滑入） -->
+    <div id="ls-w4-step2" style="display:none;width:100%;max-width:440px;position:relative;z-index:1">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-family:'Press Start 2P',monospace;font-size:8px;letter-spacing:3px;color:rgba(0,245,255,0.6);margin-bottom:8px">SELECT LEVEL</div>
+        <div id="ls-w4-mode-title" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.3rem;color:#00f5ff;text-shadow:0 0 16px rgba(0,245,255,.5)"></div>
+        <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.4),transparent);margin:10px 0 16px"></div>
+      </div>
+
+      <!-- 關卡格 1–10 -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px" id="ls-w4-level-grid"></div>
+
+      <!-- 全班開始 -->
+      <button class="ls-w4-start-btn" id="ls-w4-start-btn" disabled onclick="tcStartGame()">▶ 全班開始！</button>
+
+      <!-- 返回模式選擇 -->
+      <button onclick="lsW4BackToMode()" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px;font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:rgba(255,255,255,.4);cursor:pointer;transition:all .2s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.4)'">← 重新選模式</button>
     </div>
-    <button class="kr-btn kr-btn-start" style="font-size:1.1rem;padding:16px 50px;opacity:.4;cursor:not-allowed" id="ls-w4-start-btn" disabled onclick="tcStartGame()">▶ 全班開始！</button>
   </div>
+
+  <style>
+    @keyframes lsGridMove { 0%{background-position:0 0} 100%{background-position:36px 36px} }
+    @keyframes lsSlideIn  { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes lsSlideInL { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:translateX(0)} }
+
+    .ls-w4-card {
+      display:flex; align-items:center; gap:16px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:12px; padding:16px 20px;
+      cursor:pointer; overflow:hidden; position:relative;
+      transition:transform .2s, border-color .2s, box-shadow .2s;
+    }
+    .ls-w4-card::before {
+      content:''; position:absolute; inset:0; opacity:0; transition:opacity .3s;
+    }
+    .ls-w4-card:hover { transform:translateY(-2px) scale(1.01); }
+    .ls-w4-card:active { transform:scale(0.97); }
+    .ls-w4-card-blue  { border-color:rgba(52,152,219,0.4); }
+    .ls-w4-card-purple{ border-color:rgba(155,89,182,0.4); }
+    .ls-w4-card-red   { border-color:rgba(231,76,60,0.4);  }
+    .ls-w4-card-blue::before  { background:linear-gradient(135deg,rgba(52,152,219,0.15),transparent); }
+    .ls-w4-card-purple::before{ background:linear-gradient(135deg,rgba(155,89,182,0.15),transparent); }
+    .ls-w4-card-red::before   { background:linear-gradient(135deg,rgba(231,76,60,0.15),transparent); }
+    .ls-w4-card:hover::before { opacity:1; }
+    .ls-w4-card-blue:hover  { border-color:rgba(52,152,219,0.9);  box-shadow:0 0 20px rgba(52,152,219,0.25); }
+    .ls-w4-card-purple:hover{ border-color:rgba(155,89,182,0.9);  box-shadow:0 0 20px rgba(155,89,182,0.25); }
+    .ls-w4-card-red:hover   { border-color:rgba(231,76,60,0.9);   box-shadow:0 0 20px rgba(231,76,60,0.25); }
+
+    .ls-w4-card-icon { font-size:28px; flex-shrink:0; filter:drop-shadow(0 0 6px currentColor); }
+    .ls-w4-card-info { flex:1; text-align:left; }
+    .ls-w4-card-name { font-family:'Nunito',sans-serif; font-weight:900; font-size:1rem; margin-bottom:3px; }
+    .ls-w4-card-desc { font-family:'Press Start 2P',monospace; font-size:7px; color:rgba(255,255,255,0.35); line-height:1.6; }
+    .ls-w4-card-arrow{ font-size:18px; color:rgba(255,255,255,0.4); transition:transform .2s, color .2s; }
+    .ls-w4-card:hover .ls-w4-card-arrow { transform:translateX(5px); color:#fff; }
+
+    /* 關卡按鈕 */
+    .ls-w4-lvl-btn {
+      background:rgba(255,255,255,0.04);
+      color:rgba(255,255,255,0.6);
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:10px; padding:14px 0;
+      font-family:'Nunito',sans-serif; font-weight:900; font-size:1rem;
+      cursor:pointer; transition:all .15s; position:relative; overflow:hidden;
+    }
+    .ls-w4-lvl-btn::after {
+      content:''; position:absolute; inset:0;
+      background:radial-gradient(circle at center,rgba(0,245,255,0.2),transparent 70%);
+      opacity:0; transition:opacity .2s;
+    }
+    .ls-w4-lvl-btn:hover { background:rgba(0,245,255,0.1); border-color:#00f5ff; color:#00f5ff; transform:scale(1.1); box-shadow:0 0 14px rgba(0,245,255,0.3); }
+    .ls-w4-lvl-btn:hover::after { opacity:1; }
+    .ls-w4-lvl-btn:active { transform:scale(0.93); }
+    .ls-w4-lvl-btn.selected { background:rgba(0,245,255,0.15); border-color:#00f5ff; color:#00f5ff; box-shadow:0 0 16px rgba(0,245,255,0.4); }
+
+    /* 全班開始按鈕 */
+    .ls-w4-start-btn {
+      width:100%; padding:16px;
+      background:linear-gradient(135deg,rgba(0,245,255,0.15),rgba(0,245,255,0.05));
+      border:1px solid rgba(0,245,255,0.4); border-radius:12px;
+      font-family:'Nunito',sans-serif; font-weight:900; font-size:1rem; letter-spacing:2px;
+      color:#00f5ff; cursor:pointer; transition:all .2s;
+      text-shadow:0 0 10px rgba(0,245,255,0.5);
+      opacity:.4;
+    }
+    .ls-w4-start-btn:not(:disabled) { opacity:1; }
+    .ls-w4-start-btn:not(:disabled):hover { background:rgba(0,245,255,0.25); box-shadow:0 0 24px rgba(0,245,255,0.3); transform:translateY(-2px); }
+    .ls-w4-start-btn:not(:disabled):active { transform:scale(0.97); }
+    .ls-w4-start-btn:disabled { cursor:not-allowed; }
+  </style>
 
   <div class="kr-footer">
     <button class="kr-btn kr-btn-ghost" onclick="exitToLobby()">← 返回大廳</button>
@@ -820,68 +935,78 @@ function lsW2Render() {
     }
 }
 
-// ── W4 節奏合鳴選關 ──
-let lsW4SelectedMode  = 0; // 0=未選
-let lsW4SelectedLevel = 0; // 0=未選
+// ── W4 節奏合鳴選關（兩階段：模式卡片 → 關卡網格）──
+let lsW4SelectedMode  = 0;
+let lsW4SelectedLevel = 0;
+
+const lsW4ModeNames  = ['', '縮圈點擊', '鋼琴黑塊', '底線軌道'];
+const lsW4ModeColors = ['', '#3498db', '#9b59b6', '#e74c3c'];
 
 function lsW4Render() {
     lsW4SelectedMode  = 0;
     lsW4SelectedLevel = 0;
-    // 重設所有模式按鈕外觀
-    document.querySelectorAll('.ls-w4-mode-btn').forEach(b => {
-        b.style.boxShadow  = 'none';
-        b.style.transform  = 'scale(1)';
-        b.style.borderColor = 'rgba(255,255,255,.3)';
-    });
-    // 渲染關卡格
+    const s1 = document.getElementById('ls-w4-step1');
+    const s2 = document.getElementById('ls-w4-step2');
+    if (s1) { s1.style.display = ''; s1.style.animation = 'lsSlideIn .35s cubic-bezier(.34,1.56,.64,1) both'; }
+    if (s2) s2.style.display = 'none';
+    lsW4SetStartBtn(false);
+}
+
+function lsW4SelectMode(mode) {
+    lsW4SelectedMode  = mode;
+    lsW4SelectedLevel = 0;
+    const s1 = document.getElementById('ls-w4-step1');
+    const s2 = document.getElementById('ls-w4-step2');
+    if (s1) s1.style.display = 'none';
+    if (s2) { s2.style.display = ''; s2.style.animation = 'lsSlideIn .3s cubic-bezier(.34,1.56,.64,1) both'; }
+    const title = document.getElementById('ls-w4-mode-title');
+    if (title) {
+        title.textContent = lsW4ModeNames[mode] || '';
+        title.style.color = lsW4ModeColors[mode] || '#00f5ff';
+        title.style.textShadow = `0 0 16px ${lsW4ModeColors[mode] || '#00f5ff'}80`;
+    }
     const grid = document.getElementById('ls-w4-level-grid');
     if (!grid) return;
     grid.innerHTML = '';
     for (let i = 1; i <= 10; i++) {
         const btn = document.createElement('button');
-        btn.className = 'ls-lvl-btn ' + (i <= 3 ? 'ls-single' : i <= 7 ? 'ls-mid' : 'ls-hard');
+        btn.className = 'ls-w4-lvl-btn';
         btn.id = 'ls-w4-lvl-' + i;
         btn.textContent = i;
         btn.onclick = () => lsW4SelectLevel(i);
         grid.appendChild(btn);
     }
-    // 重設開始按鈕
-    const startBtn = document.getElementById('ls-w4-start-btn');
-    if (startBtn) { startBtn.disabled = true; startBtn.style.opacity = '.4'; startBtn.style.cursor = 'not-allowed'; }
+    lsW4SetStartBtn(false);
 }
 
-function lsW4SelectMode(mode) {
-    lsW4SelectedMode = mode;
-    document.querySelectorAll('.ls-w4-mode-btn').forEach(b => {
-        const isSelected = parseInt(b.dataset.mode) === mode;
-        b.style.boxShadow   = isSelected ? '0 0 16px rgba(245,200,0,.7)' : 'none';
-        b.style.transform   = isSelected ? 'scale(1.08) translateY(-2px)' : 'scale(1)';
-        b.style.borderColor = isSelected ? '#FFD600' : 'rgba(255,255,255,.3)';
-    });
-    lsW4CheckReady();
+function lsW4BackToMode() {
+    lsW4SelectedMode  = 0;
+    lsW4SelectedLevel = 0;
+    const s1 = document.getElementById('ls-w4-step1');
+    const s2 = document.getElementById('ls-w4-step2');
+    if (s2) s2.style.display = 'none';
+    if (s1) { s1.style.display = ''; s1.style.animation = 'lsSlideInL .3s cubic-bezier(.34,1.56,.64,1) both'; }
 }
 
 function lsW4SelectLevel(level) {
     lsW4SelectedLevel = level;
-    // 更新格子外觀
+    TC.level = level;
     for (let i = 1; i <= 10; i++) {
         const b = document.getElementById('ls-w4-lvl-' + i);
-        if (b) b.classList.toggle('ls-selected', i === level);
+        if (b) b.classList.toggle('selected', i === level);
     }
-    lsW4CheckReady();
+    lsW4SetStartBtn(true);
+}
+
+function lsW4SetStartBtn(ready) {
+    const btn = document.getElementById('ls-w4-start-btn');
+    if (!btn) return;
+    btn.disabled = !ready;
 }
 
 function lsW4CheckReady() {
-    const startBtn = document.getElementById('ls-w4-start-btn');
-    const ready = lsW4SelectedMode > 0 && lsW4SelectedLevel > 0;
-    if (startBtn) {
-        startBtn.disabled    = !ready;
-        startBtn.style.opacity = ready ? '1' : '.4';
-        startBtn.style.cursor  = ready ? 'pointer' : 'not-allowed';
-    }
-    if (ready) {
-        TC.level = lsW4SelectedLevel;
-    }
+    lsW4SetStartBtn(lsW4SelectedMode > 0 && lsW4SelectedLevel > 0);
+    if (lsW4SelectedLevel > 0) TC.level = lsW4SelectedLevel;
 }
 
 function updateLevelDisplay() {
@@ -1280,6 +1405,17 @@ window.addEventListener('message', (e) => {
     const { type, score, group } = e.data;
     const isScore   = type==='W1_SCORE' || type==='W2_SCORE' || type==='W3_SCORE' || type==='W4_SCORE';
     const isGameover= type==='W1_GAMEOVER' || type==='W2_GAMEOVER' || type==='W4_GAMEOVER';
+
+    // ── W4 學生端：sg-iframe 發來分數 → 直接寫入 Firebase（老師在不同裝置收不到 postMessage）──
+    if ((type === 'W4_SCORE' || type === 'W4_GAMEOVER') && group && window.state.perspective !== 'teacher') {
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
+            rooms[window.state.roomCode].scores[group] = score;
+            window.saveRooms(rooms);
+        }
+        return; // 學生端不需要繼續往下執行老師端邏輯
+    }
     if ((isScore || isGameover) && group) {
         tcUpdateScore(group, score);
         const rooms = window.getRooms();
@@ -1405,12 +1541,13 @@ setInterval(() => {
     if (r.status === 'playing' && pData.screen === 'screen-student-game') {
         const sgIfr = document.getElementById('sg-iframe');
         if (sgIfr?.contentWindow) {
-            if (r.paused) {
+            const wasPaused = pData._lastPaused;
+            if (r.paused && !wasPaused) {
                 sgIfr.contentWindow.postMessage({ type:'PLATFORM_PAUSE' }, '*');
-            } else if (r.paused === false && TC._lastPaused) {
+            } else if (!r.paused && wasPaused) {
                 sgIfr.contentWindow.postMessage({ type:'PLATFORM_RESUME' }, '*');
             }
-            TC._lastPaused = r.paused;
+            pData._lastPaused = !!r.paused;
         }
     }
     // 偵測老師按下結算 → 學生顯示結算畫面
@@ -2290,7 +2427,8 @@ Object.assign(window, {
     tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, exitToLobby, studentLeaveGame, tryRestoreSession,
     showToast, setViewTeacher, setViewStudent,
     syncJoinDOM, renderLobby, renderSymbolPicker, renderGroupSelect, updateStudentWaitDisplay,
-    getRooms, saveRooms
+    getRooms, saveRooms,
+    lsW4BackToMode
 });
 </script>
 </body>
