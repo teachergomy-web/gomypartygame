@@ -231,7 +231,7 @@
       <li>猜對：猜題組 +2 分，出題組 +1 分</li>
       <li>老師統一公布答案後進入下一輪</li>
     </ul>
-    <div class="pill wait">等待老師出題...</div>
+    <div class="pill wait" id="s-rules-status">等待老師出題...</div>
   </div>
 
   <!-- Draw -->
@@ -343,7 +343,7 @@ function loadState() {
   try { const r = localStorage.getItem(LS_KEY); if (r) state = JSON.parse(r); }
   catch(e) { state = defaultState(); }
 }
-// Students listen for teacher-pushed state changes
+// Students listen for teacher-pushed state changes (cross-tab)
 window.addEventListener('storage', (e) => {
   if (e.key !== LS_KEY || currentGroupIdx < 0) return;
   loadState();
@@ -351,6 +351,22 @@ window.addEventListener('storage', (e) => {
   if (state.phase === 'DRAWING' && !state.groups[currentGroupIdx]?.submitted)
     setTimeout(resizeCanvas, 60);
 });
+
+// Polling fallback — catches changes within same origin (e.g. iframe context)
+let _lastStateJson = '';
+setInterval(() => {
+  if (currentGroupIdx < 0) return; // teacher tab skips
+  try {
+    const raw = localStorage.getItem(LS_KEY) || '';
+    if (raw && raw !== _lastStateJson) {
+      _lastStateJson = raw;
+      state = JSON.parse(raw);
+      renderStudent();
+      if (state.phase === 'DRAWING' && !state.groups[currentGroupIdx]?.submitted)
+        setTimeout(resizeCanvas, 60);
+    }
+  } catch(e) {}
+}, 500);
 
 // ═══════════════════════════════════════════
 // CANVAS
