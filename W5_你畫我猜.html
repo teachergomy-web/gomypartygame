@@ -708,7 +708,13 @@ function renderS(){
       updateTimerUI();
       if(!_canvasReady){
         _canvasReady=true;
-        requestAnimationFrame(resizeCanvas);
+        // 同步呼叫 resizeCanvas（確保 canvas 有尺寸後才允許畫圖）
+        // 不用 rAF — canvas.width=0 時所有 stroke/fill 完全無效
+        resizeCanvas();
+        // 如果同步 resize 失敗（元素剛顯示尚未 layout），16ms 後重試一次
+        if(!canvas.width||canvas.width<10){
+          setTimeout(()=>{ resizeCanvas(); }, 16);
+        }
       }
       if(!studentTimer){
         studentTimer=setInterval(()=>{
