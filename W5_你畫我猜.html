@@ -85,12 +85,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 #student-screen{position:relative;}
 #s-rules{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px 20px;text-align:center;}
 
-#s-draw{width:100%;height:100%;display:none;flex-direction:column;align-items:center;padding:10px;gap:8px;}
-#s-draw-banner{width:100%;max-width:640px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+#s-draw{width:100%;height:100%;display:none;flex-direction:column;align-items:stretch;padding:8px;gap:6px;}
+#s-draw-banner{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;flex-shrink:0;}
 #s-draw-topic{font-size:20px;font-weight:900;color:var(--accent);}
-#canvas-wrap{width:100%;max-width:640px;flex:1;min-height:200px;border-radius:10px;overflow:hidden;border:2px solid var(--border);background:#fff;position:relative;}
+#canvas-wrap{width:100%;flex:1;min-height:0;border-radius:10px;overflow:hidden;border:2px solid var(--border);background:#fff;position:relative;}
 #drawCanvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair;}
-#s-toolbar{width:100%;max-width:640px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#s-toolbar{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;}
 .s-color{width:28px;height:28px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:transform .15s;flex-shrink:0;}
 .s-color.sel{border-color:var(--accent);transform:scale(1.25);}
 .s-tool-sep{flex:1;}
@@ -287,7 +287,7 @@ window.addEventListener('message',ev=>{
       myIdx=S.groups.findIndex(g=>g.name===myGroup);
       if(myIdx<0) myIdx=0;
       renderS();
-      if(S.phase==='DRAWING'&&!S.groups[myIdx]?.submitted) setTimeout(resizeCanvas,60);
+      if(S.phase==='DRAWING'&&!S.groups[myIdx]?.submitted) requestAnimationFrame(()=>requestAnimationFrame(resizeCanvas));
     }
     return;
   }
@@ -313,7 +313,7 @@ window.addEventListener('message',ev=>{
     if(isTeacher){ renderT(); }
     else{
       renderS();
-      if(S.phase==='DRAWING'&&myIdx>=0&&!S.groups[myIdx]?.submitted) setTimeout(resizeCanvas,60);
+      if(S.phase==='DRAWING'&&myIdx>=0&&!S.groups[myIdx]?.submitted) requestAnimationFrame(()=>requestAnimationFrame(resizeCanvas));
     }
     return;
   }
@@ -325,6 +325,9 @@ window.addEventListener('message',ev=>{
       if(g&&!g.submitted&&S.phase==='DRAWING'){
         g.imgData=canvas.toDataURL('image/png');
         g.submitted=true;
+        // 判斷是否為空白畫布（與全白畫布比較）
+        const blank=isCanvasBlank();
+        if(blank){ g.score=Math.max(0,g.score-2); g.forcedBlank=true; }
         push(); // push imgData immediately
       }
     }
@@ -340,30 +343,46 @@ let curColor='#111',curSize=8,painting=false,tchs={};
 
 function resizeCanvas(){
   const w=document.getElementById('canvas-wrap'); if(!w)return;
-  
-  // 保留原本畫布內容，防止 resize 時被清空
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = canvas.width;
-  tempCanvas.height = canvas.height;
-  if(canvas.width > 0 && canvas.height > 0) {
-      tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
+  const rect=w.getBoundingClientRect();
+  // 元素隱藏時 getBoundingClientRect 返回 0，改用 offsetWidth/offsetHeight
+  const cssW=rect.width||w.offsetWidth||w.clientWidth;
+  const cssH=rect.height||w.offsetHeight||w.clientHeight;
+  if(!cssW||!cssH) return; // 仍然是 0 → 元素還沒顯示，不做任何事
+
+  // 保留原本畫布內容（以 CSS 邏輯尺寸記錄）
+  const prevW=canvas._cssW||0;
+  const prevH=canvas._cssH||0;
+  const tempCanvas=document.createElement('canvas');
+  tempCanvas.width=canvas.width; tempCanvas.height=canvas.height;
+  if(canvas.width>0&&canvas.height>0&&prevW>0&&prevH>0){
+    tempCanvas.getContext('2d').drawImage(canvas,0,0);
   }
 
-  canvas.width=w.clientWidth; canvas.height=w.clientHeight;
-  
-  // 畫布填滿白色，確保沒畫時也能送出全白圖片
+  // 依照實際顯示尺寸 × devicePixelRatio 設定解析度
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=Math.round(cssW*dpr);
+  canvas.height=Math.round(cssH*dpr);
+  canvas.style.width=cssW+'px';
+  canvas.style.height=cssH+'px';
+  canvas._cssW=cssW; canvas._cssH=cssH;
+
+  // context transform 以符合 dpr
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  // 填白
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  
-  if(tempCanvas.width > 0 && tempCanvas.height > 0) {
-      ctx.drawImage(tempCanvas, 0, 0);
+  ctx.fillRect(0,0,cssW,cssH);
+
+  // 還原舊內容（等比縮放到新尺寸）
+  if(tempCanvas.width>0&&tempCanvas.height>0&&prevW>0&&prevH>0){
+    ctx.drawImage(tempCanvas,0,0,tempCanvas.width,tempCanvas.height,
+      0,0,cssW,cssH);
   }
-  
   ctx.lineCap='round'; ctx.lineJoin='round';
 }
 window.addEventListener('resize',resizeCanvas);
 
-function gp(e,t){const r=canvas.getBoundingClientRect();return{x:(t.clientX-r.left)*(canvas.width/r.width),y:(t.clientY-r.top)*(canvas.height/r.height)};}
+function gp(e,t){const r=canvas.getBoundingClientRect();return{x:(t.clientX-r.left),y:(t.clientY-r.top)};}
 function dot(p){ctx.beginPath();ctx.arc(p.x,p.y,curSize/2,0,Math.PI*2);ctx.fillStyle=curColor;ctx.fill();}
 function ln(a,b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=curSize;ctx.strokeStyle=curColor;ctx.stroke();}
 canvas.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches){const p=gp(e,t);tchs[t.identifier]=p;dot(p);}},{passive:false});
@@ -374,9 +393,19 @@ canvas.addEventListener('mousemove', e=>{if(!painting)return;const p=gp(e,e);ln(
 window.addEventListener('mouseup',   ()=>{painting=false;delete tchs.mouse;});
 
 function clearCanvas(){
-  // 清除畫布時也填滿白色
+  const cw=canvas._cssW||canvas.width;
+  const ch=canvas._cssH||canvas.height;
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0,0,cw,ch);
+}
+
+function isCanvasBlank(){
+  // 取樣畫布像素，全白（r=255,g=255,b=255）才算空白
+  const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  for(let i=0;i<data.length;i+=4){
+    if(data[i]<250||data[i+1]<250||data[i+2]<250) return false;
+  }
+  return true;
 }
 
 function pickColor(el){curColor=el.dataset.c;document.querySelectorAll('.s-color').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');}
@@ -396,7 +425,7 @@ function startRound(){
   S.round++; S.phase='DRAWING'; S.time=DRAW_TIME;
   const sh=[...TOPICS].sort(()=>Math.random()-.5);
   S.groups.forEach((g,i)=>{
-    g.imgData=''; g.submitted=false; g.guess=''; g.guessSubmitted=false;
+    g.imgData=''; g.submitted=false; g.guess=''; g.guessSubmitted=false; g.forcedBlank=false;
     g.topic=sh[i%sh.length];
     g.guessFrom=(i+S.groups.length-1)%S.groups.length;
     g.score=g.score||0;
@@ -545,7 +574,7 @@ function renderT(){
     // Topic line
     let topicHtml='';
     if(S.phase==='REVEAL'){
-      topicHtml=`<div class="dc-topic-line">題目：<strong>${g.topic}</strong></div>`;
+      topicHtml=`<div class="dc-topic-line">題目：<strong>${g.topic}</strong>${g.forcedBlank?'<span style="color:var(--red);font-size:11px;margin-left:6px">⚠️ 空白 -2分</span>':''}</div>`;
     } else {
       topicHtml=`<div class="dc-topic-line">${g.submitted?'已交卷 ✓':'作畫中...'}</div>`;
     }
@@ -598,7 +627,9 @@ function renderS(){
     if(!g.submitted){
       document.getElementById('s-draw').style.display='flex';
       document.getElementById('s-draw-topic').textContent=g.topic;
-      updateTimerUI(); setTimeout(resizeCanvas,50);
+      updateTimerUI();
+      // 等瀏覽器完成 layout 後再 resize（避免 display:none 時尺寸為 0）
+      requestAnimationFrame(()=>requestAnimationFrame(resizeCanvas));
     } else {
       showWait('✅','已交卷！',`等待其他組完成作畫...\n剩餘 ${S.time} 秒`);
     }
@@ -630,7 +661,10 @@ function renderS(){
     document.getElementById('res-text').textContent=correct?'答對了！':'答錯了！';
     if(painter) document.getElementById('res-sub').innerHTML=
       `${painter.name} 畫的是：<strong style="color:var(--accent)">${painter.topic}</strong><br>你猜的是：<strong>${g.guess||'(未作答)'}</strong>`;
-    document.getElementById('res-pts').textContent=correct?'+2 分！':'+0 分';
+    // 顯示得分（含空白扣分）
+    const myG=S.groups[myIdx];
+    const blankPenalty=myG&&myG.forcedBlank?'<br><span style="color:var(--red);font-size:13px">⚠️ 空白交卷 -2分</span>':'';
+    document.getElementById('res-pts').innerHTML=(correct?'+2 分！':'+0 分')+blankPenalty;
     document.getElementById('res-pts').style.color=correct?'var(--green)':'var(--muted)';
   }
 }
