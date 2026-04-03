@@ -85,12 +85,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 #student-screen{position:relative;}
 #s-rules{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px 20px;text-align:center;}
 
-#s-draw{width:100%;height:100%;display:none;flex-direction:column;align-items:stretch;padding:8px;gap:6px;}
+#s-draw{width:100%;height:100%;display:none;flex-direction:column;align-items:stretch;padding:8px;gap:6px;position:relative;}
 #s-draw-banner{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;flex-shrink:0;}
 #s-draw-topic{font-size:20px;font-weight:900;color:var(--accent);}
 #canvas-wrap{width:100%;flex:1;min-height:0;border-radius:10px;overflow:hidden;border:2px solid var(--border);background:#fff;position:relative;}
 #drawCanvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair;}
 #s-toolbar{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;}
+/* ── SUBMITTED OVERLAY（蓋在 #s-draw 上，保留畫布背景） */
+#s-submitted-overlay{display:none;position:absolute;inset:0;background:rgba(14,14,20,.88);flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:20;text-align:center;padding:24px;border-radius:4px;}
 .s-color{width:28px;height:28px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:transform .15s;flex-shrink:0;}
 .s-color.sel{border-color:var(--accent);transform:scale(1.25);}
 .s-tool-sep{flex:1;}
@@ -189,7 +191,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
             <circle class="bg" cx="26" cy="26" r="22"/>
             <circle class="fg" id="t-ring-fg" cx="26" cy="26" r="22" stroke-dasharray="138.2" stroke-dashoffset="0"/>
           </svg>
-          <div class="ring-num" id="s-timer-num">30</div>
+          <div class="ring-num" id="s-timer-num">60</div>
         </div>
         <button class="btn btn-teal" id="s-submit-btn" onclick="studentSubmitDrawing()">提早交卷</button>
       </div>
@@ -206,6 +208,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
       <div class="s-tool-sep"></div>
       <input type="range" id="s-size-slider" min="3" max="30" value="8">
       <button class="btn btn-ghost" onclick="clearCanvas()" style="font-size:11px;padding:7px 11px;">清除</button>
+    </div>
+    <!-- 提交後蓋在畫面上的 overlay（不破壞畫布） -->
+    <div id="s-submitted-overlay">
+      <div style="font-size:56px">✅</div>
+      <h2 style="font-size:22px;font-weight:900;color:var(--accent);">已交卷！</h2>
+      <p id="s-submitted-msg" style="color:var(--muted);font-size:14px;line-height:1.8;white-space:pre-wrap;">等待其他組完成作畫...</p>
     </div>
   </div>
 
@@ -338,12 +346,21 @@ window.addEventListener('message',ev=>{
     if(S.phase===prevPhase&&S.phase==='DRAWING'){
       updateTimerUI();
       if(myIdx>=0&&S.groups[myIdx]?.submitted){
-        showWait('✅','已交卷！',`等待其他組完成作畫...\n剩餘 ${S.time} 秒`);
+        const msgEl=document.getElementById('s-submitted-msg');
+        if(msgEl) msgEl.textContent=`等待其他組完成作畫...\n剩餘 ${S.time} 秒`;
       }
       return;
     }
 
-    // phase 改變了（例如 DRAWING→GUESSING），才重新 renderS
+    // 新一輪開始（進入 DRAWING）：重置畫布狀態
+    if(S.phase==='DRAWING'&&prevPhase!=='DRAWING'){
+      _canvasReady=false;
+      clearInterval(studentTimer); studentTimer=null;
+      // 清空畫布舊內容
+      if(canvas._W) clearCanvas();
+    }
+
+    // phase 改變了，才重新 renderS
     renderS();
     return;
   }
@@ -354,6 +371,7 @@ window.addEventListener('message',ev=>{
     if(myIdx>=0){
       const g=S.groups[myIdx];
       if(g&&!g.submitted&&S.phase==='DRAWING'){
+        if(!canvas._W||canvas.width<10) resizeCanvas();
         g.imgData=canvas.toDataURL('image/png');
         g.submitted=true;
         const blank=isCanvasBlank();
@@ -372,43 +390,37 @@ const ctx=canvas.getContext('2d',{willReadFrequently:true});
 let curColor='#111',curSize=8,painting=false,tchs={};
 
 function resizeCanvas(){
-  const w=document.getElementById('canvas-wrap'); if(!w)return;
-  const rect=w.getBoundingClientRect();
-  // 元素隱藏時 getBoundingClientRect 返回 0，改用 offsetWidth/offsetHeight
-  const cssW=rect.width||w.offsetWidth||w.clientWidth;
-  const cssH=rect.height||w.offsetHeight||w.clientHeight;
-  if(!cssW||!cssH) return; // 仍然是 0 → 元素還沒顯示，不做任何事
+  const wrap=document.getElementById('canvas-wrap'); if(!wrap) return;
+  // 只用 CSS 邏輯像素，避免 dpr 縮放帶來的複雜問題
+  const W=wrap.clientWidth;
+  const H=wrap.clientHeight;
+  if(!W||!H) return; // 元素還沒顯示
 
-  // 保留原本畫布內容（以 CSS 邏輯尺寸記錄）
-  const prevW=canvas._cssW||0;
-  const prevH=canvas._cssH||0;
-  const tempCanvas=document.createElement('canvas');
-  tempCanvas.width=canvas.width; tempCanvas.height=canvas.height;
-  if(canvas.width>0&&canvas.height>0&&prevW>0&&prevH>0){
-    tempCanvas.getContext('2d').drawImage(canvas,0,0);
-  }
+  // 把目前畫面存起來
+  const snap=document.createElement('canvas');
+  snap.width=canvas.width; snap.height=canvas.height;
+  const hadContent=canvas.width>0&&canvas.height>0;
+  if(hadContent) snap.getContext('2d').drawImage(canvas,0,0);
 
-  // 依照實際顯示尺寸 × devicePixelRatio 設定解析度
-  const dpr=window.devicePixelRatio||1;
-  canvas.width=Math.round(cssW*dpr);
-  canvas.height=Math.round(cssH*dpr);
-  canvas.style.width=cssW+'px';
-  canvas.style.height=cssH+'px';
-  canvas._cssW=cssW; canvas._cssH=cssH;
+  // 重設尺寸
+  canvas.width=W; canvas.height=H;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
 
-  // context transform 以符合 dpr
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  // 重設後 context 狀態歸零，重新設定
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.lineCap='round'; ctx.lineJoin='round';
 
   // 填白
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,cssW,cssH);
+  ctx.fillRect(0,0,W,H);
 
-  // 還原舊內容（等比縮放到新尺寸）
-  if(tempCanvas.width>0&&tempCanvas.height>0&&prevW>0&&prevH>0){
-    ctx.drawImage(tempCanvas,0,0,tempCanvas.width,tempCanvas.height,
-      0,0,cssW,cssH);
+  // 還原畫面內容（等比縮放）
+  if(hadContent&&snap.width>0&&snap.height>0){
+    ctx.drawImage(snap,0,0,snap.width,snap.height,0,0,W,H);
   }
-  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  // 記錄尺寸供 clearCanvas 使用
+  canvas._W=W; canvas._H=H;
 }
 // resize 只在畫布已就緒且 s-draw 可見時才執行，且節流避免頻繁觸發
 let _resizeThrottle=null;
@@ -420,7 +432,10 @@ window.addEventListener('resize',()=>{
   _resizeThrottle=setTimeout(resizeCanvas,200);
 });
 
-function gp(e,t){const r=canvas.getBoundingClientRect();return{x:(t.clientX-r.left),y:(t.clientY-r.top)};}
+function gp(e,t){
+  const r=canvas.getBoundingClientRect();
+  return{x:(t.clientX-r.left)*(canvas.width/r.width),y:(t.clientY-r.top)*(canvas.height/r.height)};
+}
 function dot(p){ctx.beginPath();ctx.arc(p.x,p.y,curSize/2,0,Math.PI*2);ctx.fillStyle=curColor;ctx.fill();}
 function ln(a,b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=curSize;ctx.strokeStyle=curColor;ctx.stroke();}
 canvas.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches){const p=gp(e,t);tchs[t.identifier]=p;dot(p);}},{passive:false});
@@ -431,10 +446,8 @@ canvas.addEventListener('mousemove', e=>{if(!painting)return;const p=gp(e,e);ln(
 window.addEventListener('mouseup',   ()=>{painting=false;delete tchs.mouse;});
 
 function clearCanvas(){
-  const cw=canvas._cssW||canvas.width;
-  const ch=canvas._cssH||canvas.height;
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,cw,ch);
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
 function isCanvasBlank(){
@@ -524,6 +537,8 @@ function studentSubmitDrawing(){
   const g=S.groups[myIdx];
   if(S.phase!=='DRAWING'||g.submitted) return;
   clearInterval(studentTimer); studentTimer=null;
+  // 確保畫布有實際尺寸（若還未 resize 則立即執行）
+  if(!canvas._W||canvas.width<10) resizeCanvas();
   g.imgData=canvas.toDataURL('image/png');
   g.submitted=true;
   push(); renderS();
@@ -655,9 +670,14 @@ function renderT(){
 function renderS(){
   if(myIdx<0) return;
   const g=S.groups[myIdx]; if(!g) return;
-  ['s-rules','s-draw','s-guess','s-result','s-wait'].forEach(id=>{
+
+  // 先全部隱藏（DRAWING block 會自行顯示 s-draw）
+  ['s-rules','s-draw','s-guess','s-result'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.style.display='none';
   });
+  // wait overlay 也隱藏
+  const waitEl=document.getElementById('s-wait');
+  if(waitEl) waitEl.style.display='none';
 
   if(S.phase==='IDLE'){
     document.getElementById('s-rules').style.display='flex';
@@ -665,20 +685,24 @@ function renderS(){
     return;
   }
   if(S.phase==='DRAWING'){
+    const drawEl=document.getElementById('s-draw');
+    drawEl.style.display='flex';
+    const subOverlay=document.getElementById('s-submitted-overlay');
+
     if(!g.submitted){
-      const drawEl=document.getElementById('s-draw');
-      drawEl.style.display='flex';
+      // 畫布模式：隱藏 overlay，啟用工具列
+      if(subOverlay) subOverlay.style.display='none';
       document.getElementById('s-draw-topic').textContent=g.topic;
+      const submitBtn=document.getElementById('s-submit-btn');
+      if(submitBtn){ submitBtn.disabled=false; submitBtn.style.opacity='1'; }
       updateTimerUI();
-      // 只有畫布第一次顯示時才 resize（避免每次 renderS 清空內容）
       if(!_canvasReady){
         _canvasReady=true;
         requestAnimationFrame(()=>requestAnimationFrame(resizeCanvas));
       }
-      // 學生端本地計時器：每秒更新倒數 UI（不依賴 Firebase）
       if(!studentTimer){
         studentTimer=setInterval(()=>{
-          if(S.phase!=='DRAWING'||!myIdx<0){ clearInterval(studentTimer); studentTimer=null; return; }
+          if(S.phase!=='DRAWING'||myIdx<0){ clearInterval(studentTimer); studentTimer=null; return; }
           const g2=S.groups[myIdx];
           if(!g2||g2.submitted){ clearInterval(studentTimer); studentTimer=null; return; }
           S.time=Math.max(0,S.time-1);
@@ -686,8 +710,15 @@ function renderS(){
         },1000);
       }
     } else {
+      // 已交卷：顯示 overlay 蓋在畫布上，畫布本身不動
       clearInterval(studentTimer); studentTimer=null;
-      showWait('✅','已交卷！',`等待其他組完成作畫...\n剩餘 ${S.time} 秒`);
+      if(subOverlay){
+        subOverlay.style.display='flex';
+        const msgEl=document.getElementById('s-submitted-msg');
+        if(msgEl) msgEl.textContent=`等待其他組完成作畫...\n剩餘 ${S.time} 秒`;
+      }
+      const submitBtn=document.getElementById('s-submit-btn');
+      if(submitBtn){ submitBtn.disabled=true; submitBtn.style.opacity='0.4'; }
     }
     return;
   }
@@ -742,7 +773,10 @@ function updateTimerUI(){
   }
   if(!isTeacher&&myIdx>=0){
     const g=S.groups[myIdx];
-    if(g?.submitted&&S.phase==='DRAWING'){ document.getElementById('sw-msg').textContent=`等待其他組完成作畫...\n剩餘 ${S.time} 秒`; }
+    if(g?.submitted&&S.phase==='DRAWING'){
+      const msgEl=document.getElementById('s-submitted-msg');
+      if(msgEl) msgEl.textContent=`等待其他組完成作畫...\n剩餘 ${S.time} 秒`;
+    }
   }
 }
 
