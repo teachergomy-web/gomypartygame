@@ -459,8 +459,14 @@ function gp(e,t){
   // canvas.width = wrap.clientWidth = r.width，所以比值永遠是 1
   return{ x:(t.clientX-r.left), y:(t.clientY-r.top) };
 }
-function dot(p){ctx.beginPath();ctx.arc(p.x,p.y,curSize/2,0,Math.PI*2);ctx.fillStyle=curColor;ctx.fill();}
-function ln(a,b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=curSize;ctx.strokeStyle=curColor;ctx.stroke();}
+function dot(p){
+  if(canvas.width<10||canvas.height<10) return; // 畫布未就緒，不畫
+  ctx.beginPath();ctx.arc(p.x,p.y,curSize/2,0,Math.PI*2);ctx.fillStyle=curColor;ctx.fill();
+}
+function ln(a,b){
+  if(canvas.width<10||canvas.height<10) return; // 畫布未就緒，不畫
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=curSize;ctx.strokeStyle=curColor;ctx.stroke();
+}
 canvas.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches){const p=gp(e,t);tchs[t.identifier]=p;dot(p);}},{passive:false});
 canvas.addEventListener('touchmove', e=>{e.preventDefault();for(const t of e.changedTouches){const pv=tchs[t.identifier];if(pv){const p=gp(e,t);ln(pv,p);tchs[t.identifier]=p;}}},{passive:false});
 canvas.addEventListener('touchend',  e=>{e.preventDefault();for(const t of e.changedTouches)delete tchs[t.identifier];},{passive:false});
@@ -722,13 +728,17 @@ function renderS(){
       updateTimerUI();
       if(!_canvasReady){
         _canvasReady=true;
-        // 同步呼叫 resizeCanvas（確保 canvas 有尺寸後才允許畫圖）
-        // 不用 rAF — canvas.width=0 時所有 stroke/fill 完全無效
-        resizeCanvas();
-        // 如果同步 resize 失敗（元素剛顯示尚未 layout），16ms 後重試一次
-        if(!canvas.width||canvas.width<10){
-          setTimeout(()=>{ resizeCanvas(); }, 16);
+        // display:flex 剛設完瀏覽器還沒跑 layout，clientWidth 可能是 0
+        // 用 requestAnimationFrame 持續重試直到取得真實尺寸
+        function tryResize(){
+          const wrap=document.getElementById('canvas-wrap');
+          if(wrap&&wrap.clientWidth>10&&wrap.clientHeight>10){
+            resizeCanvas();
+          } else {
+            requestAnimationFrame(tryResize);
+          }
         }
+        requestAnimationFrame(tryResize);
       }
       if(!studentTimer){
         studentTimer=setInterval(()=>{
