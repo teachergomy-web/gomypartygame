@@ -1659,25 +1659,40 @@ window.addEventListener('message', (e) => {
     if (type === 'W5_STUDENT_UPDATE' && e.data.groupName) {
         const rooms = window.getRooms();
         if (rooms[window.state.roomCode]) {
-            const w5state = rooms[window.state.roomCode].w5state;
-            if (w5state && w5state.groups) {
-                const gIdx = w5state.groups.findIndex(g => g.name === e.data.groupName);
-                if (gIdx >= 0) {
-                    // 只更新學生自己那一組的欄位
-                    const target = w5state.groups[gIdx];
-                    if (e.data.imgData)         target.imgData       = e.data.imgData;
-                    if (e.data.submitted)        target.submitted     = e.data.submitted;
-                    if (e.data.guess !== undefined)        target.guess         = e.data.guess;
-                    if (e.data.guessSubmitted)   target.guessSubmitted= e.data.guessSubmitted;
-                    if (e.data.score !== undefined)        target.score         = e.data.score;
-                    if (e.data.forcedBlank)      target.forcedBlank   = e.data.forcedBlank;
-                    rooms[window.state.roomCode].w5state = w5state;
-                    window.saveRooms(rooms);
-                    // 推給老師 iframe 顯示即時畫作
-                    const tcW5 = document.getElementById('tc-w5-iframe');
-                    if (tcW5 && tcW5.contentWindow) {
-                        try { tcW5.contentWindow.postMessage({ type: 'W5_STATE', data: w5state }, '*'); } catch(e2) {}
-                    }
+            let w5state = rooms[window.state.roomCode].w5state;
+
+            // w5state 不存在（老師端還沒推過）：從 players 建立一個基本結構
+            if (!w5state || !w5state.groups) {
+                const players = rooms[window.state.roomCode].players || [];
+                w5state = {
+                    phase: 'DRAWING',
+                    groups: players.map((p, i) => ({
+                        id: i, name: p.group,
+                        imgData: '', submitted: false,
+                        guess: '', guessSubmitted: false,
+                        score: 0, forcedBlank: false, guessFrom: -1
+                    }))
+                };
+            }
+
+            const gIdx = w5state.groups.findIndex(g => g.name === e.data.groupName);
+            if (gIdx >= 0) {
+                const target = w5state.groups[gIdx];
+                // imgData 只有有內容才更新（避免空字串覆蓋已有的畫作）
+                if (e.data.imgData && e.data.imgData.length > 50) target.imgData = e.data.imgData;
+                if (e.data.submitted)                   target.submitted      = e.data.submitted;
+                if (e.data.guess !== undefined)          target.guess          = e.data.guess;
+                if (e.data.guessSubmitted)               target.guessSubmitted = e.data.guessSubmitted;
+                if (e.data.score !== undefined)          target.score          = e.data.score;
+                if (e.data.forcedBlank)                  target.forcedBlank    = e.data.forcedBlank;
+
+                rooms[window.state.roomCode].w5state = w5state;
+                window.saveRooms(rooms);
+
+                // 推給老師 iframe 顯示即時畫作
+                const tcW5 = document.getElementById('tc-w5-iframe');
+                if (tcW5 && tcW5.contentWindow) {
+                    try { tcW5.contentWindow.postMessage({ type: 'W5_STATE', data: w5state }, '*'); } catch(e2) {}
                 }
             }
         }

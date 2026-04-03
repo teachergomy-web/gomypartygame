@@ -375,8 +375,8 @@ window.addEventListener('message',ev=>{
     if(S.phase==='DRAWING'&&prevPhase!=='DRAWING'){
       _canvasReady=false;
       clearInterval(studentTimer); studentTimer=null;
-      // 清空畫布舊內容
-      if(canvas._W) clearCanvas();
+      // 重置畫布：直接把尺寸歸零，讓 resizeCanvas 重新初始化（徹底清空）
+      canvas.width=0; canvas.height=0;
     }
 
     // phase 改變了，才重新 renderS
@@ -390,11 +390,23 @@ window.addEventListener('message',ev=>{
     if(myIdx>=0){
       const g=S.groups[myIdx];
       if(g&&!g.submitted&&S.phase==='DRAWING'){
-        if(canvas.width<10||canvas.height<10) resizeCanvas();
+        // 確保畫布有正確尺寸再 capture
+        // 如果 canvas 尺寸為 0（還未 resize），先同步執行 resize
+        if(canvas.width<10||canvas.height<10){
+          resizeCanvas();
+        }
+        // 再次確認，如果還是 0 就強制設一個合理尺寸
+        if(canvas.width<10||canvas.height<10){
+          canvas.width=300; canvas.height=200;
+          ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,300,200);
+        }
         g.imgData=canvas.toDataURL('image/png');
         g.submitted=true;
         const blank=isCanvasBlank();
         if(blank){ g.score=Math.max(0,g.score-2); g.forcedBlank=true; }
+        push();
+      } else if(g&&g.submitted&&g.imgData){
+        // 已提早交卷的：imgData 已有，確保再 push 一次讓老師端收到
         push();
       }
     }
@@ -413,15 +425,15 @@ function resizeCanvas(){
   const W=wrap.clientWidth, H=wrap.clientHeight;
   if(W<10||H<10) return;
 
-  // 備份現有內容
+  // 備份現有內容（只有畫布已有有效尺寸時才備份，
+  // 若 canvas.width=0 代表新一輪剛重置，不備份→直接給空白畫布）
   let snap=null;
-  if(canvas.width>0&&canvas.height>0){
+  if(canvas.width>10&&canvas.height>10){
     snap=document.createElement('canvas');
     snap.width=canvas.width; snap.height=canvas.height;
     snap.getContext('2d').drawImage(canvas,0,0);
   }
 
-  // 設定 pixel buffer = 容器 CSS 尺寸（1:1，無 dpr 縮放，最簡單可靠）
   canvas.width=W; canvas.height=H;
   ctx.lineCap='round'; ctx.lineJoin='round';
 
@@ -429,7 +441,7 @@ function resizeCanvas(){
   ctx.fillStyle='#ffffff';
   ctx.fillRect(0,0,W,H);
 
-  // 還原內容
+  // 有備份才還原（新一輪 snap=null，直接保持空白）
   if(snap) ctx.drawImage(snap,0,0,snap.width,snap.height,0,0,W,H);
 }
 // resize 只在畫布已就緒且 s-draw 可見時才執行，且節流避免頻繁觸發
@@ -512,16 +524,18 @@ function forceCollect(){
   clearInterval(timer);
   // 1) Signal students to auto-capture NOW
   try{ window.parent.postMessage({type:'W5_FORCE_COLLECT'},'*'); }catch(e){}
-  // 2) Wait longer (1.5s) for students to push their imgData, then switch phase
+
+  // 2) 等學生推送 imgData，老師端的 S.groups[i].imgData 由 index.html 合併回來
+  //    等待 2.5s（給足夠時間讓網路來回）再切換到 GUESSING
   setTimeout(()=>{
     S.phase='GUESSING';
-    // Fallback: 如果網路延遲或斷線導致 imgData 為空，補上白底圖避免破圖
+    // Fallback：仍為空的補白底圖
     S.groups.forEach(g => {
-      if (!g.imgData) g.imgData = EMPTY;
-      g.submitted = true;
+      if(!g.imgData) g.imgData=EMPTY;
+      g.submitted=true;
     });
     push(); renderT();
-  }, 1500); 
+  }, 2500);
 }
 
 function revealAnswers(){
