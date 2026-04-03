@@ -82,10 +82,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 #t-rules-card{width:100%;max-width:700px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px 20px;display:none;text-align:center;}
 
 /* ── STUDENT ── */
-#student-screen{position:relative;}
-#s-rules{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px 20px;text-align:center;}
+#student-screen{position:relative;width:100%;height:100%;display:flex;flex-direction:column;}
+#s-rules{width:100%;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px 20px;text-align:center;}
 
-#s-draw{width:100%;height:100%;display:none;flex-direction:column;align-items:stretch;padding:8px;gap:6px;position:relative;}
+#s-draw{width:100%;flex:1;min-height:0;display:none;flex-direction:column;align-items:stretch;padding:8px;gap:6px;position:relative;}
 #s-draw-banner{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;flex-shrink:0;}
 #s-draw-topic{font-size:20px;font-weight:900;color:var(--accent);}
 #canvas-wrap{width:100%;flex:1;min-height:0;border-radius:10px;overflow:hidden;border:2px solid var(--border);background:#fff;position:relative;}
@@ -98,7 +98,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .s-tool-sep{flex:1;}
 #s-size-slider{width:70px;accent-color:var(--accent);cursor:pointer;}
 
-#s-guess{width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;}
+#s-guess{width:100%;flex:1;min-height:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;overflow-y:auto;}
 #s-guess-title{font-size:20px;font-weight:900;}
 #s-guess-img{max-width:380px;width:90%;border-radius:10px;border:3px solid var(--accent);background:#fff;}
 #s-guess-from{font-size:12px;color:var(--muted);font-family:'Space Mono',monospace;}
@@ -107,7 +107,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 #s-guess-input:focus{border-color:var(--accent);}
 #s-guess-submitted{display:none;font-size:13px;color:var(--muted);text-align:center;padding:4px 0;}
 
-#s-result{width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;}
+#s-result{width:100%;flex:1;min-height:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;}
 .res-emoji{font-size:70px;animation:pop .4s cubic-bezier(.175,.885,.32,1.275);}
 .res-text{font-size:24px;font-weight:900;}
 .res-sub{font-size:14px;color:var(--muted);line-height:1.7;}
