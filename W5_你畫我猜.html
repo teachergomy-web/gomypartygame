@@ -144,12 +144,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     <div class="rule-title">你畫我猜 🎨</div>
     <div class="rule-group" style="margin-bottom: 16px;">老師控制台</div>
     <ul class="rules-list">
-      <li>各組收到題目後限時 <strong>30 秒</strong>畫出來</li>
-      <li>學生可以提早交卷，等待倒數結束</li>
+      <li>各組收到題目後限時作畫，可提早交卷</li>
       <li>時間到畫作自動傳給另一組猜</li>
-      <li>猜對：猜題組 +2 分，出題組 +1 分</li>
+      <li>猜對：猜題組 <strong>+20分</strong>，出題組 <strong>+10分</strong></li>
+      <li>空白交卷：<strong>-10分</strong></li>
       <li>老師按「隨機出題」開始每輪，並統一公布答案</li>
     </ul>
+    <div style="margin-top:20px;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 20px;">
+      <label style="font-size:13px;color:var(--muted);">⏱ 作畫時間</label>
+      <input type="number" id="t-draw-time" value="60" min="10" max="300" step="5"
+        style="width:72px;background:var(--bg);border:1px solid var(--border);color:var(--accent);border-radius:7px;padding:6px 10px;font-size:16px;font-weight:700;font-family:'Space Mono',monospace;text-align:center;outline:none;"
+        oninput="DRAW_TIME=Math.max(10,parseInt(this.value)||60)">
+      <span style="font-size:13px;color:var(--muted);">秒</span>
+    </div>
   </div>
 
   <!-- Score strip -->
@@ -256,7 +263,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 const TOPICS=["大象","火車","電腦","珍珠奶茶","長頸鹿","麥當勞","機器人","太空船","警察局","烤肉","彩虹","腳踏車","直升機","鬼屋","冰淇淋","蜘蛛人","聖誕樹","滑水道","潛水艇","比薩斜塔","柯基犬","熱氣球","恐龍","花椰菜","消防車","釣魚","溜冰"];
 const GC_BASE=["#f7c948","#ff5c5c","#4ecdc4","#a78bfa","#34d399","#f97316"];
 const GC=new Proxy(GC_BASE,{get:(t,k)=>typeof k==='string'&&!isNaN(k)?t[+k%t.length]:t[k]});
-const DRAW_TIME=60;  // ← 改為 60 秒
+let DRAW_TIME=60; // 老師可在遊戲前設定
 const EMPTY='data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
 
 let isTeacher=false, myGroup='', myIdx=-1;
@@ -513,6 +520,9 @@ function startRound(){
   clearInterval(timer);
   clearInterval(studentTimer); studentTimer=null;
   _canvasReady=false;
+  // 讀取老師設定的作畫時間
+  const timeInput=document.getElementById('t-draw-time');
+  if(timeInput) DRAW_TIME=Math.max(10,parseInt(timeInput.value)||60);
   S.round++; S.phase='DRAWING'; S.time=DRAW_TIME;
   const sh=[...TOPICS].sort(()=>Math.random()-.5);
   S.groups.forEach((g,i)=>{
@@ -799,15 +809,20 @@ function renderS(){
     if(painter) document.getElementById('s-guess-img').src=painter.imgData||'';
     if(painter) document.getElementById('s-guess-from').textContent=`來自 ${painter.name} 的畫作`;
     const inp=document.getElementById('s-guess-input');
-    if(inp&&g.guess) inp.value=g.guess;
     const btn=document.getElementById('s-guess-btn');
     const sub=document.getElementById('s-guess-submitted');
     const sv=document.getElementById('s-guess-submitted-val');
     if(g.guessSubmitted){
-      btn.style.display='none'; inp.disabled=true;
+      // 已送出：顯示送出的答案
+      if(inp) inp.value=g.guess;
+      if(inp) inp.disabled=true;
+      btn.style.display='none';
       sub.style.display='block'; if(sv) sv.textContent=g.guess;
     } else {
-      btn.style.display=''; inp.disabled=false; sub.style.display='none';
+      // 未送出：強制清空（不留上一輪答案），讓學生重新輸入
+      if(inp){ inp.value=''; inp.disabled=false; }
+      btn.style.display='';
+      sub.style.display='none';
     }
     return;
   }
