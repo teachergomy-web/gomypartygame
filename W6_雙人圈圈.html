@@ -255,11 +255,29 @@ function getCorners() {
 }
 
 // ══════════════════════════════════════════════════
+//  Seeded 隨機（確保同關同環節所有組一致）
+// ══════════════════════════════════════════════════
+function seededRandom(seed) {
+    // mulberry32 — 簡單快速的 32-bit PRNG
+    let s = seed >>> 0;
+    return function() {
+        s += 0x6D2B79F5;
+        let t = Math.imul(s ^ s >>> 15, 1 | s);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// ══════════════════════════════════════════════════
 //  環節初始化
 // ══════════════════════════════════════════════════
 function initRound() {
     const { radius, speed } = getLevelParams(currentLevel);
-    const count = Math.floor(Math.random() * 4) + 1; // 1~4
+
+    // ── Seeded random：seed = level * 10 + roundIndex ──
+    // 確保同一關同一環節所有組拿到完全相同的圈圈數量與搖桿位置
+    const rng   = seededRandom(currentLevel * 10 + roundsDone);
+    const count = Math.floor(rng() * 4) + 1; // 1~4，固定結果
 
     sharedProgress = 0;
     particles = [];
@@ -267,9 +285,9 @@ function initRound() {
     cursors   = [];
     circles   = [];
 
-    // 隨機挑選 count 個不重複角落放搖桿
+    // 用 seeded rng 決定角落順序
     const allCorners = getCorners();
-    const shuffled   = [...allCorners].sort(() => Math.random() - 0.5).slice(0, count);
+    const shuffled   = [...allCorners].sort(() => rng() - 0.5).slice(0, count);
 
     // 全畫面可用邊界（所有圈圈共用，不分區）
     const pad = radius + 12;
@@ -281,9 +299,7 @@ function initRound() {
     };
 
     for (let i = 0; i < count; i++) {
-        const color = COLORS[i % COLORS.length];
-
-        // 初始位置：平均散佈，避免重疊
+        const color  = COLORS[i % COLORS.length];
         const startX = (cw / (count + 1)) * (i + 1);
         const startY = ch * 0.38;
 
@@ -291,7 +307,7 @@ function initRound() {
             x: startX, y: startY,
             tx: 0, ty: 0,
             radius,
-            bounds: fullBounds,   // ← 全畫面，不分區
+            bounds: fullBounds,
             speeds:    [speed * 2.2, speed * 1.0, speed * 0.3],
             durations: [100, 140, 170],
             cycleIndex: i % 3, cycleTimer: 0,
@@ -314,8 +330,7 @@ function initRound() {
             vx: 0, vy: 0, color
         });
     }
-
-    updateDots();
+    // 注意：updateDots() 不在這裡呼叫，由 roundComplete() / startGame() 負責
 }
 
 function pickWaypoint(c) {
@@ -335,12 +350,14 @@ function startGame(level) {
     waitingScreen.style.display  = 'none';
     completeScreen.style.display = 'none';
     initRound();
+    updateDots(); // 第0環節 active
 }
 
 function roundComplete() {
     roundsDone++;
     triggerBurst();
-    updateDots();
+    gameState = 'TRANSITIONING'; // 先設狀態，再更新 dots
+    updateDots(); // roundsDone 已 ++，gameState 為 TRANSITIONING → 不會多標 active
 
     // 通知老師端目前環節進度
     const elapsed = ((Date.now() - gameStartTime) / 1000).toFixed(1);
@@ -354,10 +371,10 @@ function roundComplete() {
     if (roundsDone >= TOTAL_ROUNDS) {
         gameComplete();
     } else {
-        gameState = 'TRANSITIONING';
         setTimeout(() => {
             gameState = 'PLAYING';
             initRound();
+            updateDots(); // 新環節 active 點亮
         }, 420);
     }
 }
@@ -381,11 +398,12 @@ function gameComplete() {
 //  環節點 UI
 // ══════════════════════════════════════════════════
 function updateDots() {
+    const isPlaying = gameState === 'PLAYING';
     for (let i = 0; i < TOTAL_ROUNDS; i++) {
         const dot = document.getElementById(`dot-${i}`);
         dot.className = 'round-dot';
-        if (i < roundsDone) dot.classList.add('done');
-        else if (i === roundsDone && gameState === 'PLAYING') dot.classList.add('active');
+        if (i < roundsDone)                    dot.classList.add('done');
+        else if (i === roundsDone && isPlaying) dot.classList.add('active');
     }
     hudRound.innerText = `${roundsDone}/${TOTAL_ROUNDS}`;
 }
