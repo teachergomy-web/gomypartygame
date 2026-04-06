@@ -416,8 +416,7 @@ window.addEventListener('message',ev=>{
         }
         g.imgData=canvas.toDataURL('image/png');
         g.submitted=true;
-        const blank=isCanvasBlank();
-        if(blank){ g.score=Math.max(0,g.score-10); g.forcedBlank=true; }
+        // 空白由老師端 forceCollect fallback 統一扣分
         push();
       } else if(g&&g.submitted&&g.imgData){
         // 已提早交卷的：imgData 已有，確保再 push 一次讓老師端收到
@@ -558,9 +557,10 @@ function forceCollect(){
   // 3s 後才切 GUESSING，確保 S 已有最新 imgData
   setTimeout(()=>{
     S.phase='GUESSING';
-    // Fallback：仍為空的補白底圖，並標記空白扣分
+    // 統一扣分：imgData 長度 < 5000 視為空白（全白 PNG base64 通常 < 3000）
     S.groups.forEach(g=>{
-      if(!g.imgData||g.imgData.length<100){
+      const isBlank=!g.imgData||g.imgData.length<5000;
+      if(isBlank){
         g.imgData=EMPTY;
         if(!g.forcedBlank){ g.score=Math.max(0,g.score-10); g.forcedBlank=true; }
       }
@@ -597,8 +597,7 @@ function studentSubmitDrawing(){
   if(canvas.width<10||canvas.height<10) resizeCanvas();
   g.imgData=canvas.toDataURL('image/png');
   g.submitted=true;
-  // 提早交卷也檢查空白，空白扣 10 分
-  if(isCanvasBlank()){ g.score=Math.max(0,g.score-10); g.forcedBlank=true; }
+  // 空白由老師端 forceCollect fallback 統一扣分，學生端不自行扣
   push(); renderS();
 }
 
