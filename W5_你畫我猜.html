@@ -339,13 +339,18 @@ window.addEventListener('message',ev=>{
     return;
   }
 
-  // ── Incoming state from Firebase ──
+  // ── Incoming state from Firebase / index.html merge ──
   if(d.type==='W5_STATE'&&d.data){
     const inc=d.data;
-    // Preserve local imgData not yet in Firebase
+    // 老師端：保留 inc 裡有內容的 imgData，補上本地有但 inc 沒有的
     if(S.groups&&inc.groups){
       inc.groups.forEach((ig,i)=>{
-        if(S.groups[i]?.imgData&&!ig.imgData) ig.imgData=S.groups[i].imgData;
+        const local=S.groups[i];
+        if(!local) return;
+        // inc 有 imgData → 保留（這是 index.html merge 後的最新值）
+        // inc 沒有但本地有 → 補回去
+        if(!ig.imgData&&local.imgData&&local.imgData.length>50)
+          ig.imgData=local.imgData;
       });
     }
     // 學生端：保護本地狀態，避免 Firebase 覆蓋
@@ -530,19 +535,24 @@ function startTimer(){
 
 function forceCollect(){
   clearInterval(timer);
-  // 1) Signal students to auto-capture NOW
+  // 1) 通知學生立即 capture 並 push imgData
   try{ window.parent.postMessage({type:'W5_FORCE_COLLECT'},'*'); }catch(e){}
 
-  // 2) 等學生推送 imgData，老師端的 S.groups[i].imgData 由 index.html 合併回來
-  //    等待 2.5s（給足夠時間讓網路來回）再切換到 GUESSING
+  // 2) 等 2.5s 讓學生推送 imgData 到 index.html
+  //    然後請 index.html 把 merge 好的 w5state 傳回來
   setTimeout(()=>{
-    S.phase='GUESSING';
-    // Fallback：仍為空的補白底圖
-    S.groups.forEach(g => {
-      if(!g.imgData) g.imgData=EMPTY;
-      g.submitted=true;
-    });
-    push(); renderT();
+    // 請 index.html 回傳目前 merge 後的最新 w5state
+    try{ window.parent.postMessage({type:'W5_REQUEST_STATE'},'*'); }catch(e){}
+    // 再等 300ms 給 index.html 回應時間
+    setTimeout(()=>{
+      // 把老師端 S 裡仍為空的 imgData 補白底圖（保險用）
+      S.phase='GUESSING';
+      S.groups.forEach(g=>{
+        if(!g.imgData||g.imgData.length<50) g.imgData=EMPTY;
+        g.submitted=true;
+      });
+      push(); renderT();
+    }, 300);
   }, 2500);
 }
 
@@ -685,13 +695,21 @@ function renderT(){
       }
     }
 
+    // DRAWING 階段不顯示畫布，只顯示狀態文字
+    const showCanvas = (S.phase==='GUESSING'||S.phase==='REVEAL');
+    const drawingStatus = g.submitted
+      ? '<div style="padding:24px 12px;text-align:center;font-size:28px;">✅<br><span style="font-size:13px;color:var(--green);">已完成</span></div>'
+      : '<div style="padding:24px 12px;text-align:center;font-size:28px;">✏️<br><span style="font-size:13px;color:var(--accent);">作畫中...</span></div>';
+
     grid.innerHTML+=`
       <div class="t-dc">
         <div class="dc-head">
           <span class="dc-group" style="color:${GC[g.id]}">${g.name}</span>
           <span class="dc-status">${g.submitted?'✓ 已交':'畫中'}</span>
         </div>
-        <div class="dc-img"><img src="${g.imgData||EMPTY}" alt=""></div>
+        ${showCanvas
+          ? `<div class="dc-img"><img src="${g.imgData||EMPTY}" alt=""></div>`
+          : drawingStatus}
         <div class="dc-foot">${topicHtml}${ansHtml}</div>
       </div>`;
   });

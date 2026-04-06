@@ -1698,6 +1698,18 @@ window.addEventListener('message', (e) => {
         }
     }
 
+    // W5：老師端請求最新 merge state（forceCollect 後同步 imgData 用）
+    if (type === 'W5_REQUEST_STATE' && window.state.perspective === 'teacher') {
+        const rooms = window.getRooms();
+        const w5state = rooms[window.state.roomCode]?.w5state;
+        if (w5state) {
+            const tcW5 = document.getElementById('tc-w5-iframe');
+            if (tcW5 && tcW5.contentWindow) {
+                try { tcW5.contentWindow.postMessage({ type: 'W5_STATE', data: w5state }, '*'); } catch(e2) {}
+            }
+        }
+    }
+
     // W5 強制收卷：老師觸發 → 平台廣播給學生 iframe
     if (type === 'W5_FORCE_COLLECT' && window.state.perspective === 'teacher') {
         const sgIframe = document.getElementById('sg-iframe');
