@@ -2660,12 +2660,12 @@ function updateStudentWaitDisplay() {
 
 function simulateJoin() {
   if (window.state.players.length >= 5) { window.showToast('房間已滿'); return; }
-  let gNum = 1; while(window.state.players.some(p => p.group === `第 ${gNum} 組`) && gNum <= 5) gNum++;
+  let gNum = 1;
+  while (window.state.players.some(p => p.group === `第 ${gNum} 組`) && gNum <= 5) gNum++;
   if (gNum > 5) return;
 
   const sym = window.SYMBOLS[(gNum - 1) % window.SYMBOLS.length];
-  const newPlayer = { group: `第 ${gNum} 組`, symbol: sym };
-  window.state.players.push(newPlayer);
+  window.state.players.push({ group: `第 ${gNum} 組`, symbol: sym });
   window.state.takenSymbols.push(sym);
 
   let pKey = 's' + gNum;
@@ -2684,7 +2684,20 @@ function simulateJoin() {
   }
   window.renderLobby();
   updateStudentWaitDisplay();
-  window.showToast(`✅ 第 ${gNum} 組加入！`);
+
+  // W6：自動另開機器人觀測視窗
+  if (window.state.selectedGame === 5 && window.state.roomCode) {
+    const baseUrl = window.location.href.split('?')[0];
+    const robotUrl = `${baseUrl}?autoJoin=1&roomCode=${window.state.roomCode}&group=${gNum}&robot=1`;
+    const win = window.open(robotUrl, `robot_w6_${gNum}`, 'width=500,height=760,menubar=no,toolbar=no,location=no,status=no');
+    if (!win) {
+      window.showToast(`✅ 第 ${gNum} 組加入！（請允許彈出視窗以開啟機器人）`);
+    } else {
+      window.showToast(`🤖 第 ${gNum} 組機器人加入！`);
+    }
+  } else {
+    window.showToast(`✅ 第 ${gNum} 組加入！`);
+  }
 }
 
 function teacherLogin() {

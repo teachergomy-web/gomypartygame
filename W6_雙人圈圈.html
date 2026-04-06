@@ -104,7 +104,7 @@
         <span class="hud-label">LEVEL</span>
         <span class="hud-value" id="hud-level">—</span>
     </div>
-    <div class="hud-title">雙人圈圈</div>
+    <div class="hud-title">雙人圈圈<span id="robot-badge" style="display:none;font-size:9px;margin-left:8px;color:#2ecc71;text-shadow:0 0 8px rgba(46,204,113,0.6)">🤖 AI</span></div>
     <div class="hud-block" style="flex-direction:row;gap:20px;">
         <div class="hud-block">
             <span class="hud-label">ROUND</span>
@@ -150,8 +150,9 @@
 //  取得參數
 // ══════════════════════════════════════════════════
 const params    = new URLSearchParams(location.search);
-let MY_GROUP    = params.get('group') || '';
+let MY_GROUP    = params.get('group') ? `第 ${params.get('group')} 組` : '';
 let START_LEVEL = parseInt(params.get('autostart') || '0') || 0;
+const IS_ROBOT  = params.get('robot') === '1';
 
 // ══════════════════════════════════════════════════
 //  Canvas & DOM
@@ -238,6 +239,11 @@ window.addEventListener('message', e => {
 // URL 自動啟動（測試沙盒用）
 if (START_LEVEL > 0) {
     setTimeout(() => startGame(START_LEVEL), 300);
+}
+
+// 機器人模式：顯示 badge
+if (IS_ROBOT) {
+    document.getElementById('robot-badge').style.display = 'inline';
 }
 
 // ══════════════════════════════════════════════════
@@ -510,10 +516,34 @@ function update() {
     // 游標移動
     const n = cursors.length;
     for (let i = 0; i < n; i++) {
-        const cur = cursors[i], js = joysticks[i];
-        cur.vx += js.dx * ACCEL; cur.vy += js.dy * ACCEL;
-        cur.vx *= FRICTION;      cur.vy *= FRICTION;
-        cur.x  += cur.vx;        cur.y  += cur.vy;
+        const cur = cursors[i];
+
+        if (IS_ROBOT) {
+            // ── 機器人 AI：直接追蹤對應圈圈，加一點抖動模擬人味 ──
+            const target = circles[i];
+            const dx = target.x - cur.x;
+            const dy = target.y - cur.y;
+            const dist = Math.hypot(dx, dy);
+            // 距離越遠加速越快，靠近時放慢
+            const force = Math.min(dist * 0.08, 4.5);
+            if (dist > 2) {
+                cur.vx += (dx / dist) * force;
+                cur.vy += (dy / dist) * force;
+            }
+            // 輕微隨機抖動（模擬人手不穩）
+            cur.vx += (Math.random() - 0.5) * 0.3;
+            cur.vy += (Math.random() - 0.5) * 0.3;
+        } else {
+            // 人工搖桿輸入
+            const js = joysticks[i];
+            cur.vx += js.dx * ACCEL;
+            cur.vy += js.dy * ACCEL;
+        }
+
+        cur.vx *= FRICTION;
+        cur.vy *= FRICTION;
+        cur.x  += cur.vx;
+        cur.y  += cur.vy;
         cur.x = Math.max(15, Math.min(cw - 15, cur.x));
         cur.y = Math.max(90, Math.min(ch - 15, cur.y));
     }
@@ -581,7 +611,7 @@ function draw() {
             const isIn = d < c.radius * c.breathScale;
             drawCursorWithRing(cur, cur.color, isIn);
         }
-        for (const js of joysticks) drawJoystick(js);
+        for (const js of joysticks) { if (!IS_ROBOT) drawJoystick(js); }
     }
 
     drawParticles();
