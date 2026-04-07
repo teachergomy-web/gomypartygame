@@ -775,7 +775,7 @@ let isFirebaseAuthComplete = false;
                         clearInterval(_restoreInterval);
                         if (window._pendingRestore) {
                             // 超過次數仍找不到房間，清掉 session
-                            localStorage.removeItem('game_session');
+                            sessionStorage.removeItem('game_session');
                             window._pendingRestore = null;
                             const ld = document.getElementById('restore-loading');
                             if (ld) ld.style.display = 'none';
@@ -909,7 +909,7 @@ function startSyncListener() {
             if (p !== 'teacher') {
                 const pData = window.pStates[p];
                 if (pData) { pData.joined = false; pData.screen = 'screen-home'; }
-                localStorage.removeItem('game_session');
+                sessionStorage.removeItem('game_session');
                 window.goTo('screen-home');
                 window.showToast('🚪 房間已關閉');
             }
@@ -1722,7 +1722,7 @@ function tcLaunchStudentIfNeeded() {
     // group 優先從 pData 取，沒有就從 Firebase rooms.players 找
     let myGroup = pData.group || '';
     if (!myGroup && r.players) {
-        const saved = JSON.parse(localStorage.getItem('game_session') || '{}');
+        const saved = JSON.parse(sessionStorage.getItem('game_session') || '{}');
         const match = r.players.find(pl => pl.group === saved.group);
         if (match) {
             myGroup = match.group;
@@ -2203,7 +2203,7 @@ setInterval(() => {
     if (!r || !r.open) {
         pData.joined = false; pData.screen = 'screen-home';
         stopSyncListener();
-        localStorage.removeItem('game_session');
+        sessionStorage.removeItem('game_session');
         window.goTo('screen-home');
         window.showToast('🚪 房間已關閉');
         return;
@@ -2659,7 +2659,7 @@ function _finishJoin(groupName, symbol, roomCode) {
   window.goTo('screen-student-wait');
   // 學生 session：只儲存學生資訊，不含 teacher 標記
   if (groupName) {
-      localStorage.setItem('game_session', JSON.stringify({ perspective: window.state.perspective, roomCode, group: groupName, symbol }));
+      sessionStorage.setItem('game_session', JSON.stringify({ perspective: window.state.perspective, roomCode, group: groupName, symbol }));
   }
   window.showToast(`✅ ${groupName} 已加入房間！`);
 }
@@ -2683,7 +2683,7 @@ function leaveRoomStudent() {
         }
         pData.group = ''; pData.symbol = ''; pData.joinStep = 1;
     }
-    window.syncJoinDOM(); localStorage.removeItem('game_session'); window.goTo('screen-home'); window.showToast('🚪 已離開房間');
+    window.syncJoinDOM(); sessionStorage.removeItem('game_session'); window.goTo('screen-home'); window.showToast('🚪 已離開房間');
 }
 
 function selectGame(i) {
@@ -2875,7 +2875,7 @@ function teacherLogin() {
   // 先設 roomCode，讓 saveRooms 知道要存哪個房間
   window.state.roomCode = code;
   window.state.players = []; window.state.takenSymbols = [];
-  localStorage.setItem('game_session', JSON.stringify({ perspective:'teacher', roomCode:code, _teacherToken: true }));
+  sessionStorage.setItem('game_session', JSON.stringify({ perspective:'teacher', roomCode:code, _teacherToken: true }));
 
   window.saveRooms(rooms);
   // 直接寫入 Firebase（不管 auth 狀態，等連線後自動重試）
@@ -2915,7 +2915,7 @@ function doCloseRoom() {
       if (rooms[code]) { rooms[code].open = false; window.saveRooms(rooms); }
       setTimeout(() => window.deleteRoom(code), 2000);
       localStorage.removeItem('my_last_room_code');
-  localStorage.removeItem('game_session');
+  sessionStorage.removeItem('game_session');
   }
   stopSyncListener();
   window.state.roomCode = ''; window.state.players = []; window.state.takenSymbols = [];
@@ -3021,13 +3021,17 @@ function goToTeacherLogin() { window.goTo('screen-teacher-login'); }
 window._initLoad = true;
 document.addEventListener('DOMContentLoaded', () => {
     window._initLoad = false;
-    window.state.perspective = 'guest';
 
-    // ── 重整恢復：等 Firebase 連線後再檢查 ──
-    window._pendingRestore = JSON.parse(localStorage.getItem('game_session') || 'null');
+    // ── 重整恢復：先讀 session，再決定初始 perspective ──
+    window._pendingRestore = JSON.parse(sessionStorage.getItem('game_session') || 'null');
+
     if (window._pendingRestore && window._pendingRestore.roomCode) {
+        // 有 session → 先保持 guest，等 Firebase 恢復後再切換
+        window.state.perspective = 'guest';
         const loading = document.getElementById('restore-loading');
         if (loading) loading.style.display = 'flex';
+    } else {
+        window.state.perspective = 'guest';
     }
 
     // ── 測試工具：URL 參數自動加入 ──
@@ -3039,7 +3043,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!code || !group) return;
 
         // 清掉舊 session，避免觸發恢復連線流程
-        localStorage.removeItem('game_session');
+        sessionStorage.removeItem('game_session');
         window._pendingRestore = null;
 
         // 隱藏恢復連線的 loading 畫面
@@ -3070,7 +3074,7 @@ window.addEventListener('message', (e) => {
     if (!roomCode || !group) return;
 
     // 清掉舊 session，避免觸發恢復連線流程
-    localStorage.removeItem('game_session');
+    sessionStorage.removeItem('game_session');
     window._pendingRestore = null;
 
     // 隱藏恢復連線的 loading 畫面
@@ -3122,11 +3126,7 @@ function triggerAutoJoin() {
 
 // ── Firebase 連線後執行恢復 ──
 function tryRestoreSession() {
-    // 如果有自動加入請求（來自測試工具），優先執行
-    if (window._autoJoinParams) {
-        triggerAutoJoin();
-        return;
-    }
+    if (window._autoJoinParams) { triggerAutoJoin(); return; }
 
     const saved = window._pendingRestore;
     if (!saved || !saved.perspective || !saved.roomCode) return;
@@ -3136,35 +3136,27 @@ function tryRestoreSession() {
         if (ld) ld.style.display = 'none';
     };
 
-    // ── 安全性：老師 session 必須有 _teacherToken ──
+    // 安全性檢查
     if (saved.perspective === 'teacher' && !saved._teacherToken) {
-        localStorage.removeItem('game_session');
-        hideLoading(); return;
+        sessionStorage.removeItem('game_session'); hideLoading(); return;
     }
     if (saved.perspective !== 'teacher' && !saved.group) {
-        localStorage.removeItem('game_session');
-        hideLoading(); return;
+        sessionStorage.removeItem('game_session'); hideLoading(); return;
     }
 
     const rooms = window.getRooms();
     const room  = rooms[saved.roomCode];
 
-    // ── 房間找不到：可能 Firebase 快照還沒到，不要急著清 session ──
-    if (!room) {
-        // 還沒收到 Firebase 資料，等 allRoomsListener 快照後再試
-        // （_pendingRestore 保留，讓 startAllRoomsListener 的第一次快照觸發）
-        window._pendingRestore = saved;
-        return;
-    }
+    // 房間資料尚未從 Firebase 到達 → 等待，不清 session
+    if (!room) return;
 
-    // 房間確實已關閉才清 session
+    // 房間已關閉 → 清 session
     if (!room.open) {
-        localStorage.removeItem('game_session');
-        hideLoading(); return;
+        sessionStorage.removeItem('game_session'); hideLoading(); return;
     }
 
-    // ── 房間找到了，正式恢復 ──
-    window._pendingRestore = null;  // 立即清除，防止重複執行
+    // ══ 恢復成功，清除等待狀態 ══
+    window._pendingRestore = null;
 
     window.state.roomCode     = saved.roomCode;
     window.state.players      = room.players || [];
@@ -3172,40 +3164,47 @@ function tryRestoreSession() {
     window.state.selectedGame = room.selectedGame || 0;
 
     if (saved.perspective === 'teacher') {
+        // ── 老師端恢復 ──
         window.state.perspective = 'teacher';
-        const lobbyCode = document.getElementById('lobby-code');
-        if (lobbyCode) lobbyCode.textContent = saved.roomCode;
+        document.getElementById('lobby-code')?.textContent && (document.getElementById('lobby-code').textContent = saved.roomCode);
         window.renderLobby();
         startSyncListener();
+
         if (room.status === 'playing' || room.status === 'settlement') {
             TC.level  = room.gameLevel || 1;
             TC.scores = room.scores    || {};
             window.pStates['teacher'].screen = 'screen-teacher-console';
             window.goTo('screen-teacher-console');
-            if (room.selectedGame === 5) tcStartGame();
+            if (room.selectedGame === 5) {
+                TC.isNextLevel = true; // 避免重置分數
+                tcStartGame();
+                TC.isNextLevel = false;
+            }
         } else {
             window.pStates['teacher'].screen = 'screen-lobby';
             window.goTo('screen-lobby');
         }
+        showToast('🔄 老師已恢復連線');
+        hideLoading();
+
     } else {
-        // 學生恢復：驗證 group 在房間的 players 裡
+        // ── 學生端恢復 ──
         const groupInRoom = (room.players || []).some(p => p.group === saved.group);
         if (!groupInRoom) {
-            // players 可能還沒同步完，保留 session 等下次快照重試
-            // 用 _restoreRetry 計次，超過 3 次才放棄
+            // players 還沒同步，最多等待 5 次快照
             saved._restoreRetry = (saved._restoreRetry || 0) + 1;
-            if (saved._restoreRetry >= 3) {
-                localStorage.removeItem('game_session');
-                hideLoading();
-                return;
+            if (saved._restoreRetry > 5) {
+                sessionStorage.removeItem('game_session'); hideLoading();
+            } else {
+                window._pendingRestore = saved; // 保留，等下次快照
             }
-            window._pendingRestore = saved;
             return;
         }
 
-        window.state.perspective = saved.perspective;
-        const pData = window.pStates[saved.perspective];
-        if (!pData) { localStorage.removeItem('game_session'); hideLoading(); return; }
+        const perspective = saved.perspective;
+        window.state.perspective = perspective;
+        const pData = window.pStates[perspective];
+        if (!pData) { sessionStorage.removeItem('game_session'); hideLoading(); return; }
 
         pData.joined = true;
         pData.group  = saved.group;
@@ -3218,6 +3217,7 @@ function tryRestoreSession() {
         window.updateStudentWaitDisplay();
 
         if (room.status === 'playing') {
+            pData.screen = 'screen-student-game';
             tcLaunchStudentIfNeeded();
         } else if (room.status === 'settlement') {
             pData.screen = 'screen-settlement';
@@ -3226,9 +3226,9 @@ function tryRestoreSession() {
             pData.screen = 'screen-student-wait';
             window.goTo('screen-student-wait');
         }
+        showToast('🔄 已恢復上次連線');
+        hideLoading();
     }
-    showToast('🔄 已恢復上次連線');
-    hideLoading();
 }
 
 // ==========================================
