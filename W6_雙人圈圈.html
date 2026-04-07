@@ -371,25 +371,27 @@ function startGame(level) {
 function roundComplete() {
     roundsDone++;
     triggerBurst();
-    gameState = 'TRANSITIONING'; // 先設狀態，再更新 dots
-    updateDots(); // roundsDone 已 ++，gameState 為 TRANSITIONING → 不會多標 active
-
-    // 通知老師端目前環節進度
-    const elapsed = ((Date.now() - gameStartTime) / 1000).toFixed(1);
-    window.parent?.postMessage({
-        type: 'W6_ROUND_UPDATE',
-        group: MY_GROUP,
-        rounds: roundsDone,
-        elapsed: parseFloat(elapsed)
-    }, '*');
+    gameState = 'TRANSITIONING';
+    updateDots();
 
     if (roundsDone >= TOTAL_ROUNDS) {
+        // 最後一環節直接走 gameComplete，不發 W6_ROUND_UPDATE
+        // 避免 rounds:6 done:false 和 W6_COMPLETE 競爭覆蓋
         gameComplete();
     } else {
+        // 中間環節才發進度更新
+        const elapsed = ((Date.now() - gameStartTime) / 1000).toFixed(1);
+        window.parent?.postMessage({
+            type: 'W6_ROUND_UPDATE',
+            group: MY_GROUP,
+            rounds: roundsDone,
+            elapsed: parseFloat(elapsed)
+        }, '*');
+
         setTimeout(() => {
             gameState = 'PLAYING';
             initRound();
-            updateDots(); // 新環節 active 點亮
+            updateDots();
         }, 420);
     }
 }

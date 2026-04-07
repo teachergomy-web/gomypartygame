@@ -972,6 +972,8 @@ function startSyncListener() {
             for (const g in data.w6status) {
                 const remote = data.w6status[g];
                 const local  = _w6GroupStatus[g] || {};
+                // 防止舊的 ROUND_UPDATE 把已完成（done:true）的狀態降級
+                if (local.done && !remote.done) continue;
                 if (local.rounds !== remote.rounds || local.done !== remote.done || local.cumScore !== remote.cumScore) {
                     _w6GroupStatus[g] = remote;
                     changed = true;
@@ -2149,6 +2151,8 @@ setInterval(() => {
         for (const g in r.w6status) {
             const local  = _w6GroupStatus[g] || {};
             const remote = r.w6status[g];
+            // 防止舊的 ROUND_UPDATE 把已完成（done:true）的狀態降級
+            if (local.done && !remote.done) continue;
             if (local.rounds !== remote.rounds || local.done !== remote.done || local.cumScore !== remote.cumScore) {
                 _w6GroupStatus[g] = remote;
                 w6Changed = true;
