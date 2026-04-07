@@ -1125,12 +1125,15 @@ function w6RenderTCCards() {
     const doneEl = document.getElementById('tc-w6-done-count');
     if (doneEl) doneEl.textContent = doneCount;
 
-    // 所有組都完成 → 顯示下一關按鈕
+    // 所有組都完成 → 顯示操作按鈕區
     const nextWrap = document.getElementById('tc-w6-next-wrap');
     if (nextWrap && players.length > 0 && doneCount >= players.length) {
         nextWrap.style.display = 'block';
         const nextLvEl = document.getElementById('tc-w6-next-lv');
-        if (nextLvEl) nextLvEl.textContent = TC.level < 30 ? TC.level + 1 : '—';
+        if (nextLvEl) nextLvEl.textContent = TC.level + 1;
+        // LV.30 隱藏「下一關」按鈕
+        const nextBtn = nextWrap.querySelector('button:first-of-type');
+        if (nextBtn) nextBtn.style.display = TC.level >= 30 ? 'none' : '';
     }
 }
 
@@ -1484,7 +1487,7 @@ function tcStartGame() {
         const pauseBtn      = document.getElementById('tc-btn-pause');
         const resumeBtn     = document.getElementById('tc-btn-resume');
         const nextContainer = document.getElementById('tc-next-level-container');
-        if (settleBtn)      settleBtn.style.display  = '';
+        if (settleBtn)      settleBtn.style.display  = 'none'; // W6 不顯示手動結算，由全組完成後才出現
         if (levelBadge)   { levelBadge.style.display = ''; levelBadge.textContent = `LV.${TC.level}`; }
         if (pauseBtn)       pauseBtn.style.display   = 'none';
         if (resumeBtn)      resumeBtn.style.display  = 'none';
@@ -1520,10 +1523,15 @@ function tcStartGame() {
               </div>
               <div id="tc-w6-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;width:100%;max-width:760px"></div>
               <div id="tc-w6-next-wrap" style="display:none;margin-top:16px;text-align:center">
-                <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:#2ecc71;margin-bottom:10px">✅ 全組完成！</div>
-                <button onclick="w6NextLevel()" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;padding:12px 36px;background:linear-gradient(135deg,#f5c800,#e09000);color:#1a1200;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4)">
-                  ▶ 下一關 (LV.<span id="tc-w6-next-lv">${TC.level + 1}</span>)
-                </button>
+                <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:#2ecc71;margin-bottom:12px">✅ 全組完成！</div>
+                <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+                  <button onclick="w6NextLevel()" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.95rem;padding:12px 28px;background:linear-gradient(135deg,#f5c800,#e09000);color:#1a1200;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4)">
+                    ▶ 下一關 (LV.<span id="tc-w6-next-lv">${TC.level + 1}</span>)
+                  </button>
+                  <button onclick="tcSettleGame()" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.95rem;padding:12px 28px;background:linear-gradient(135deg,#e82020,#b81010);color:#fff;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4)">
+                    🏆 結算
+                  </button>
+                </div>
               </div>`;
             w6RenderTCCards();
         }
