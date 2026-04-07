@@ -755,7 +755,6 @@ let isFirebaseAuthComplete = false;
         fsDelete     = fsModule.deleteDoc;
         fsTransaction = fsModule.runTransaction;
         fsGetDoc      = fsModule.getDoc;
-        window._fsUpdate = fsModule.updateDoc; // W6 用，原子更新單一欄位避免覆蓋衝突
 
         await authModule.signInAnonymously(auth);
 
@@ -767,22 +766,21 @@ let isFirebaseAuthComplete = false;
                 startAllRoomsListener();
                 // 如果已有房間密碼，再開始監聽單一房間
                 if (window.state && window.state.roomCode) startSyncListener();
-                // Firebase 連線後備援恢復：每 800ms 重試一次，最多 5 次
-                let _restoreAttempts = 0;
-                const _restoreInterval = setInterval(() => {
-                    _restoreAttempts++;
-                    if (!window._pendingRestore || _restoreAttempts > 5) {
-                        clearInterval(_restoreInterval);
+                // Firebase 連線後嘗試恢復 session（allRoomsListener 第一次快照會優先觸發；這裡作備援）
+                // 備援重試：每 800ms 一次，最多 5 次
+                let _backupRetry = 0;
+                const _backupTimer = setInterval(() => {
+                    if (!window._pendingRestore || ++_backupRetry > 5) {
+                        clearInterval(_backupTimer);
                         if (window._pendingRestore) {
-                            // 超過次數仍找不到房間，清掉 session
                             sessionStorage.removeItem('game_session');
                             window._pendingRestore = null;
                             const ld = document.getElementById('restore-loading');
                             if (ld) ld.style.display = 'none';
                         }
-                        return;
+                    } else {
+                        tryRestoreSession();
                     }
-                    tryRestoreSession();
                 }, 800);
             } else {
                 isFirebaseAuthComplete = false;
@@ -820,25 +818,6 @@ window.saveRooms = function(r) {
     if (isFirebase && db && isFirebaseAuthComplete) {
         fsSet(fsDoc(db, 'rooms', myCode), r[myCode])
             .catch(e => console.error("Firebase Save Error:", e));
-    }
-};
-
-// W6 專用：原子更新單一組的進度，不覆蓋其他組（解決多組同時寫入的競爭問題）
-window.w6SaveGroupStatus = function(group, statusObj) {
-    const myCode = window.state && window.state.roomCode;
-    if (!myCode) return;
-
-    // 更新本機快取（合併，不覆蓋其他組）
-    if (!window._allRoomsCache[myCode]) window._allRoomsCache[myCode] = {};
-    if (!window._allRoomsCache[myCode].w6status) window._allRoomsCache[myCode].w6status = {};
-    window._allRoomsCache[myCode].w6status[group] = statusObj;
-
-    // Firebase 原子更新（updateDoc 只改指定欄位，不影響其他組）
-    if (isFirebase && db && isFirebaseAuthComplete && window._fsUpdate) {
-        const updateData = {};
-        updateData[`w6status.${group}`] = statusObj;
-        window._fsUpdate(fsDoc(db, 'rooms', myCode), updateData)
-            .catch(e => console.error('W6 status update error:', e));
     }
 };
 
@@ -884,7 +863,7 @@ function startAllRoomsListener() {
         });
         if (changed) localStorage.setItem('playroom_rooms', JSON.stringify(local));
 
-        // ── 每次收到快照都嘗試恢復（直到 _pendingRestore 被消費）──
+        // ── 每次快照到達都嘗試恢復（直到成功為止）──
         if (window._pendingRestore) tryRestoreSession();
 
         // 重新渲染房間列表
@@ -976,23 +955,6 @@ function startSyncListener() {
             const tcW5 = document.getElementById('tc-w5-iframe');
             if (tcW5 && tcW5.contentWindow) {
                 try { tcW5.contentWindow.postMessage({ type: 'W5_STATE', data: data.w5state }, '*'); } catch(e2) {}
-            }
-        }
-        // 老師端：W6 各組進度即時更新（Firebase 推送，比輪詢快）
-        if (p === 'teacher' && data.w6status && window.state.selectedGame === 5) {
-            let changed = false;
-            for (const g in data.w6status) {
-                const remote = data.w6status[g];
-                const local  = _w6GroupStatus[g] || {};
-                // 防止舊的 ROUND_UPDATE 把已完成（done:true）的狀態降級
-                if (local.done && !remote.done) continue;
-                if (local.rounds !== remote.rounds || local.done !== remote.done || local.cumScore !== remote.cumScore) {
-                    _w6GroupStatus[g] = remote;
-                    changed = true;
-                }
-            }
-            if (changed && window.pStates['teacher'].screen === 'screen-teacher-console') {
-                w6RenderTCCards();
             }
         }
     }, err => console.error('Room sync error:', err));
@@ -1174,15 +1136,12 @@ function w6RenderTCCards() {
     const doneEl = document.getElementById('tc-w6-done-count');
     if (doneEl) doneEl.textContent = doneCount;
 
-    // 所有組都完成 → 顯示操作按鈕區
+    // 所有組都完成 → 顯示下一關按鈕
     const nextWrap = document.getElementById('tc-w6-next-wrap');
     if (nextWrap && players.length > 0 && doneCount >= players.length) {
         nextWrap.style.display = 'block';
         const nextLvEl = document.getElementById('tc-w6-next-lv');
-        if (nextLvEl) nextLvEl.textContent = TC.level + 1;
-        // LV.30 隱藏「下一關」按鈕
-        const nextBtn = nextWrap.querySelector('button:first-of-type');
-        if (nextBtn) nextBtn.style.display = TC.level >= 30 ? 'none' : '';
+        if (nextLvEl) nextLvEl.textContent = TC.level < 30 ? TC.level + 1 : '—';
     }
 }
 
@@ -1229,30 +1188,33 @@ window.addEventListener('message', (e2) => {
     if (!e2.data || e2.data.type !== 'W6_COMPLETE') return;
     const { group, elapsed } = e2.data;
     if (!group) return;
-
     // 計算本關得分
     const levelScore = Math.max(100, Math.floor(1000 - parseFloat(elapsed) * 8));
-    const prev   = _w6GroupStatus[group] || {};
-    const newCum = (prev.cumScore || 0) + levelScore;
+    const prev    = _w6GroupStatus[group] || {};
+    const newCum  = (prev.cumScore || 0) + levelScore;
     _w6GroupStatus[group] = { done: true, rounds: 6, elapsed, cumScore: newCum };
     TC.scores[group] = newCum;
 
-    // 原子寫入 Firebase — 只更新這一組的狀態，不覆蓋其他組
-    window.w6SaveGroupStatus(group, { done: true, rounds: 6, elapsed, cumScore: newCum });
-
-    // 同步總分（這個用 saveRooms 覆蓋整個 scores 是可接受的，因為各組不同時間完成）
+    // 【新增】寫入 Firebase 同步給老師端
     const rooms = window.getRooms();
     if (rooms[window.state.roomCode]) {
+        if (!rooms[window.state.roomCode].w6status) rooms[window.state.roomCode].w6status = {};
+        rooms[window.state.roomCode].w6status[group] = _w6GroupStatus[group];
+        
+        // 順便寫入總分，讓其他地方的計分板也能同步
         if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
         rooms[window.state.roomCode].scores[group] = newCum;
         window.saveRooms(rooms);
     }
 
-    // 只有老師端才直接更新格子（學生端靠 Firebase 同步即可）
+    w6RenderTCCards();
+    w6RenderGroupCards();
+    
+    // 區分老師與學生的提示文字
     if (window.state.perspective === 'teacher') {
-        w6RenderTCCards();
-        w6RenderGroupCards();
         showToast(`✔ ${group} 完成！+${levelScore}分（累積 ${newCum}分）`);
+    } else {
+        showToast(`🏆 恭喜完成！`);
     }
 });
 
@@ -1376,7 +1338,7 @@ function jumpToPhase(phase) {
 
 // ── 即時分數渲染 ──
 function tcRenderScores() {
-    if (window.state.selectedGame === 2 || window.state.selectedGame === 4 || window.state.selectedGame === 5) return;
+    if (window.state.selectedGame === 2 || window.state.selectedGame === 4) return;
     const area = document.getElementById('tc-scores-area');
     if (!area) return;
     const players = window.state.players;
@@ -1527,32 +1489,31 @@ function tcStartGame() {
             }
         }
     } else if (window.state.selectedGame === 5) {
-        // W6：老師控制台
+        // W6：老師控制台 — 整關期間持續顯示各組進度格子
         const settleBtn     = document.getElementById('tc-btn-settle');
         const levelBadge    = document.getElementById('tc-level-badge');
         const pauseBtn      = document.getElementById('tc-btn-pause');
         const resumeBtn     = document.getElementById('tc-btn-resume');
         const nextContainer = document.getElementById('tc-next-level-container');
-        if (settleBtn)      settleBtn.style.display  = 'none';
+        if (settleBtn)      settleBtn.style.display  = '';
         if (levelBadge)   { levelBadge.style.display = ''; levelBadge.textContent = `LV.${TC.level}`; }
         if (pauseBtn)       pauseBtn.style.display   = 'none';
         if (resumeBtn)      resumeBtn.style.display  = 'none';
         if (nextContainer)  nextContainer.style.display = 'none';
 
-        // 新遊戲：完全重置所有組的進度（cumScore 也清零）
-        if (!TC.isNextLevel) {
-            _w6GroupStatus = {};
-        } else {
-            // 下一關：只清 done/rounds，保留 cumScore
-            Object.keys(_w6GroupStatus).forEach(g => {
-                _w6GroupStatus[g] = { done: false, rounds: 0, elapsed: null, cumScore: _w6GroupStatus[g].cumScore || 0 };
-            });
-        }
-
-        // 強制把清空後的狀態寫回 Firebase，防止輪詢把舊資料拉回來
+        // 若是新遊戲（不是下一關），重置狀態
+        if (!TC.isNextLevel) _w6GroupStatus = {};
+        // 每關開始時清除上一關的 done 標記，保留累積分數
+        Object.keys(_w6GroupStatus).forEach(g => {
+            _w6GroupStatus[g].done   = false;
+            _w6GroupStatus[g].rounds = 0;
+            _w6GroupStatus[g].elapsed = null;
+        });
+        
+        // 【新增】將初始或重置後的狀態同步到 Firebase
         const roomsW6 = window.getRooms();
         if (roomsW6[window.state.roomCode]) {
-            roomsW6[window.state.roomCode].w6status = {};  // 清空，讓學生端重新填入
+            roomsW6[window.state.roomCode].w6status = _w6GroupStatus;
             window.saveRooms(roomsW6);
         }
 
@@ -1570,15 +1531,10 @@ function tcStartGame() {
               </div>
               <div id="tc-w6-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;width:100%;max-width:760px"></div>
               <div id="tc-w6-next-wrap" style="display:none;margin-top:16px;text-align:center">
-                <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:#2ecc71;margin-bottom:12px">✅ 全組完成！</div>
-                <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-                  <button onclick="w6NextLevel()" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.95rem;padding:12px 28px;background:linear-gradient(135deg,#f5c800,#e09000);color:#1a1200;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4)">
-                    ▶ 下一關 (LV.<span id="tc-w6-next-lv">${TC.level + 1}</span>)
-                  </button>
-                  <button onclick="tcSettleGame()" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.95rem;padding:12px 28px;background:linear-gradient(135deg,#e82020,#b81010);color:#fff;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4)">
-                    🏆 結算
-                  </button>
-                </div>
+                <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;color:#2ecc71;margin-bottom:10px">✅ 全組完成！</div>
+                <button onclick="w6NextLevel()" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;padding:12px 36px;background:linear-gradient(135deg,#f5c800,#e09000);color:#1a1200;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.4)">
+                  ▶ 下一關 (LV.<span id="tc-w6-next-lv">${TC.level + 1}</span>)
+                </button>
               </div>`;
             w6RenderTCCards();
         }
@@ -1942,17 +1898,24 @@ window.addEventListener('message', (e) => {
     if (type === 'W6_ROUND_UPDATE' && e.data.group) {
         const { group, rounds, elapsed } = e.data;
         const prev = _w6GroupStatus[group] || {};
-        const updated = { done: false, rounds: rounds || 0, elapsed: elapsed || null, cumScore: prev.cumScore || 0 };
-        _w6GroupStatus[group] = updated;
-
-        // 原子寫入 Firebase（只更新這一組，不覆蓋其他組）
-        window.w6SaveGroupStatus(group, updated);
-
-        // 老師端直接更新，學生端靠 Firebase
-        if (window.state.perspective === 'teacher') {
-            w6RenderTCCards();
-            w6RenderGroupCards();
+        // 保留累積分數，只更新進度
+        _w6GroupStatus[group] = {
+            done: false,
+            rounds: rounds || 0,
+            elapsed: elapsed || null,
+            cumScore: prev.cumScore || 0
+        };
+        
+        // 【新增】寫入 Firebase 同步給老師端
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            if (!rooms[window.state.roomCode].w6status) rooms[window.state.roomCode].w6status = {};
+            rooms[window.state.roomCode].w6status[group] = _w6GroupStatus[group];
+            window.saveRooms(rooms);
         }
+
+        w6RenderTCCards();
+        w6RenderGroupCards();
         return;
     }
 
@@ -2149,31 +2112,27 @@ setInterval(() => {
         }
         // 如果分數有變且是老師端，重新排序並渲染
         if (scoreChanged && window.state.perspective === 'teacher' && window.pStates['teacher'].screen === 'screen-teacher-console') {
-            if (window.state.selectedGame === 5) {
-                w6RenderTCCards(); // W6 用格子顯示，不用排行榜
-            } else {
-                tcRenderScores();
-            }
+            tcRenderScores();
         }
     }
 
-    // W6 各組進度：輪詢作為備援（Firebase snapshot 是主要路徑）
-    if (r.w6status && window.state.perspective === 'teacher' && window.state.selectedGame === 5) {
+    // 【新增】同步 W6 的各組進度與完成狀態
+    if (r.w6status) {
         let w6Changed = false;
-        for (const g in r.w6status) {
-            const local  = _w6GroupStatus[g] || {};
+        for (let g in r.w6status) {
+            const local = _w6GroupStatus[g] || {};
             const remote = r.w6status[g];
-            // 防止舊的 ROUND_UPDATE 把已完成（done:true）的狀態降級
-            if (local.done && !remote.done) continue;
-            if (local.rounds !== remote.rounds || local.done !== remote.done || local.cumScore !== remote.cumScore) {
+            if (local.rounds !== remote.rounds || local.done !== remote.done) {
                 _w6GroupStatus[g] = remote;
                 w6Changed = true;
             }
         }
-        if (w6Changed && window.pStates['teacher'].screen === 'screen-teacher-console') {
-            w6RenderTCCards();
-        } else if (w6Changed && window.pStates['teacher'].screen === 'screen-level-select') {
-            w6RenderGroupCards();
+        if (w6Changed && window.state.perspective === 'teacher') {
+            if (window.pStates['teacher'].screen === 'screen-teacher-console') {
+                w6RenderTCCards();
+            } else if (window.pStates['teacher'].screen === 'screen-level-select') {
+                w6RenderGroupCards();
+            }
         }
     }
 
@@ -3021,17 +2980,13 @@ function goToTeacherLogin() { window.goTo('screen-teacher-login'); }
 window._initLoad = true;
 document.addEventListener('DOMContentLoaded', () => {
     window._initLoad = false;
+    window.state.perspective = 'guest';
 
-    // ── 重整恢復：先讀 session，再決定初始 perspective ──
+    // ── 重整恢復：等 Firebase 連線後再檢查 ──
     window._pendingRestore = JSON.parse(sessionStorage.getItem('game_session') || 'null');
-
     if (window._pendingRestore && window._pendingRestore.roomCode) {
-        // 有 session → 先保持 guest，等 Firebase 恢復後再切換
-        window.state.perspective = 'guest';
         const loading = document.getElementById('restore-loading');
         if (loading) loading.style.display = 'flex';
-    } else {
-        window.state.perspective = 'guest';
     }
 
     // ── 測試工具：URL 參數自動加入 ──
@@ -3136,7 +3091,7 @@ function tryRestoreSession() {
         if (ld) ld.style.display = 'none';
     };
 
-    // 安全性檢查
+    // 安全性：格式不對才清 session
     if (saved.perspective === 'teacher' && !saved._teacherToken) {
         sessionStorage.removeItem('game_session'); hideLoading(); return;
     }
@@ -3147,15 +3102,26 @@ function tryRestoreSession() {
     const rooms = window.getRooms();
     const room  = rooms[saved.roomCode];
 
-    // 房間資料尚未從 Firebase 到達 → 等待，不清 session
-    if (!room) return;
-
-    // 房間已關閉 → 清 session
-    if (!room.open) {
-        sessionStorage.removeItem('game_session'); hideLoading(); return;
+    // 房間找不到 → Firebase 快照還沒到，等待（不清 session）
+    if (!room) {
+        saved._waitCount = (saved._waitCount || 0) + 1;
+        if (saved._waitCount > 8) {
+            // 等太久了，房間真的不存在
+            sessionStorage.removeItem('game_session'); hideLoading();
+            window._pendingRestore = null;
+        }
+        // 保留 _pendingRestore，下次快照再試
+        return;
     }
 
-    // ══ 恢復成功，清除等待狀態 ══
+    // 房間已關閉才清 session
+    if (!room.open) {
+        sessionStorage.removeItem('game_session');
+        window._pendingRestore = null;
+        hideLoading(); return;
+    }
+
+    // ══ 房間找到，恢復 ══
     window._pendingRestore = null;
 
     window.state.roomCode     = saved.roomCode;
@@ -3164,19 +3130,18 @@ function tryRestoreSession() {
     window.state.selectedGame = room.selectedGame || 0;
 
     if (saved.perspective === 'teacher') {
-        // ── 老師端恢復 ──
         window.state.perspective = 'teacher';
-        document.getElementById('lobby-code')?.textContent && (document.getElementById('lobby-code').textContent = saved.roomCode);
+        const lobbyCode = document.getElementById('lobby-code');
+        if (lobbyCode) lobbyCode.textContent = saved.roomCode;
         window.renderLobby();
         startSyncListener();
-
         if (room.status === 'playing' || room.status === 'settlement') {
             TC.level  = room.gameLevel || 1;
             TC.scores = room.scores    || {};
             window.pStates['teacher'].screen = 'screen-teacher-console';
             window.goTo('screen-teacher-console');
             if (room.selectedGame === 5) {
-                TC.isNextLevel = true; // 避免重置分數
+                TC.isNextLevel = true;
                 tcStartGame();
                 TC.isNextLevel = false;
             }
@@ -3184,26 +3149,25 @@ function tryRestoreSession() {
             window.pStates['teacher'].screen = 'screen-lobby';
             window.goTo('screen-lobby');
         }
-        showToast('🔄 老師已恢復連線');
+        showToast('🔄 已恢復連線');
         hideLoading();
 
     } else {
-        // ── 學生端恢復 ──
+        // 學生端：驗證 group 在 players 裡
         const groupInRoom = (room.players || []).some(p => p.group === saved.group);
         if (!groupInRoom) {
-            // players 還沒同步，最多等待 5 次快照
-            saved._restoreRetry = (saved._restoreRetry || 0) + 1;
-            if (saved._restoreRetry > 5) {
+            // players 可能還沒同步，最多重試 5 次
+            saved._retryCount = (saved._retryCount || 0) + 1;
+            if (saved._retryCount > 5) {
                 sessionStorage.removeItem('game_session'); hideLoading();
             } else {
-                window._pendingRestore = saved; // 保留，等下次快照
+                window._pendingRestore = saved; // 下次快照再試
             }
             return;
         }
 
-        const perspective = saved.perspective;
-        window.state.perspective = perspective;
-        const pData = window.pStates[perspective];
+        window.state.perspective = saved.perspective;
+        const pData = window.pStates[saved.perspective];
         if (!pData) { sessionStorage.removeItem('game_session'); hideLoading(); return; }
 
         pData.joined = true;
@@ -3217,7 +3181,6 @@ function tryRestoreSession() {
         window.updateStudentWaitDisplay();
 
         if (room.status === 'playing') {
-            pData.screen = 'screen-student-game';
             tcLaunchStudentIfNeeded();
         } else if (room.status === 'settlement') {
             pData.screen = 'screen-settlement';
@@ -3226,7 +3189,7 @@ function tryRestoreSession() {
             pData.screen = 'screen-student-wait';
             window.goTo('screen-student-wait');
         }
-        showToast('🔄 已恢復上次連線');
+        showToast('🔄 已恢復連線');
         hideLoading();
     }
 }
