@@ -147,7 +147,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
       <li>各組收到題目後限時作畫，可提早交卷</li>
       <li>時間到畫作自動傳給另一組猜</li>
       <li>猜對：猜題組 <strong>+20分</strong>，出題組 <strong>+10分</strong></li>
-      <li>老師按「隨機出題」開始每輪，並統一公布答案</li>
+      <li>老師按「隨機出題」開始，並統一公布答案</li>
     </ul>
     <div style="margin-top:20px;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 20px;">
       <label style="font-size:13px;color:var(--muted);">⏱ 作畫時間</label>
@@ -175,10 +175,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     <div class="rule-title">你畫我猜 🎨</div>
     <div class="rule-group" id="s-group-label">第 ? 組</div>
     <ul class="rules-list">
-      <li>收到題目後限時 <strong>30 秒</strong>畫出來</li>
+      <li>收到題目後限時畫出來</li>
       <li>可以提早交卷，等待倒數結束</li>
       <li>時間到畫作自動傳給另一組猜</li>
-      <li>猜對：猜題組 +2 分，出題組 +1 分</li>
+      <li>猜對：猜題組 +20 分，出題組 +10 分</li>
       <li>老師統一公布答案後進入下一輪</li>
     </ul>
     <div class="pill wait" style="margin-top:16px;">等待老師出題...</div>
@@ -259,7 +259,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 // ─────────────────────────────────────────
 // CONSTANTS & STATE
 // ─────────────────────────────────────────
-const TOPICS=["大象","火車","電腦","珍珠奶茶","長頸鹿","麥當勞","機器人","太空船","警察局","烤肉","彩虹","腳踏車","直升機","鬼屋","冰淇淋","蜘蛛人","聖誕樹","滑水道","潛水艇","比薩斜塔","柯基犬","熱氣球","恐龍","花椰菜","消防車","釣魚","溜冰"];
+const TOPICS=["大象", "火車", "電腦", "珍珠奶茶", "長頸鹿", "麥當勞", "機器人", "太空船", "警察局", "烤肉",  "彩虹", "腳踏車", "直升機", "鬼屋", "冰淇淋", "蜘蛛人", "聖誕樹", "滑水道", "潛水艇", "比薩斜塔",  "柯基犬", "熱氣球", "恐龍", "花椰菜", "消防車", "釣魚", "溜冰", "雲霄飛車", "夾娃娃機", "旋轉木馬",  "摩天輪", "海生館", "動物園", "演唱會", "電影院", "溫泉", "扭蛋", "密室逃脫", "臭豆腐", "垃圾車",  "夜市", "刨冰", "火鍋", "粽子", "舞龍舞獅", "廟會", "悠遊卡", "夾腳拖", "雞排", "小籠包",  "外星人", "獨角獸", "聖誕老人", "美人魚", "吸血鬼", "木乃伊", "巫婆", "忍者", "飛碟", "變形金剛",  "龍捲風", "火山爆發", "黑洞", "流星雨", "放大鏡", "顯微鏡", "望遠鏡", "指南針", "地球儀", "運動會",  "聯絡簿", "擴音器", "獎盃", "獎狀", "黑板擦", "升旗典禮", "躲避球", "太空人", "攝影師", "牙醫",  "啦啦隊", "小丑", "偵探", "遙控器", "體重計", "存錢筒", "行動電源", "隱形眼鏡", "購物車", "降落傘",  "自由女神", "螢火蟲", "招財貓", "捕蚊燈", "爆米花", "迴轉壽司", "溜滑梯", "盪鞦韆", "摩天大樓", "OK繃", "麥克風", "網球拍", "鏡子", "彈弓", "迴紋針", "蘑菇", "水母", "溫度計", "狼", "鱷魚", "蝙蝠", "海豚", "鴕鳥", "貓頭鷹", "蝸牛", "帳篷", "城堡",  "燈籠", "蠟燭", "海綿", "起司", "薯條", "鬆餅", "水餃", "游泳圈", "溜溜球", "飛盤",  "陀螺", "滑板"];
 const GC_BASE=["#f7c948","#ff5c5c","#4ecdc4","#a78bfa","#34d399","#f97316"];
 const GC=new Proxy(GC_BASE,{get:(t,k)=>typeof k==='string'&&!isNaN(k)?t[+k%t.length]:t[k]});
 let DRAW_TIME=60; // 老師可在遊戲前設定
@@ -840,16 +840,25 @@ function renderS(){
   if(S.phase==='REVEAL'){
     const painter=S.groups[g.guessFrom];
     const correct=painter&&g.guess.trim()!==''&&g.guess.trim()===painter.topic.trim();
+    // 出題加分：看哪一組的 guessFrom 指向我，且那組猜對了
+    const guesserOfMe=S.groups.find(x=>x.guessFrom===myIdx);
+    const myTopicGuessed=guesserOfMe&&guesserOfMe.guess.trim()!==''&&guesserOfMe.guess.trim()===g.topic.trim();
     document.getElementById('s-result').style.display='flex';
-    document.getElementById('res-emoji').textContent=correct?'🎉':'😅';
-    document.getElementById('res-text').textContent=correct?'答對了！':'答錯了！';
+    // emoji/標題：優先看自己猜對；若自己沒猜對但出題被猜對也算好消息
+    document.getElementById('res-emoji').textContent=correct?'🎉':(myTopicGuessed?'🎨':'😅');
+    document.getElementById('res-text').textContent=correct?'猜對了！':(myTopicGuessed?'你的圖被猜對了！':'這輪沒有得分');
     if(painter) document.getElementById('res-sub').innerHTML=
       `${painter.name} 畫的是：<strong style="color:var(--accent)">${painter.topic}</strong><br>你猜的是：<strong>${g.guess||'(未作答)'}</strong>`;
-    // 顯示得分（含空白扣分）
+    // 顯示得分明細：猜題 +20、出題 +10，分開列出
     const myG=S.groups[myIdx];
-    const blankPenalty=myG&&myG.forcedBlank?'<br><span style="color:var(--red);font-size:13px">⚠️ 空白交卷</span>':'';
-    document.getElementById('res-pts').innerHTML=(correct?'+20 分！':'+0 分')+blankPenalty;
-    document.getElementById('res-pts').style.color=correct?'var(--green)':'var(--muted)';
+    const blankPenalty=myG&&myG.forcedBlank?'<span style="color:var(--red);font-size:12px">⚠️ 空白交卷</span>':'';
+    let ptsHtml='';
+    if(correct)       ptsHtml+=`<span style="color:var(--green)">猜題 +20</span>`;
+    if(myTopicGuessed)ptsHtml+=`${correct?'　':''}<span style="color:var(--accent)">出題 +10</span>`;
+    if(!correct&&!myTopicGuessed) ptsHtml=`<span style="color:var(--muted)">+0 分</span>`;
+    if(blankPenalty)  ptsHtml+=`<br>${blankPenalty}`;
+    document.getElementById('res-pts').innerHTML=ptsHtml;
+    document.getElementById('res-pts').style.color='';  // 清掉舊的 inline color，改由各 span 自行設色
   }
 }
 
