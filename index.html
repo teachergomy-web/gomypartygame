@@ -2010,11 +2010,12 @@ window.addEventListener('message', (e) => {
                 const target = w5state.groups[gIdx];
                 // imgData：有內容才更新（長度 > 100 確保是真實圖片，不是空白 base64）
                 if (e.data.imgData && e.data.imgData.length > 100) target.imgData = e.data.imgData;
-                if (e.data.submitted)              target.submitted      = true;
-                if (e.data.guess !== undefined)    target.guess          = e.data.guess;
-                if (e.data.guessSubmitted)         target.guessSubmitted = true;
-                if (e.data.score !== undefined)    target.score          = e.data.score;
-                if (e.data.forcedBlank)            target.forcedBlank    = true;
+                if (e.data.submitted)                       target.submitted      = true;
+                if (e.data.guess !== undefined)             target.guess          = e.data.guess;
+                // 【修復 #5】直接賦值允許 false，否則 editGuess() 的撤回無法存入 Firebase
+                if (e.data.guessSubmitted !== undefined)    target.guessSubmitted = !!e.data.guessSubmitted;
+                if (e.data.score !== undefined)             target.score          = e.data.score;
+                if (e.data.forcedBlank)                     target.forcedBlank    = true;
 
                 rooms[roomCode].w5state = w5state;
                 // 存入 Firebase（所有裝置都靠 Firebase listener 同步）

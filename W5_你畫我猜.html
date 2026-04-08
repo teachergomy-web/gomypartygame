@@ -349,13 +349,16 @@ window.addEventListener('message',ev=>{
   if(d.type==='W5_STATE'&&d.data){
     const inc=d.data;
     // 老師端：保留 inc 裡有內容的 imgData，補上本地有但 inc 沒有的
+    // 【修復 #4】只在同一輪（round 相同）才補回 imgData；新一輪時 inc.imgData='' 是正確的，不應補舊圖
     if(S.groups&&inc.groups){
+      const sameRoundT=(inc.round===S.round);
       inc.groups.forEach((ig,i)=>{
         const local=S.groups[i];
         if(!local) return;
         // inc 有 imgData → 保留（這是 index.html merge 後的最新值）
-        // inc 沒有但本地有 → 補回去
-        if(!ig.imgData&&local.imgData&&local.imgData.length>50)
+        // inc 沒有但本地有，且同一輪 → 補回去（避免 Firebase 延遲導致老師端遺失 imgData）
+        // 新一輪（round 不同）→ 不補回，讓空的 imgData 正常生效
+        if(sameRoundT&&!ig.imgData&&local.imgData&&local.imgData.length>50)
           ig.imgData=local.imgData;
       });
     }
@@ -388,7 +391,7 @@ window.addEventListener('message',ev=>{
     if(S.phase==='DRAWING'&&prevPhase!=='DRAWING'){
       _canvasReady=false;
       clearInterval(studentTimer); studentTimer=null;
-      // 重置畫布：直接把尺寸歸零，讓 resizeCanvas 重新初始化（徹底清空）
+      // canvas.width=0 會自動清空所有像素內容，無需額外 fillRect
       canvas.width=0; canvas.height=0;
     }
 
@@ -548,22 +551,26 @@ function forceCollect(){
   // 通知 index.html，由 index.html 透過 Firebase 廣播給所有學生
   try{ window.parent.postMessage({type:'W5_FORCE_COLLECT'},'*'); }catch(e){}
 
-  // 等待 3s：
+  // 等待 5s（從 3s 延長）：
   //   - 學生收到 W5_FORCE_COLLECT → toDataURL → push W5_STUDENT_UPDATE
   //   - 學生的 index.html 存入 Firebase
   //   - 老師的 Firebase listener 收到 → 推 W5_STATE 給老師 iframe
   //   - 老師 iframe 的 W5_STATE handler 更新 S（含 imgData）
-  // 3s 後才切 GUESSING，確保 S 已有最新 imgData
+  // 5s 後才切 GUESSING，給網路較慢的教室更充裕的同步時間
   setTimeout(()=>{
     S.phase='GUESSING';
-    // 空白不扣分，只標記 forcedBlank（供老師端 UI 顯示）
+    // 空白判斷：imgData 不存在、長度極短（<100，即 EMPTY gif）、
+    // 或長度雖然夠但像素全白 → 標記 forcedBlank
+    // 注意：純白 PNG 即使有尺寸，length 也可能 >5000，所以不能只靠長度
     S.groups.forEach(g=>{
-      const isBlank=!g.imgData||g.imgData.length<5000;
-      if(isBlank){ g.imgData=EMPTY; g.forcedBlank=true; }
+      const missing=!g.imgData||g.imgData.length<100;
+      if(missing){ g.imgData=EMPTY; g.forcedBlank=true; }
+      // 若有圖但長度極短（剛好是 EMPTY gif），也標記
+      else if(g.imgData===EMPTY){ g.forcedBlank=true; }
       g.submitted=true;
     });
     push(); renderT();
-  }, 3000);
+  }, 5000);
 }
 
 function revealAnswers(){
@@ -754,9 +761,10 @@ function renderS(){
     const drawEl=document.getElementById('s-draw');
     drawEl.style.display='flex';
     const subOverlay=document.getElementById('s-submitted-overlay');
+    // 【修復】無論如何先強制隱藏 overlay，防止上一輪的 display:flex 殘留
+    if(subOverlay) subOverlay.style.display='none';
 
     if(!g.submitted){
-      if(subOverlay) subOverlay.style.display='none';
       document.getElementById('s-draw-topic').textContent=g.topic;
       const submitBtn=document.getElementById('s-submit-btn');
       if(submitBtn){ submitBtn.disabled=false; submitBtn.style.opacity='1'; }
