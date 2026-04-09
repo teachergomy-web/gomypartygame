@@ -542,20 +542,22 @@ function backToMenu(){
 
 function loadLevel(isRetry=false){
   if(!isRetry){
-    // 下一關 / 第一次進入：計時器歸零
     stopGameTimer();
     document.getElementById('header-timer-box').style.display='none';
   }
-  // 重試（isRetry=true）：計時器繼續跑，不歸零
   document.getElementById('status-modal').classList.add('hidden');
   document.getElementById('header-lvl').textContent=`LV ${curLvl} / 10`;
   document.getElementById('header-score').textContent=score;
   [1,2,3].forEach(i=>document.getElementById(`screen-${i}`).classList.remove('active'));
   document.getElementById(`screen-${curPart}`).classList.add('active');
   setSeed(curPart*1000+curLvl);
-  if(curPart===1) startFlip();
-  else if(curPart===2) startParade();
-  else if(curPart===3) startSafe();
+  // requestAnimationFrame 確保 screen active 後瀏覽器 layout 完成，
+  // 才讓各關讀取 clientWidth/clientHeight（否則下一關卡片尺寸會算出 0）
+  requestAnimationFrame(()=>{
+    if(curPart===1) startFlip();
+    else if(curPart===2) startParade();
+    else if(curPart===3) startSafe();
+  });
 }
 
 function nextLevel(){
@@ -713,6 +715,7 @@ function drawCardFront(canvas,w,h,emoji){
 
 let flipCards=[],flipFirst=null,flipSecond=null,flipLock=false;
 let flipPairsLeft=0,flipMemTimer=null,flipPhase='MEM',flipMemSeconds=0;
+let _flipPairCount=0; // 提升為模組級，讓 onFlipClick 計分時取到正確值
 
 function startFlip(){
   flipPhase='MEM'; flipFirst=null; flipSecond=null; flipLock=false;
@@ -720,26 +723,31 @@ function startFlip(){
 
   const lvIdx=curLvl-1;
   const total=FLIP_TOTALS[lvIdx];
-  // 【修復 Bug 1/2】Math.floor 確保整數對：25張=12對+1空格，不會有無法配對的孤牌
-  const pairCount=total/2; // 全部關卡均為偶數張，直接整除
+  const pairCount=total/2;
   flipPairsLeft=pairCount;
+  _flipPairCount=pairCount; // 同步更新模組級變數
 
   const [cols,rows]=FLIP_GRIDS[lvIdx];
-
-  // 建牌池：每個 emoji 出現2次，共 pairCount*2 個
-  // 25張(LV7)：12對=24個，slotCount=25，第25格是空格
-  const emojiPool=[];
-  for(let i=0;i<pairCount;i++) emojiPool.push(i%CARD_EMOJIS.length, i%CARD_EMOJIS.length);
   const slotCount=cols*rows;
 
-  // seeded shuffle
+  // 建牌池並 shuffle（此處消耗 seededRandom，必須只做一次）
+  const emojiPool=[];
+  for(let i=0;i<pairCount;i++) emojiPool.push(i%CARD_EMOJIS.length, i%CARD_EMOJIS.length);
   for(let i=emojiPool.length-1;i>0;i--){
     const j=Math.floor(seededRandom()*(i+1));
     [emojiPool[i],emojiPool[j]]=[emojiPool[j],emojiPool[i]];
   }
 
-  // 計算卡片尺寸（填滿可用空間，保持格子形狀）
+  // 尺寸計算：若 wrap 還沒有尺寸（layout 未完成），保存 pool 後下一幀重試
+  _buildFlipGrid(cols, rows, slotCount, emojiPool, pairCount, lvIdx);
+}
+
+function _buildFlipGrid(cols, rows, slotCount, emojiPool, pairCount, lvIdx){
   const wrap=document.getElementById('flip-grid-wrap');
+  if(!wrap||wrap.clientWidth<10){
+    requestAnimationFrame(()=>_buildFlipGrid(cols,rows,slotCount,emojiPool,pairCount,lvIdx));
+    return;
+  }
   const gapPx=6;
   const padW=12, padH=12;
   const availW=wrap.clientWidth-padW*2;
@@ -847,9 +855,8 @@ function onFlipClick(card){
       stopGameTimer();
       const elapsed=getElapsed();
       // 基礎分：每對 80 分
-      const base=pairCount*80;
-      // 時間分：基準秒數 = 配對數 × 4s，每超過1秒扣15分，最少0
-      const timePar=pairCount*4;
+      const base=_flipPairCount*80;
+      const timePar=_flipPairCount*4;
       const timeBonus=calcTimeBonus(elapsed, timePar*15, 15);
       const total=base+timeBonus;
       score+=total; document.getElementById('header-score').textContent=score;
