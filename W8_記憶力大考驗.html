@@ -117,10 +117,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 
 #flip-grid-wrap{
   flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;
-  padding:10px 10px 12px;overflow:hidden;position:relative;
+  padding:8px 10px;overflow:hidden;position:relative;
 }
 #flip-grid{
-  display:grid;gap:8px;width:100%;height:100%;
+  display:grid;gap:6px;
 }
 .flip-cell{display:flex;align-items:center;justify-content:center;}
 .card-flipper{
@@ -460,6 +460,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
   <div class="pill wait" style="animation:pulse 1.2s infinite alternate;">⏳ 請稍候</div>
 </div>
 
+<!-- ═══ 暫停覆蓋層 ═══ -->
+<div id="pause-overlay" class="hidden" style="
+  position:fixed;inset:0;background:rgba(14,14,20,.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;z-index:450;text-align:center;">
+  <div style="font-size:52px;">⏸</div>
+  <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);">遊戲暫停中</div>
+  <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);">等待老師繼續...</div>
+</div>
+
 <script>
 // ════════════════════════════════════
 // 背景星星
@@ -498,23 +508,68 @@ let curPart=0,curLvl=1,score=0,currentRetryCount=0,skipRequested=false;
 let platformMode=false;  // 是否由平台啟動（iframe 嵌入）
 let platformGroup='';    // 組別名稱
 
-// PLATFORM_START：平台傳入 level（=Part 編號 1/2/3）、group
+// PLATFORM_START / PAUSE / RESUME 監聽
+let _pausedByPlatform=false;
+let _pausedFlipTimer=null;    // 暫停時儲存 flipMemSeconds 剩餘
+let _pausedTimerElapsed=0;    // 暫停時儲存已過秒數
+
 window.addEventListener('message', e=>{
-  if(!e.data||e.data.type!=='PLATFORM_START') return;
-  const {level, group} = e.data;
+  if(!e.data?.type) return;
+  const d=e.data;
+
+  // ── PLATFORM_PAUSE ──
+  if(d.type==='PLATFORM_PAUSE'){
+    _pausedByPlatform=true;
+    // 停計時器
+    stopGameTimer();
+    if(flipMemTimer){ clearInterval(flipMemTimer); _pausedFlipTimer=flipMemSeconds; }
+    if(skipRequested===false && typeof safeCmds!=='undefined'){ /* Part3 的 waitWithSkip 會靠 skipRequested 自然暫停 */ }
+    // 顯示暫停覆蓋層
+    document.getElementById('pause-overlay').classList.remove('hidden');
+    return;
+  }
+
+  // ── PLATFORM_RESUME ──
+  if(d.type==='PLATFORM_RESUME'){
+    _pausedByPlatform=false;
+    document.getElementById('pause-overlay').classList.add('hidden');
+    // 恢復計時器（若有在跑）
+    if(_timerStart>0 && !_timerRAF) startGameTimer();
+    // 恢復翻牌記憶倒數
+    if(_pausedFlipTimer!==null && flipPhase==='MEM'){
+      flipMemSeconds=_pausedFlipTimer;
+      _pausedFlipTimer=null;
+      flipMemTimer=setInterval(()=>{
+        if(_pausedByPlatform) return; // 再次暫停時不倒數
+        flipMemSeconds--;
+        document.getElementById('flip-mem-count').textContent=flipMemSeconds;
+        if(flipMemSeconds<=0){
+          clearInterval(flipMemTimer); flipMemTimer=null;
+          flipCards.forEach(c=>{c.el.classList.remove('flipped');c.flipped=false;});
+          flipPhase='PLAY';
+          document.getElementById('flip-phase-label').textContent='🃏 找出配對';
+          document.getElementById('flip-phase-label').className='play';
+          document.getElementById('flip-mem-overlay').classList.add('hidden');
+          if(!_timerRAF) startGameTimer();
+        }
+      },1000);
+    }
+    return;
+  }
+
+  // ── PLATFORM_START ──
+  if(d.type!=='PLATFORM_START') return;
+  const {level, group} = d;
   platformMode=true;
   platformGroup=group||'';
   const part=Math.max(1,Math.min(3,parseInt(level)||1));
-  // 隱藏等待畫面（如果上一個 Part 完成後在等待）
   document.getElementById('wait-teacher-overlay').classList.add('hidden');
-  // 隱藏選單、直接啟動指定 Part
+  document.getElementById('pause-overlay').classList.add('hidden');
   document.getElementById('main-menu').classList.add('hidden');
   document.getElementById('ui-header').classList.add('on');
-  // 平台模式下「離開」按鈕隱藏，不讓學生自行退出
   const leaveBtn=document.querySelector('#ui-header .btn-ghost');
   if(leaveBtn) leaveBtn.style.display='none';
-  // 平台模式：分數跨 Part 累加，不歸零
-  startPart(part, /*keepScore=*/platformMode && curPart>0);
+  startPart(part, platformMode && curPart>0);
 });
 
 function startPart(part, keepScore=false){
@@ -644,22 +699,21 @@ function calcTimeBonus(elapsed, base, penalty){
 // ════════════════════════════════════
 
 const FLIP_TOTALS=[12,14,16,18,20,24,24,28,30,30];
-// 每個關卡對應的最佳 grid cols×rows
-const FLIP_GRIDS=[
-  [4,3],[7,2],[4,4],[6,3],[5,4],   // 12,14,16,18,20
-  [6,4],[6,4],[7,4],[6,5],[6,5]    // 24,24,28,30,30
-];
+// 每個關卡的列數（固定比例卡片，rows 由高度自動算）
+const FLIP_COLS=[4,7,4,6,5,6,6,7,6,6];
+// rows 對應（用於格子配置驗證）
+const FLIP_ROWS=[3,2,4,3,4,4,4,4,5,5];
 
-// ── Emoji 池：分「色系組」設計，同色系不同形狀 ──
-// 每個 emoji 在配對時讓學生區分「哦！這個在那格！」
-// 15 種（最多30張=15對）
+// ── Emoji 池：同類別、相似外形，讓玩家需要仔細辨認 ──
+// 分 3 大組，每組 5 個視覺相近：
+//   組A：各種笑臉（輪廓都是黃色圓臉）
+//   組B：各種心形（形狀都是心）
+//   組C：各種花（形狀圓形花朵）
+// 共 15 種，對應最多 15 對（30 張）
 const CARD_EMOJIS=[
-  // 紅色系（形狀各異）
-  '🍎','🍓','🌹','🧧','🎪',
-  // 藍/綠色系
-  '💎','🫐','🌊','🦋','🌿',
-  // 黃/橙色系
-  '⭐','🌻','🍋','🎃','🔔',
+  '😀','😃','😄','😁','😆',   // A 笑臉系
+  '❤️','🧡','💛','💚','💙',   // B 愛心系（同形狀不同顏色）
+  '🌸','🌺','🌼','🌻','🌹',   // C 花朵系（圓形花，顏色和形態相近）
 ];
 
 // 卡背 canvas：菱形格紋 + 紫青漸層邊框 + 中心圓
@@ -702,12 +756,11 @@ function drawCardBack(canvas,w,h){
 function drawCardFront(canvas,w,h,emoji){
   const ctx=canvas.getContext('2d');
   canvas.width=w; canvas.height=h;
-  // 背景漸層
   const bg=ctx.createLinearGradient(0,0,w,h);
   bg.addColorStop(0,'#1e1e2e'); bg.addColorStop(1,'#16161f');
   ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
-  // emoji，字型大小約卡片 60%
-  const fs=Math.floor(Math.min(w,h)*.58);
+  // 基於短邊（高度）決定 emoji 大小，長方形卡片視覺更飽滿
+  const fs=Math.floor(h*.62);
   ctx.font=`${fs}px serif`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(emoji, w/2, h/2);
@@ -727,7 +780,8 @@ function startFlip(){
   flipPairsLeft=pairCount;
   _flipPairCount=pairCount; // 同步更新模組級變數
 
-  const [cols,rows]=FLIP_GRIDS[lvIdx];
+  const cols=FLIP_COLS[lvIdx];
+  const rows=FLIP_ROWS[lvIdx];
   const slotCount=cols*rows;
 
   // 建牌池並 shuffle（此處消耗 seededRandom，必須只做一次）
@@ -749,11 +803,19 @@ function _buildFlipGrid(cols, rows, slotCount, emojiPool, pairCount, lvIdx){
     return;
   }
   const gapPx=6;
-  const padW=12, padH=12;
+  const padW=10, padH=8;
   const availW=wrap.clientWidth-padW*2;
-  const availH=wrap.clientHeight-padH*2-44; // 44=header 高度
-  const cellW=Math.floor((availW-(cols-1)*gapPx)/cols);
-  const cellH=Math.floor((availH-(rows-1)*gapPx)/rows);
+  const availH=wrap.clientHeight-padH*2;
+
+  // ── 固定 3:2 長方形（寬:高 = 3:2）──
+  // 先由寬度算出卡片寬
+  let cellW=Math.floor((availW-(cols-1)*gapPx)/cols);
+  let cellH=Math.round(cellW*2/3);
+  // 如果高度超出可用空間，改由高度反推
+  if(cellH*rows+(rows-1)*gapPx > availH){
+    cellH=Math.floor((availH-(rows-1)*gapPx)/rows);
+    cellW=Math.round(cellH*3/2);
+  }
   // canvas 用 2x 解析度確保清晰
   const cvW=cellW*2, cvH=cellH*2;
 
@@ -838,6 +900,7 @@ function _buildFlipGrid(cols, rows, slotCount, emojiPool, pairCount, lvIdx){
 }
 
 function onFlipClick(card){
+  if(_pausedByPlatform) return; // 暫停中禁止操作
   if(flipPhase!=='PLAY') return;
   if(flipLock||card.matched||card.flipped) return;
   card.flipped=true; card.el.classList.add('flipped');
@@ -984,7 +1047,7 @@ async function startParade(){
   selector.innerHTML='';
   PARADE_ITEMS.forEach(emoji=>{
     const d=document.createElement('div'); d.className='item-icon'; d.textContent=emoji;
-    d.onclick=()=>{ if(paradeUserSeq.length<paradeSeq.length){ paradeUserSeq.push(emoji); updateParadeUI(); }};
+    d.onclick=()=>{ if(_pausedByPlatform) return; if(paradeUserSeq.length<paradeSeq.length){ paradeUserSeq.push(emoji); updateParadeUI(); }};
     selector.appendChild(d);
   });
 
@@ -1377,11 +1440,13 @@ function waitWithSkip(ms){
 function triggerSkipInstructions(){ skipRequested=true; document.getElementById('safe-skip-btn').classList.add('hidden'); }
 
 function operateGear(dir){
+  if(_pausedByPlatform) return;
   gearRotation+=dir; userDir=dir; safeSubStep++;
   safeDialAngle+=dir*9; animateDial(safeDialAngle);
 }
 
 function confirmSafeCommand(){
+  if(_pausedByPlatform) return;
   const target=safeCmds[safeStep];
   const targetDir=target.dir==='L'?-1:1;
   if(safeSubStep===target.val&&userDir===targetDir){
