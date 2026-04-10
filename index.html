@@ -1564,7 +1564,8 @@ function jumpToPhase(phase) {
 
 // ── 即時分數渲染 ──
 function tcRenderScores() {
-    if (window.state.selectedGame === 2 || window.state.selectedGame === 4) return;
+    const sg = window.state.selectedGame;
+    if (sg === 2 || sg === 4 || sg === 5 || sg === 6 || sg === 7) return;
     const area = document.getElementById('tc-scores-area');
     if (!area) return;
     const players = window.state.players;
