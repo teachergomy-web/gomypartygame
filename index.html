@@ -1330,7 +1330,31 @@ function w8RenderTCCards() {
     if (nextWrap) nextWrap.style.display = allDone ? 'block' : 'none';
 }
 
-// W8_COMPLETE 接收
+// W8_PROGRESS：每個小節（LV）完成時即時回報，供結算使用
+window.addEventListener('message', (e4) => {
+    if (!e4.data || e4.data.type !== 'W8_PROGRESS') return;
+    const { group, part, score } = e4.data;
+    if (!group) return;
+    const pts = parseInt(score) || 0;
+    // 更新 _w8GroupStatus 的當前分數（不標記 done，只更新 score）
+    const prev = _w8GroupStatus[group] || {};
+    _w8GroupStatus[group] = {
+        ...prev,
+        score: pts,
+        cumScore: pts  // 當前累計（含跨 Part）
+    };
+    // 同步 TC.scores 和 Firebase
+    const best = Math.max(TC.scores[group] || 0, pts);
+    TC.scores[group] = best;
+    const rooms3 = window.getRooms();
+    if (rooms3[window.state.roomCode]) {
+        if (!rooms3[window.state.roomCode].scores) rooms3[window.state.roomCode].scores = {};
+        if (pts > (rooms3[window.state.roomCode].scores[group] || 0)) {
+            rooms3[window.state.roomCode].scores[group] = pts;
+            window.saveRooms(rooms3);
+        }
+    }
+});
 window.addEventListener('message', (e3) => {
     if (!e3.data || e3.data.type !== 'W8_COMPLETE') return;
     const { group, score, elapsed, part } = e3.data;
@@ -2152,21 +2176,35 @@ window.addEventListener('message', (e) => {
     if (type === 'W6_ROUND_UPDATE' && e.data.group) {
         const { group, rounds, elapsed } = e.data;
         const prev = _w6GroupStatus[group] || {};
-        // 保留累積分數，只更新進度
+        // 計算中途預估分數：按完成輪數比例估算（保守估計，完成才給完整分）
+        // 每輪約 1000/6 ≈ 166 分，以輪數比例累計到 cumScore
+        const partialScore = Math.floor(Math.max(100, 1000 - parseFloat(elapsed||0) * 8) * (rounds / 6));
+        const newCum = (prev.cumScore || 0) > partialScore
+            ? (prev.cumScore || 0)   // 已有更高分（上一關累計），保留
+            : partialScore;
+
         _w6GroupStatus[group] = {
             done: false,
             rounds: rounds || 0,
             elapsed: elapsed || null,
-            cumScore: prev.cumScore || 0
+            cumScore: prev.cumScore || 0  // 跨關累計保留
         };
-        
-        // 【新增】寫入 Firebase 同步給老師端
+
+        // 把中途分數寫入 Firebase（結算時可讀到）
         const rooms = window.getRooms();
         if (rooms[window.state.roomCode]) {
             if (!rooms[window.state.roomCode].w6status) rooms[window.state.roomCode].w6status = {};
             rooms[window.state.roomCode].w6status[group] = _w6GroupStatus[group];
+            // 更新分數：取目前 cumScore 和中途預估分的較大值
+            if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
+            const prevFirebase = rooms[window.state.roomCode].scores[group] || 0;
+            if (newCum > prevFirebase) {
+                rooms[window.state.roomCode].scores[group] = newCum;
+            }
             window.saveRooms(rooms);
         }
+
+        TC.scores[group] = Math.max(TC.scores[group] || 0, newCum);
 
         w6RenderTCCards();
         w6RenderGroupCards();
