@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>W8 環遊大富翁</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sky: #4FC3F7;
+  --sky-dark: #0288D1;
+  --grass: #66BB6A;
+  --grass-dark: #388E3C;
+  --sand: #FFE082;
+  --sand-dark: #F9A825;
+  --pink: #F48FB1;
+  --pink-dark: #C2185B;
+  --purple: #CE93D8;
+  --purple-dark: #7B1FA2;
+  --orange: #FFAB40;
+  --orange-dark: #E65100;
+  --red: #EF5350;
+  --red-dark: #B71C1C;
+  --teal: #4DB6AC;
+  --teal-dark: #00695C;
+  --white: #FFFFFF;
+  --card: rgba(255,255,255,0.92);
+  --shadow: 0 8px 32px rgba(0,0,0,0.18);
+  --radius: 20px;
+  --font-main: 'Noto Sans TC', 'Nunito', sans-serif;
+  --font-title: 'Fredoka One', 'Noto Sans TC', cursive;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body, button, input, select, textarea {
+  font-family: 'Noto Sans TC', 'Nunito', sans-serif;
+}
+.logo, .result-title, .btn-roll, .btn-primary, .btn-publish,
+.btn-next-turn, .btn-settle, .btn-restart, .turn-badge,
+.score-row .team-pts, .result-score, .dice-total, .cell-num {
+  font-family: 'Noto Sans TC', sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+body {
+  font-family: var(--font-main);
+  background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 40%, #e8f5e9 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== LOADING ===== */
+#loading-screen {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #29B6F6, #66BB6A);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999; transition: opacity 0.6s;
+}
+#loading-screen .logo {
+  font-family: var(--font-title);
+  font-size: 3rem; color: white;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  margin-bottom: 1rem;
+}
+#loading-screen .spinner {
+  width: 48px; height: 48px;
+  border: 5px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== SETUP SCREEN ===== */
+#setup-screen {
+  display: none;
+  min-height: 100vh;
+  align-items: center; justify-content: center;
+  padding: 2rem;
+}
+.setup-card {
+  background: var(--card);
+  border-radius: 32px;
+  padding: 3rem;
+  box-shadow: var(--shadow);
+  max-width: 500px; width: 100%;
+  text-align: center;
+}
+.setup-card h1 {
+  font-family: var(--font-title);
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, var(--sky-dark), var(--grass-dark));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+.setup-card p { color: #666; margin-bottom: 2rem; }
+.setup-input {
+  width: 100%; padding: 1rem 1.5rem;
+  border: 2px solid #e0e0e0; border-radius: 14px;
+  font-family: var(--font-main); font-size: 1.1rem;
+  margin-bottom: 1rem; outline: none;
+  transition: border-color 0.2s;
+}
+.setup-input:focus { border-color: var(--sky); }
+.setup-select {
+  width: 100%; padding: 1rem 1.5rem;
+  border: 2px solid #e0e0e0; border-radius: 14px;
+  font-family: var(--font-main); font-size: 1.1rem;
+  margin-bottom: 1.5rem; outline: none; background: white;
+}
+.btn-primary {
+  width: 100%; padding: 1.1rem;
+  background: linear-gradient(135deg, var(--sky), var(--grass));
+  color: white; border: none; border-radius: 14px;
+  font-family: var(--font-title); font-size: 1.3rem;
+  cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 16px rgba(79,195,247,0.4);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(79,195,247,0.5); }
+.btn-primary:active { transform: translateY(0); }
+
+/* ===== MAIN GAME LAYOUT ===== */
+#game-screen {
+  display: none;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* TEACHER LAYOUT */
+.teacher-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: auto 1fr;
+  gap: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: calc(100vh - 2rem);
+}
+
+.teacher-header {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 1rem;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.8rem 1.5rem;
+  box-shadow: var(--shadow);
+}
+.teacher-header h1 {
+  font-family: var(--font-title);
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, var(--sky-dark), var(--grass-dark));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  flex: 1;
+}
+.turn-badge {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--sand);
+  padding: 0.5rem 1.2rem;
+  border-radius: 50px;
+  font-weight: 800; font-size: 1rem;
+}
+
+/* BOARD AREA */
+.board-area {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+/* SIDEBAR */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  overflow-y: auto;
+}
+
+/* SCOREBOARD */
+.scoreboard {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+}
+.scoreboard h3 {
+  font-family: var(--font-title);
+  font-size: 1.1rem; color: var(--sky-dark);
+  margin-bottom: 0.8rem;
+}
+.score-row {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  margin-bottom: 0.4rem;
+  transition: background 0.2s;
+}
+.score-row.active-turn { background: rgba(79,195,247,0.15); }
+.score-row .team-icon { font-size: 1.5rem; }
+.score-row .team-name { flex: 1; font-weight: 700; font-size: 0.9rem; }
+.score-row .team-pts {
+  font-family: var(--font-title);
+  font-size: 1.2rem; color: var(--grass-dark);
+}
+.score-row .dice-extra { font-size: 0.75rem; color: var(--orange-dark); }
+
+/* EVENT PANEL */
+.event-panel {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+  flex: 1;
+}
+.event-panel h3 {
+  font-family: var(--font-title);
+  font-size: 1.1rem; color: var(--purple-dark);
+  margin-bottom: 0.8rem;
+}
+.event-box {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 1rem;
+  min-height: 120px;
+  margin-bottom: 0.8rem;
+  font-size: 0.95rem; line-height: 1.6;
+}
+.event-box .question-text {
+  font-weight: 700; font-size: 1rem;
+  margin-bottom: 0.8rem; color: #333;
+}
+.event-box .option-btn {
+  display: block; width: 100%;
+  padding: 0.6rem 1rem;
+  border-radius: 10px; border: 2px solid #e0e0e0;
+  background: white; cursor: pointer;
+  font-family: var(--font-main); font-size: 0.9rem;
+  margin-bottom: 0.5rem; text-align: left;
+  transition: all 0.15s; font-weight: 600;
+}
+.event-box .option-btn:hover { border-color: var(--purple); background: #f3e5f5; }
+.event-box .option-btn.selected { border-color: var(--purple-dark); background: #e1bee7; }
+.event-box .option-btn.correct { border-color: var(--grass-dark); background: #c8e6c9; color: var(--grass-dark); }
+.event-box .option-btn.wrong { border-color: var(--red-dark); background: #ffcdd2; color: var(--red-dark); }
+
+.explain-box {
+  background: linear-gradient(135deg, #fff9c4, #fff3e0);
+  border-radius: 10px; padding: 0.8rem;
+  font-size: 0.85rem; color: #555;
+  border-left: 4px solid var(--orange);
+  display: none;
+}
+
+.btn-publish {
+  width: 100%; padding: 0.9rem;
+  background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+  color: white; border: none; border-radius: 12px;
+  font-family: var(--font-title); font-size: 1.1rem;
+  cursor: pointer; transition: all 0.15s;
+  box-shadow: 0 4px 12px rgba(206,147,216,0.5);
+  display: none;
+}
+.btn-publish:hover { transform: translateY(-2px); }
+
+.btn-next-turn {
+  width: 100%; padding: 0.9rem;
+  background: linear-gradient(135deg, var(--grass), var(--grass-dark));
+  color: white; border: none; border-radius: 12px;
+  font-family: var(--font-title); font-size: 1.1rem;
+  cursor: pointer; transition: all 0.15s;
+  box-shadow: 0 4px 12px rgba(102,187,106,0.4);
+  display: none;
+}
+.btn-next-turn:hover { transform: translateY(-2px); }
+
+.btn-settle {
+  width: 100%; padding: 0.9rem;
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  color: white; border: none; border-radius: 12px;
+  font-family: var(--font-title); font-size: 1rem;
+  cursor: pointer; transition: all 0.15s;
+  box-shadow: 0 4px 12px rgba(255,171,64,0.4);
+  margin-top: 0.5rem;
+}
+.btn-settle:hover { transform: translateY(-2px); }
+
+/* STUDENT LAYOUT */
+.student-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 600px;
+  margin: 0 auto;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.student-header {
+  width: 100%;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.student-header h1 {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  background: linear-gradient(135deg, var(--sky-dark), var(--grass-dark));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.my-team-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: var(--sand);
+  padding: 0.3rem 1rem; border-radius: 50px;
+  font-weight: 700; font-size: 0.9rem;
+  margin-top: 0.3rem;
+}
+
+.student-board-area {
+  width: 100%;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.student-action {
+  width: 100%;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.student-action .waiting-msg {
+  color: #999; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.pulse-dot {
+  width: 10px; height: 10px;
+  background: var(--grass);
+  border-radius: 50%;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.btn-roll {
+  padding: 1.2rem 3rem;
+  background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+  color: white; border: none; border-radius: 20px;
+  font-family: var(--font-title); font-size: 2rem;
+  cursor: pointer; transition: all 0.15s;
+  box-shadow: 0 6px 24px rgba(255,171,64,0.5);
+  animation: bounceBtn 2s ease-in-out infinite;
+}
+@keyframes bounceBtn {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.03); }
+}
+.btn-roll:active { transform: scale(0.95) !important; animation: none; }
+
+.dice-result {
+  display: flex; align-items: center; justify-content: center;
+  gap: 1rem; margin: 0.5rem 0;
+}
+.dice-face {
+  width: 70px; height: 70px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15), inset 0 2px 4px rgba(0,0,0,0.05);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem;
+  border: 3px solid #e0e0e0;
+  animation: diceReveal 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes diceReveal {
+  from { transform: scale(0.5) rotate(-20deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+.dice-total {
+  font-family: var(--font-title);
+  font-size: 1.5rem; color: var(--orange-dark);
+}
+
+/* ===== ISOMETRIC BOARD ===== */
+.iso-board-wrapper {
+  position: relative;
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.iso-board {
+  position: relative;
+  transform: rotateX(45deg) rotateZ(-45deg);
+  transform-style: preserve-3d;
+}
+
+.cell {
+  position: absolute;
+  width: 68px; height: 68px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  cursor: default;
+  transition: filter 0.2s;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 6px 8px rgba(0,0,0,0.1);
+  border: 2px solid rgba(255,255,255,0.6);
+}
+
+.cell .cell-num {
+  font-family: var(--font-title);
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.9);
+  transform: rotateX(-45deg) rotateZ(45deg);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.cell .cell-icon {
+  font-size: 1.1rem;
+  transform: rotateX(-45deg) rotateZ(45deg);
+  line-height: 1;
+}
+.cell.type-q { background: linear-gradient(135deg, #FFF176, #FFD54F); }
+.cell.type-lucky { background: linear-gradient(135deg, #81C784, #43A047); }
+.cell.type-bad { background: linear-gradient(135deg, #EF9A9A, #E53935); }
+.cell.type-special { background: linear-gradient(135deg, #CE93D8, #7B1FA2); }
+.cell.type-start { background: linear-gradient(135deg, #4FC3F7, #0288D1); }
+.cell.active-cell {
+  filter: drop-shadow(0 0 12px rgba(255,255,100,0.9));
+  animation: cellGlow 1s ease-in-out infinite alternate;
+}
+@keyframes cellGlow {
+  from { filter: drop-shadow(0 0 8px rgba(255,255,100,0.7)); }
+  to { filter: drop-shadow(0 0 20px rgba(255,200,0,1)); }
+}
+
+/* PIECES */
+.piece {
+  position: absolute;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+  border: 3px solid white;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  transform: rotateX(-45deg) rotateZ(45deg);
+  z-index: 10;
+  transition: left 0.6s cubic-bezier(0.34,1.56,0.64,1), top 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  animation: pieceFloat 2s ease-in-out infinite;
+}
+@keyframes pieceFloat {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -5px; }
+}
+
+/* ===== NOTIFICATION TOAST ===== */
+.toast {
+  position: fixed; top: 80px; left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(30,30,30,0.9);
+  color: white; padding: 0.8rem 1.8rem;
+  border-radius: 50px;
+  font-weight: 700; font-size: 1rem;
+  z-index: 9000; opacity: 0;
+  transition: all 0.3s; pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+.toast.show {
+  opacity: 1; transform: translateX(-50%) translateY(0);
+}
+
+/* ===== SCORE POPUP ===== */
+.score-popup {
+  position: fixed;
+  font-family: var(--font-title);
+  font-size: 2.5rem;
+  pointer-events: none;
+  z-index: 9999;
+  animation: scoreFloat 1.5s forwards;
+}
+@keyframes scoreFloat {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-80px) scale(1.3); }
+}
+
+/* ===== RESULT SCREEN ===== */
+#result-screen {
+  display: none;
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #1a237e, #283593, #0d47a1);
+  z-index: 8000;
+  align-items: center; justify-content: center;
+  flex-direction: column;
+}
+.result-title {
+  font-family: var(--font-title);
+  font-size: 3rem; color: var(--sand);
+  text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  margin-bottom: 2rem;
+  animation: titlePop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes titlePop {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.result-list {
+  display: flex; flex-direction: column; gap: 1rem;
+  width: 100%; max-width: 440px;
+}
+.result-item {
+  display: flex; align-items: center; gap: 1rem;
+  background: rgba(255,255,255,0.12);
+  border-radius: 16px; padding: 1rem 1.5rem;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+  animation: resultSlide 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes resultSlide {
+  from { transform: translateX(-50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.result-rank { font-family: var(--font-title); font-size: 2rem; color: var(--sand); width: 40px; }
+.result-icon { font-size: 2rem; }
+.result-name { flex: 1; color: white; font-weight: 700; font-size: 1.1rem; }
+.result-score { font-family: var(--font-title); font-size: 1.8rem; color: var(--grass); }
+.confetti-wrap { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.confetti-piece {
+  position: absolute;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(-20px) rotate(0); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+.btn-restart {
+  margin-top: 2rem; padding: 1rem 3rem;
+  background: white; color: #1a237e;
+  border: none; border-radius: 50px;
+  font-family: var(--font-title); font-size: 1.3rem;
+  cursor: pointer; transition: transform 0.15s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+.btn-restart:hover { transform: scale(1.05); }
+
+/* ===== STOP BADGE ===== */
+.stop-badge {
+  position: absolute; top: -10px; right: -10px;
+  background: var(--red); color: white;
+  font-size: 0.65rem; font-weight: 800;
+  padding: 2px 6px; border-radius: 20px;
+  transform: rotateX(-45deg) rotateZ(45deg);
+  white-space: nowrap;
+}
+
+/* Event indicator on cells */
+.cell-team-dots {
+  display: flex; gap: 2px;
+  transform: rotateX(-45deg) rotateZ(45deg);
+  flex-wrap: wrap; max-width: 40px;
+}
+.team-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  border: 1px solid white;
+}
+
+/* Student scores mini */
+.student-scores {
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+.student-score-chip {
+  display: flex; align-items: center; gap: 0.3rem;
+  background: var(--card); padding: 0.4rem 0.8rem;
+  border-radius: 50px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  font-weight: 700; font-size: 0.85rem;
+}
+.student-score-chip.my-team {
+  background: var(--sand);
+  box-shadow: 0 2px 12px rgba(255,224,130,0.6);
+}
+
+/* Loading question */
+.loading-q {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0.5rem; color: #999; padding: 1rem;
+}
+.loading-q .dot {
+  width: 8px; height: 8px;
+  background: var(--purple);
+  border-radius: 50%;
+  animation: dotBounce 0.8s ease-in-out infinite;
+}
+.loading-q .dot:nth-child(2) { animation-delay: 0.15s; }
+.loading-q .dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dotBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-screen">
+  <div class="logo">🎲 環遊大富翁</div>
+  <div style="color:rgba(255,255,255,0.8);margin-bottom:1.5rem;font-family:'Nunito',sans-serif;">載入中...</div>
+  <div class="spinner"></div>
+</div>
+
+<!-- Setup -->
+<div id="setup-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:2rem;display:none;">
+  <div class="setup-card">
+    <div style="font-size:3rem;margin-bottom:0.5rem;">🎲</div>
+    <h1>環遊大富翁</h1>
+    <p>請輸入房間代碼以加入遊戲</p>
+    <input id="room-input" class="setup-input" type="text" placeholder="房間代碼（例如：ABC123）" maxlength="10">
+    <select id="role-select" class="setup-select">
+      <option value="teacher">👨‍🏫 老師端</option>
+      <option value="student">👩‍🎓 學生端</option>
+    </select>
+    <div id="team-select-wrap" style="display:none;">
+      <select id="team-select" class="setup-select">
+        <option value="">選擇你的組別...</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="joinGame()">🚀 進入遊戲</button>
+  </div>
+</div>
+
+<!-- Game Screen -->
+<div id="game-screen" style="display:none;">
+
+  <!-- TEACHER VIEW -->
+  <div id="teacher-view" style="display:none;" class="teacher-layout">
+    <div class="teacher-header">
+      <h1>🎲 環遊大富翁</h1>
+      <div class="turn-badge">
+        <span id="turn-icon">🐻</span>
+        <span id="turn-name">第1組</span>
+        <span>的回合</span>
+      </div>
+      <div id="skipped-badge" style="display:none;background:#ffcdd2;padding:0.3rem 0.8rem;border-radius:50px;font-size:0.85rem;color:#b71c1c;font-weight:700;">
+        ⏸ 停一回合
+      </div>
+    </div>
+
+    <div class="board-area">
+      <div class="iso-board-wrapper">
+        <div id="board" class="iso-board"></div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <!-- Scoreboard -->
+      <div class="scoreboard">
+        <h3>🏆 各組分數</h3>
+        <div id="teacher-scores"></div>
+      </div>
+
+      <!-- Event Panel -->
+      <div class="event-panel">
+        <h3>📋 事件面板</h3>
+        <div id="event-box" class="event-box">
+          <div style="color:#bbb;text-align:center;padding:1rem;">等待骰子...</div>
+        </div>
+        <div id="explain-box" class="explain-box"></div>
+        <button id="btn-publish" class="btn-publish" onclick="publishAnswer()">🎯 公布答案</button>
+        <button id="btn-next-turn" class="btn-next-turn" onclick="nextTurn()">➡️ 下一組</button>
+        <button class="btn-settle" onclick="showResult()">🏆 結算遊戲</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STUDENT VIEW -->
+  <div id="student-view" style="display:none;" class="student-layout">
+    <div class="student-header">
+      <h1>🎲 環遊大富翁</h1>
+      <div>
+        <span class="my-team-badge">
+          <span id="s-my-icon">🐻</span>
+          <span id="s-my-name">我的組</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="student-scores" id="student-scores-row"></div>
+
+    <div class="student-board-area">
+      <div class="iso-board-wrapper" style="height:320px;">
+        <div id="s-board" class="iso-board"></div>
+      </div>
+    </div>
+
+    <div class="student-action" id="student-action">
+      <div class="waiting-msg">
+        <div class="pulse-dot"></div>
+        <span id="s-turn-msg">等待其他組...</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Result Screen -->
+<div id="result-screen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#1a237e,#283593,#0d47a1);z-index:8000;align-items:center;justify-content:center;flex-direction:column;">
+  <div class="confetti-wrap" id="confetti-wrap"></div>
+  <div class="result-title">🏆 遊戲結算！</div>
+  <div class="result-list" id="result-list"></div>
+  <button class="btn-restart" onclick="location.reload()">🔄 再玩一次</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== CONFIG =====
+
+// ===== TEAMS =====
+const TEAMS = [
+  { id: 1, name: "第1組", icon: "🐻", color: "#FF8A65" },
+  { id: 2, name: "第2組", icon: "🐼", color: "#81C784" },
+  { id: 3, name: "第3組", icon: "🦊", color: "#FFB74D" },
+  { id: 4, name: "第4組", icon: "🐸", color: "#4FC3F7" },
+  { id: 5, name: "第5組", icon: "🐧", color: "#CE93D8" },
+];
+
+// ===== BOARD =====
+const TOTAL_CELLS = 24;
+// Cell types: start(0), q=question, lucky, bad, special
+const CELL_TYPES = [
+  'start','q','lucky','q','bad','lucky','q','bad','q','lucky',
+  'bad','q','special','q','lucky','bad','q','lucky','q','bad',
+  'q','lucky','bad','q'
+];
+const CELL_ICONS = {
+  start: '🏁', q: '❓', lucky: '🍀', bad: '💀', special: '⭐'
+};
+
+// ===== ISOMETRIC LAYOUT =====
+// 24 cells arranged around a rectangle: top(8) right(4) bottom(8) left(4)
+function getBoardLayout() {
+  // Cells go clockwise around a rectangular path
+  const cols = 7, rows = 5;
+  const gap = 74;
+  const path = [];
+  // top row left to right (0..6) = cells 0..6
+  for (let c = 0; c < cols; c++) path.push([c, 0]);
+  // right col top to bottom (1..4) = cells 7..10
+  for (let r = 1; r < rows; r++) path.push([cols-1, r]);
+  // bottom row right to left (5..0) = cells 11..16
+  for (let c = cols-2; c >= 0; c--) path.push([c, rows-1]);
+  // left col bottom to top (3..1) = cells 17..19
+  for (let r = rows-2; r >= 1; r--) path.push([0, r]);
+  // trim to 24
+  const positions = path.slice(0, TOTAL_CELLS);
+  return positions.map(([c, r]) => ({ x: c * gap, y: r * gap }));
+}
+
+// ===== STATE =====
+let myRole = '', myTeamId = 0, roomCode = '';
+let gameState = null;
+let boardPositions = [];
+let selectedAnswer = null;
+let currentQuestion = null;
+let teamCount = 4;
+
+// ===== INIT =====
+window.addEventListener('message', (e) => {
+  if (e.data?.type === 'PLATFORM_START') {
+    const { role, teamId, roomCode: rc, teamCount: tc } = e.data;
+    myRole = role || 'student';
+    // teamId 可能是數字或字串「第N組」，統一轉成數字
+    if (typeof teamId === 'number') {
+      myTeamId = teamId;
+    } else if (typeof teamId === 'string') {
+      const m = teamId.match(/\d+/);
+      myTeamId = m ? parseInt(m[0]) : 1;
+    } else {
+      myTeamId = 1;
+    }
+    roomCode = rc || 'W8ROOM';
+    teamCount = parseInt(tc) || 4;
+    startGame();
+  }
+});
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    // Check URL params for standalone mode
+    const params = new URLSearchParams(location.search);
+    if (params.get('room')) {
+      roomCode = params.get('room');
+      myRole = params.get('role') || 'student';
+      myTeamId = parseInt(params.get('team') || '1');
+      teamCount = parseInt(params.get('teams') || '4');
+      startGame();
+    } else if (!window.parent || window.parent === window) {
+      // Standalone: show setup
+      document.getElementById('loading-screen').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('loading-screen').style.display = 'none';
+        const ss = document.getElementById('setup-screen');
+        ss.style.display = 'flex';
+      }, 400);
+    } else {
+      // Wait for platform message
+      document.getElementById('loading-screen').querySelector('div:nth-child(2)').textContent = '等待平台啟動...';
+    }
+  }, 800);
+});
+
+document.getElementById('role-select').addEventListener('change', function() {
+  const tw = document.getElementById('team-select-wrap');
+  if (this.value === 'student') {
+    tw.style.display = 'block';
+    const ts = document.getElementById('team-select');
+    ts.innerHTML = '<option value="">選擇你的組別...</option>';
+    TEAMS.slice(0, 5).forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.icon + ' ' + t.name;
+      ts.appendChild(o);
+    });
+  } else {
+    tw.style.display = 'none';
+  }
+});
+
+function joinGame() {
+  roomCode = document.getElementById('room-input').value.trim().toUpperCase() || 'DEMO';
+  myRole = document.getElementById('role-select').value;
+  if (myRole === 'student') {
+    myTeamId = parseInt(document.getElementById('team-select').value);
+    if (!myTeamId) { showToast('請選擇組別！'); return; }
+  }
+  teamCount = 4;
+  startGame();
+}
+
+function startGame() {
+  document.getElementById('loading-screen').style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'block';
+  }, 400);
+
+  buildBoard();
+  initState();
+}
+
+// ===== BUILD BOARD =====
+function buildBoard() {
+  boardPositions = getBoardLayout();
+  ['board', 's-board'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '';
+    const isSmall = id === 's-board';
+    const scale = isSmall ? 0.72 : 1;
+    const gap = 74 * scale;
+
+    const maxX = Math.max(...boardPositions.map(p=>p.x));
+    const maxY = Math.max(...boardPositions.map(p=>p.y));
+
+    // Adjust board size for isometric
+    el.style.width = ((maxX + 68) * scale) + 'px';
+    el.style.height = ((maxY + 68) * scale) + 'px';
+
+    boardPositions.forEach((pos, i) => {
+      const cell = document.createElement('div');
+      cell.className = `cell type-${CELL_TYPES[i]}`;
+      cell.id = (id === 'board' ? 'cell-' : 's-cell-') + i;
+      cell.style.left = (pos.x * scale) + 'px';
+      cell.style.top = (pos.y * scale) + 'px';
+      if (isSmall) {
+        cell.style.width = cell.style.height = (68 * scale) + 'px';
+      }
+      cell.innerHTML = `
+        <span class="cell-icon">${CELL_ICONS[CELL_TYPES[i]]}</span>
+        <span class="cell-num">${i}</span>
+        <div class="cell-team-dots" id="${id === 'board' ? 'dots-' : 's-dots-'}${i}"></div>
+      `;
+      el.appendChild(cell);
+    });
+  });
+}
+
+// ===== STATE =====
+// 老師端維護 gameState，每次更新後透過 postMessage 廣播給平台再轉給學生
+// 學生端透過 window.message 接收 W8_STATE 更新畫面
+
+function initState() {
+  if (myRole === 'teacher') {
+    // 老師端：建立初始狀態，直接 render
+    gameState = createInitialState();
+    render();
+  } else {
+    // 學生端：等待老師廣播的狀態，顯示等待畫面
+    gameState = null;
+    render();
+  }
+}
+
+// 接收平台轉發的 W8_STATE（學生端）
+window.addEventListener('message', (e) => {
+  if (!e.data) return;
+  if (e.data.type === 'W8_STATE' && myRole === 'student') {
+    gameState = e.data.state;
+    render();
+  }
+});
+
+function createInitialState() {
+  const teams = {};
+  for (let i = 1; i <= teamCount; i++) {
+    teams[i] = {
+      id: i,
+      position: 0,
+      score: 0,
+      extraDice: false,
+      skipTurn: false,
+    };
+  }
+  return {
+    teams,
+    currentTurn: 1,
+    phase: 'waiting_roll', // waiting_roll, rolled, event, answering, revealing, done
+    diceResult: null,
+    event: null,
+    question: null,
+    selectedAnswer: null,
+    teamCount,
+  };
+}
+
+function updateState(patch) {
+  gameState = { ...gameState, ...patch };
+  render();
+  // 老師端廣播最新狀態給平台（平台再轉給學生）
+  if (myRole === 'teacher') {
+    try {
+      window.parent.postMessage({ type: 'W8_STATE', state: gameState }, '*');
+    } catch(e) {}
+  }
+}
+
+function updateTeam(teamId, patch) {
+  const teams = { ...gameState.teams };
+  teams[teamId] = { ...teams[teamId], ...patch };
+  updateState({ teams });
+}
+
+// ===== RENDER =====
+function render() {
+  if (!gameState) return;
+  const isTeacher = myRole === 'teacher';
+  document.getElementById('teacher-view').style.display = isTeacher ? 'grid' : 'none';
+  document.getElementById('student-view').style.display = isTeacher ? 'none' : 'flex';
+
+  renderPieces();
+  if (isTeacher) renderTeacher();
+  else renderStudent();
+}
+
+function renderPieces() {
+  ['board','s-board'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isSmall = id === 's-board';
+    const scale = isSmall ? 0.72 : 1;
+
+    // Remove old pieces
+    el.querySelectorAll('.piece').forEach(p => p.remove());
+    // Clear dots
+    el.querySelectorAll('.cell-team-dots').forEach(d => d.innerHTML = '');
+
+    const activeCell = document.getElementById((id === 'board' ? 'cell-' : 's-cell-') + 0);
+
+    Object.values(gameState.teams || {}).forEach(team => {
+      const t = TEAMS[team.id - 1];
+      if (!t) return;
+      const pos = team.position % TOTAL_CELLS;
+      const bp = boardPositions[pos];
+      if (!bp) return;
+
+      // Add dot to cell
+      const dots = document.getElementById((id === 'board' ? 'dots-' : 's-dots-') + pos);
+      if (dots) {
+        const dot = document.createElement('div');
+        dot.className = 'team-dot';
+        dot.style.background = t.color;
+        dots.appendChild(dot);
+      }
+
+      // Piece
+      const piece = document.createElement('div');
+      piece.className = 'piece';
+      piece.style.left = (bp.x * scale + 16 * scale) + 'px';
+      piece.style.top = (bp.y * scale - 20) + 'px';
+      piece.style.background = t.color;
+      piece.style.animationDelay = (team.id * 0.3) + 's';
+      if (team.skipTurn) {
+        piece.innerHTML = t.icon;
+        const badge = document.createElement('div');
+        badge.className = 'stop-badge';
+        badge.textContent = '停';
+        piece.appendChild(badge);
+      } else {
+        piece.textContent = t.icon;
+      }
+      el.appendChild(piece);
+    });
+
+    // Highlight active cell
+    el.querySelectorAll('.cell').forEach(c => c.classList.remove('active-cell'));
+    if (gameState.currentTurn) {
+      const team = gameState.teams[gameState.currentTurn];
+      if (team) {
+        const pos = team.position % TOTAL_CELLS;
+        const activeEl = document.getElementById((id === 'board' ? 'cell-' : 's-cell-') + pos);
+        if (activeEl) activeEl.classList.add('active-cell');
+      }
+    }
+  });
+}
+
+function renderTeacher() {
+  const gs = gameState;
+  const currentTeam = TEAMS[gs.currentTurn - 1];
+  if (!currentTeam) return;
+
+  document.getElementById('turn-icon').textContent = currentTeam.icon;
+  document.getElementById('turn-name').textContent = currentTeam.name;
+
+  // Scores
+  const sc = document.getElementById('teacher-scores');
+  sc.innerHTML = '';
+  Object.values(gs.teams).forEach(team => {
+    const t = TEAMS[team.id - 1];
+    const row = document.createElement('div');
+    row.className = 'score-row' + (team.id === gs.currentTurn ? ' active-turn' : '');
+    row.innerHTML = `
+      <span class="team-icon">${t.icon}</span>
+      <span class="team-name" style="color:${t.color}">${t.name}</span>
+      ${team.extraDice ? '<span class="dice-extra">🎲🎲</span>' : ''}
+      ${team.skipTurn ? '<span style="font-size:0.75rem;color:#e53935;">⏸停</span>' : ''}
+      <span class="team-pts">${team.score}分</span>
+    `;
+    sc.appendChild(row);
+  });
+
+  // Event panel
+  renderEventPanel();
+}
+
+function renderEventPanel() {
+  const gs = gameState;
+  const eb = document.getElementById('event-box');
+  const exb = document.getElementById('explain-box');
+  const bpub = document.getElementById('btn-publish');
+  const bnext = document.getElementById('btn-next-turn');
+
+  exb.style.display = 'none';
+  bpub.style.display = 'none';
+  bnext.style.display = 'none';
+  selectedAnswer = null;
+
+  if (gs.phase === 'waiting_roll') {
+    eb.innerHTML = `<div style="text-align:center;padding:1.5rem;color:#bbb;">⏳ 等待 ${TEAMS[gs.currentTurn-1]?.icon} 擲骰...</div>`;
+  } else if (gs.phase === 'rolled') {
+    const dice = gs.diceResult;
+    const diceFaces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    eb.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font-size:0.9rem;color:#999;margin-bottom:0.5rem;">🎲 骰子結果</div>
+        <div class="dice-result">
+          <div class="dice-face">${diceFaces[(dice.d1||1)-1]}</div>
+          ${dice.d2 ? `<div class="dice-face">${diceFaces[(dice.d2||1)-1]}</div>` : ''}
+        </div>
+        <div class="dice-total">共 ${dice.total} 步</div>
+      </div>
+    `;
+    bnext.style.display = 'block';
+    bnext.textContent = '▶ 移動棋子';
+    bnext.onclick = () => movePiece();
+  } else if (gs.phase === 'event') {
+    renderEventCard();
+  } else if (gs.phase === 'answering') {
+    renderQuestionPanel();
+    bpub.style.display = 'block';
+  } else if (gs.phase === 'revealing') {
+    renderRevealPanel();
+    bnext.style.display = 'block';
+    bnext.textContent = '➡️ 下一組';
+    bnext.onclick = () => nextTurn();
+  } else if (gs.phase === 'done') {
+    eb.innerHTML = `<div style="text-align:center;padding:1rem;color:#888;">等待繼續...</div>`;
+    bnext.style.display = 'block';
+    bnext.textContent = '➡️ 下一組';
+    bnext.onclick = () => nextTurn();
+  }
+}
+
+function renderEventCard() {
+  const gs = gameState;
+  const ev = gs.event;
+  const eb = document.getElementById('event-box');
+  const bnext = document.getElementById('btn-next-turn');
+
+  if (!ev) return;
+
+  const icons = { lucky: '🍀', bad: '💀', start: '🏁' };
+  const colors = { lucky: '#e8f5e9', bad: '#ffebee', start: '#e3f2fd' };
+
+  eb.style.background = colors[ev.type] || '#f8f9fa';
+  eb.innerHTML = `
+    <div style="font-size:2rem;text-align:center;margin-bottom:0.5rem;">${icons[ev.type] || '🎯'}</div>
+    <div style="text-align:center;font-weight:800;font-size:1.1rem;margin-bottom:0.5rem;">${ev.title}</div>
+    <div style="text-align:center;color:#555;font-size:0.9rem;">${ev.desc}</div>
+  `;
+
+  bnext.style.display = 'block';
+  bnext.textContent = '➡️ 下一組';
+  bnext.onclick = () => nextTurn();
+
+  // Apply effect immediately
+  if (!ev.applied) {
+    applyEventEffect(ev);
+    updateState({ event: { ...ev, applied: true } });
+  }
+}
+
+function renderQuestionPanel() {
+  const gs = gameState;
+  const q = gs.question;
+  const eb = document.getElementById('event-box');
+  if (!q) {
+    eb.innerHTML = `<div class="loading-q"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span style="margin-left:0.5rem;">AI 出題中...</span></div>`;
+    return;
+  }
+  eb.style.background = '#f8f9fa';
+  const sa = gs.selectedAnswer;
+  eb.innerHTML = `
+    <div class="question-text">${q.question}</div>
+    <button class="option-btn ${sa==='A'?'selected':''}" onclick="selectAnswer('A')">A. ${q.optionA}</button>
+    <button class="option-btn ${sa==='B'?'selected':''}" onclick="selectAnswer('B')">B. ${q.optionB}</button>
+  `;
+}
+
+function renderRevealPanel() {
+  const gs = gameState;
+  const q = gs.question;
+  const sa = gs.selectedAnswer;
+  const eb = document.getElementById('event-box');
+  const exb = document.getElementById('explain-box');
+
+  if (!q) return;
+  const correct = sa === q.answer;
+  eb.style.background = correct ? '#e8f5e9' : '#ffebee';
+  eb.innerHTML = `
+    <div class="question-text">${q.question}</div>
+    <button class="option-btn ${sa==='A'?(correct&&sa==='A'?'correct':'wrong'):''} ${q.answer==='A'&&sa!=='A'?'correct':''}" disabled>
+      A. ${q.optionA} ${q.answer==='A'?'✅':''}
+    </button>
+    <button class="option-btn ${sa==='B'?(correct&&sa==='B'?'correct':'wrong'):''} ${q.answer==='B'&&sa!=='B'?'correct':''}" disabled>
+      B. ${q.optionB} ${q.answer==='B'?'✅':''}
+    </button>
+    <div style="text-align:center;font-weight:800;margin-top:0.5rem;color:${correct?'#2e7d32':'#c62828'}">
+      ${correct ? '🎉 答對了！+' + (gs.event?.specialQ ? 4 : 2) + '分' : '❌ 答錯了！'}
+    </div>
+  `;
+  exb.style.display = 'block';
+  exb.textContent = '💡 ' + (q.explanation || '');
+}
+
+function renderStudent() {
+  const gs = gameState;
+  const myTeam = TEAMS[myTeamId - 1];
+  if (myTeam) {
+    document.getElementById('s-my-icon').textContent = myTeam.icon;
+    document.getElementById('s-my-name').textContent = myTeam.name;
+  }
+
+  // Score chips
+  const sr = document.getElementById('student-scores-row');
+  sr.innerHTML = '';
+  Object.values(gs.teams).forEach(team => {
+    const t = TEAMS[team.id - 1];
+    const chip = document.createElement('div');
+    chip.className = 'student-score-chip' + (team.id === myTeamId ? ' my-team' : '');
+    chip.innerHTML = `${t.icon} ${team.score}分`;
+    sr.appendChild(chip);
+  });
+
+  // Action area
+  const sa = document.getElementById('student-action');
+  const currentTeam = gs.teams[gs.currentTurn];
+  const isMyTurn = gs.currentTurn === myTeamId;
+  const currentT = TEAMS[gs.currentTurn - 1];
+
+  sa.innerHTML = '';
+
+  if (gs.phase === 'waiting_roll' && isMyTurn) {
+    if (currentTeam?.skipTurn) {
+      sa.innerHTML = `<div style="font-size:1.2rem;font-weight:700;color:#e53935;">⏸ 這回合停止行動！</div>`;
+    } else {
+      const hasExtra = currentTeam?.extraDice;
+      sa.innerHTML = `
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:1rem;color:#555;">
+          輪到你們了！${hasExtra ? '🎲🎲 兩顆骰子' : ''}
+        </div>
+        <button class="btn-roll" onclick="rollDice()">🎲 擲骰！</button>
+      `;
+    }
+  } else if (gs.phase === 'waiting_roll') {
+    sa.innerHTML = `<div class="waiting-msg"><div class="pulse-dot"></div><span>${currentT?.icon || ''} ${currentT?.name || ''}的回合，請等待...</span></div>`;
+  } else if (gs.phase === 'rolled' || gs.phase === 'event') {
+    const dice = gs.diceResult;
+    if (dice) {
+      const diceFaces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+      sa.innerHTML = `
+        <div style="margin-bottom:0.5rem;color:#555;font-weight:700;">${isMyTurn?'你們':'${currentT?.icon}'} 擲出了：</div>
+        <div class="dice-result">
+          <div class="dice-face">${diceFaces[(dice.d1||1)-1]}</div>
+          ${dice.d2 ? `<div class="dice-face">${diceFaces[(dice.d2||1)-1]}</div>` : ''}
+        </div>
+        <div class="dice-total">共 ${dice.total} 步</div>
+      `;
+    }
+  } else if (gs.phase === 'answering') {
+    const q = gs.question;
+    if (!q) {
+      sa.innerHTML = `<div class="loading-q"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span style="margin-left:0.5rem;">AI 出題中...</span></div>`;
+    } else {
+      sa.innerHTML = `
+        <div style="font-weight:700;font-size:1rem;margin-bottom:1rem;color:#333;">${q.question}</div>
+        <div style="display:flex;gap:1rem;justify-content:center;">
+          <div style="padding:1rem 2rem;background:#e3f2fd;border-radius:14px;font-weight:800;font-size:1.2rem;">A. ${q.optionA}</div>
+          <div style="padding:1rem 2rem;background:#fce4ec;border-radius:14px;font-weight:800;font-size:1.2rem;">B. ${q.optionB}</div>
+        </div>
+        <div style="margin-top:1rem;color:#999;font-size:0.9rem;">老師選擇答案中...</div>
+      `;
+    }
+  } else if (gs.phase === 'revealing') {
+    const q = gs.question;
+    const sa2 = gs.selectedAnswer;
+    const correct = sa2 === q?.answer;
+    sa.innerHTML = `
+      <div style="font-size:2rem;margin-bottom:0.5rem;">${correct ? '🎉' : '😢'}</div>
+      <div style="font-weight:800;font-size:1.3rem;color:${correct?'#2e7d32':'#c62828'}">
+        ${correct ? '答對了！' : '答錯了...'}
+      </div>
+      <div style="color:#555;margin-top:0.5rem;font-size:0.9rem;">💡 ${q?.explanation || ''}</div>
+    `;
+  } else {
+    sa.innerHTML = `<div class="waiting-msg"><div class="pulse-dot"></div><span>等待繼續...</span></div>`;
+  }
+}
+
+// ===== DICE =====
+function rollDice() {
+  const team = gameState.teams[myTeamId];
+  if (!team) return;
+
+  const d1 = Math.ceil(Math.random() * 6);
+  let d2 = null;
+  if (team.extraDice) d2 = Math.ceil(Math.random() * 6);
+  const total = d1 + (d2 || 0);
+
+  updateState({
+    phase: 'rolled',
+    diceResult: { d1, d2, total }
+  });
+  showToast(`🎲 ${TEAMS[myTeamId-1]?.icon} 擲出 ${total} 步！`);
+}
+
+// ===== MOVE PIECE =====
+function movePiece() {
+  const gs = gameState;
+  const team = gs.teams[gs.currentTurn];
+  const steps = gs.diceResult?.total || 1;
+  const newPos = (team.position + steps) % TOTAL_CELLS;
+  const cellType = CELL_TYPES[newPos];
+
+  updateTeam(gs.currentTurn, { position: newPos });
+
+  setTimeout(() => triggerCellEvent(cellType, newPos), 600);
+}
+
+// ===== CELL EVENTS =====
+function triggerCellEvent(cellType, pos) {
+  const gs = gameState;
+  const teamId = gs.currentTurn;
+
+  if (cellType === 'q') {
+    updateState({ phase: 'answering', event: null });
+    fetchQuestion(false);
+  } else if (cellType === 'special') {
+    updateState({ phase: 'answering', event: { specialQ: true } });
+    fetchQuestion(true);
+  } else if (cellType === 'lucky') {
+    triggerLucky(teamId);
+  } else if (cellType === 'bad') {
+    triggerBad(teamId);
+  } else if (cellType === 'start') {
+    showToast('🏁 經過起點！+1分');
+    updateTeam(teamId, { score: (gs.teams[teamId].score || 0) + 1 });
+    updateState({ phase: 'done', event: null });
+  } else {
+    updateState({ phase: 'done', event: null });
+  }
+}
+
+const LUCKY_EVENTS = [
+  { title: '幸運之星！', desc: '+3 分！', effect: (tid, gs) => updateTeam(tid, { score: (gs.teams[tid].score||0)+3 }) },
+  { title: '順風！', desc: '前進 2 格！', effect: (tid, gs) => {
+    const newPos = (gs.teams[tid].position + 2) % TOTAL_CELLS;
+    updateTeam(tid, { position: newPos });
+  }},
+  { title: '全組加分！', desc: '所有組各得 1 分！', effect: (tid, gs) => {
+    const patch = {};
+    Object.values(gs.teams).forEach(t => {
+      patch[t.id] = { ...gs.teams[t.id], score: (gs.teams[t.id].score||0)+1 };
+    });
+    updateState({ teams: patch });
+  }},
+  { title: '🎲 獲得第二顆骰子！', desc: '之後每回合可以擲兩顆骰子！', effect: (tid) => updateTeam(tid, { extraDice: true }) },
+  { title: '神秘禮物！', desc: '+2 分！', effect: (tid, gs) => updateTeam(tid, { score: (gs.teams[tid].score||0)+2 }) },
+];
+
+const BAD_EVENTS = [
+  { title: '倒楣！', desc: '-1 分', effect: (tid, gs) => updateTeam(tid, { score: Math.max(0, (gs.teams[tid].score||0)-1) }) },
+  { title: '滑倒！', desc: '退後 2 格', effect: (tid, gs) => {
+    const newPos = ((gs.teams[tid].position - 2) + TOTAL_CELLS) % TOTAL_CELLS;
+    updateTeam(tid, { position: newPos });
+  }},
+  { title: '⏸ 停一回合！', desc: '下回合跳過', effect: (tid) => updateTeam(tid, { skipTurn: true }) },
+];
+
+function triggerLucky(teamId) {
+  const ev = LUCKY_EVENTS[Math.floor(Math.random() * LUCKY_EVENTS.length)];
+  const gs = gameState;
+  ev.effect(teamId, gs);
+  updateState({ phase: 'event', event: { type: 'lucky', title: ev.title, desc: ev.desc, applied: true } });
+  showScorePopup(ev.title.includes('骰') ? '🎲' : '+', 'var(--grass-dark)');
+  showToast(`🍀 ${ev.title}`);
+}
+
+function triggerBad(teamId) {
+  const ev = BAD_EVENTS[Math.floor(Math.random() * BAD_EVENTS.length)];
+  const gs = gameState;
+  ev.effect(teamId, gs);
+  updateState({ phase: 'event', event: { type: 'bad', title: ev.title, desc: ev.desc, applied: true } });
+  showScorePopup('-1', 'var(--red-dark)');
+  showToast(`💀 ${ev.title}`);
+}
+
+function applyEventEffect(ev) {
+  // Already applied above
+}
+
+// ===== FETCH QUESTION =====
+async function fetchQuestion(isSpecial) {
+  const subjects = ['生活常識、自然科學', '國語（成語、字義、造句）'];
+  const subject = subjects[Math.floor(Math.random() * subjects.length)];
+  const difficulty = isSpecial ? '中難度，適合國小高年級' : '簡單到中等，適合國小混齡學生';
+
+  const prompt = `你是一位小學老師，請出一題${subject}的選擇題。
+要求：
+- 難度：${difficulty}
+- 格式：AB兩個選項
+- 必須附上解釋說明（1~2句話）
+- 請用JSON格式回答，不要有其他文字：
+{
+  "question": "題目",
+  "optionA": "A選項",
+  "optionB": "B選項",
+  "answer": "A或B",
+  "explanation": "解釋說明"
+}`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const q = JSON.parse(clean);
+    currentQuestion = q;
+    updateState({ question: q, phase: isSpecial ? 'answering' : 'answering' });
+  } catch(e) {
+    // Fallback question
+    const fallback = {
+      question: '「一石二鳥」這個成語的意思是？',
+      optionA: '做一件事同時達成兩個目的',
+      optionB: '用石頭打兩隻鳥',
+      answer: 'A',
+      explanation: '一石二鳥比喻做一件事情，同時達到兩個目的，是常用的成語。'
+    };
+    updateState({ question: fallback, phase: 'answering' });
+  }
+}
+
+// ===== ANSWER =====
+function selectAnswer(ans) {
+  selectedAnswer = ans;
+  updateState({ selectedAnswer: ans });
+  // Re-render to show selected
+  renderEventPanel();
+}
+
+function publishAnswer() {
+  const gs = gameState;
+  if (!gs.selectedAnswer) { showToast('請先選擇答案！'); return; }
+  const q = gs.question;
+  const correct = gs.selectedAnswer === q.answer;
+  const bonus = gs.event?.specialQ ? 4 : 2;
+
+  if (correct) {
+    const team = gs.teams[gs.currentTurn];
+    updateTeam(gs.currentTurn, { score: (team.score||0) + bonus });
+    showScorePopup('+' + bonus, 'var(--grass-dark)');
+  }
+
+  updateState({ phase: 'revealing' });
+  showToast(correct ? `🎉 答對！+${bonus}分` : '❌ 答錯！');
+}
+
+// ===== NEXT TURN =====
+function nextTurn() {
+  const gs = gameState;
+  const tc = parseInt(gs.teamCount) || teamCount;
+  let next = (gs.currentTurn % tc) + 1;
+
+  // Check if next team needs to skip
+  const nextTeam = gs.teams[next];
+  if (nextTeam?.skipTurn) {
+    updateTeam(next, { skipTurn: false });
+    showToast(`⏸ ${TEAMS[next-1]?.icon} 停一回合，跳過！`);
+    next = (next % tc) + 1;
+  }
+
+  updateState({
+    currentTurn: next,
+    phase: 'waiting_roll',
+    diceResult: null,
+    event: null,
+    question: null,
+    selectedAnswer: null,
+  });
+}
+
+// ===== RESULT =====
+function showResult() {
+  const gs = gameState;
+  const rs = document.getElementById('result-screen');
+  rs.style.display = 'flex';
+
+  const sorted = Object.values(gs.teams).sort((a,b) => b.score - a.score);
+  const rl = document.getElementById('result-list');
+  rl.innerHTML = '';
+  const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+
+  sorted.forEach((team, i) => {
+    const t = TEAMS[team.id - 1];
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    item.style.animationDelay = (i * 0.15) + 's';
+    item.innerHTML = `
+      <span class="result-rank">${medals[i]}</span>
+      <span class="result-icon">${t.icon}</span>
+      <span class="result-name">${t.name}</span>
+      <span class="result-score">${team.score}分</span>
+    `;
+    rl.appendChild(item);
+  });
+
+  spawnConfetti();
+}
+
+function spawnConfetti() {
+  const wrap = document.getElementById('confetti-wrap');
+  const colors = ['#FFD700','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD'];
+  for (let i = 0; i < 60; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDuration = (2 + Math.random() * 3) + 's';
+    p.style.animationDelay = Math.random() * 2 + 's';
+    p.style.width = p.style.height = (6 + Math.random() * 10) + 'px';
+    wrap.appendChild(p);
+  }
+}
+
+// ===== UI HELPERS =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function showScorePopup(text, color) {
+  const p = document.createElement('div');
+  p.className = 'score-popup';
+  p.textContent = text;
+  p.style.color = color;
+  p.style.left = (30 + Math.random() * 40) + 'vw';
+  p.style.top = '40vh';
+  document.body.appendChild(p);
+  setTimeout(() => p.remove(), 1500);
+}
+</script>
+</body>
+</html>

@@ -492,6 +492,17 @@ body::before {
     <button class="kr-btn kr-btn-start" style="font-size:1.2rem;padding:18px 60px" onclick="tcStartGame()">▶ 全班開始！</button>
   </div>
 
+  <!-- W8 大富翁（直接開始，無需選關） -->
+  <div id="ls-W8" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:28px 20px">
+    <div style="font-size:5rem;animation:heroBounce 2s ease-in-out infinite">🚀</div>
+    <div style="text-align:center">
+      <div style="font-family:'Noto Sans TC',sans-serif;font-weight:900;font-size:1.8rem;color:#f5c800;text-shadow:0 0 20px rgba(245,200,0,.4);margin-bottom:8px">星際大富翁</div>
+      <div style="font-family:'Noto Sans TC',sans-serif;font-weight:700;font-size:.9rem;color:rgba(255,255,255,.5)">各組輪流擲骰・答題冒險・累積分數</div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" id="ls-w8-groups"></div>
+    <button class="kr-btn kr-btn-start" style="font-size:1.2rem;padding:18px 60px" onclick="tcStartGame()">▶ 全班出發！</button>
+  </div>
+
   <!-- W4 選關（W4 遊戲同款風格：模式卡片 → 關卡網格） -->
   <div id="ls-w4" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px;background:radial-gradient(ellipse at center,rgba(0,20,40,0.6),transparent 70%);position:relative;overflow:hidden">
 
@@ -1048,12 +1059,15 @@ function openTeacherConsole() {
     const isW4 = window.state.selectedGame === 3;
     const isW6 = window.state.selectedGame === 5;
     const isW7 = window.state.selectedGame === 6;
-    document.getElementById('ls-w1').style.display = (!isW2 && !isW4 && !isW6 && !isW7) ? 'flex' : 'none';
+    const isW8 = window.state.selectedGame === 7;
+    document.getElementById('ls-w1').style.display = (!isW2 && !isW4 && !isW6 && !isW7 && !isW8) ? 'flex' : 'none';
     document.getElementById('ls-w2').style.display = isW2 ? 'flex' : 'none';
     document.getElementById('ls-w4').style.display = isW4 ? 'flex' : 'none';
     document.getElementById('ls-w6').style.display = isW6 ? 'flex' : 'none';
     const lsW7El = document.getElementById('ls-W7');
     if (lsW7El) lsW7El.style.display = isW7 ? 'flex' : 'none';
+    const lsW8El = document.getElementById('ls-W8');
+    if (lsW8El) lsW8El.style.display = isW8 ? 'flex' : 'none';
     if (isW2) { lsW2SelectedLevel = 0; TC.level = 1; lsW2Render(); }
     if (isW4) { lsW4Render(); }
     if (isW6) { TC.level = 1; w6UpdateLevelDisplay(); w6RenderGroupCards(); }
@@ -1381,6 +1395,29 @@ window.addEventListener('message', (e3) => {
 
     if (window.state.perspective === 'teacher') {
         showToast(`✔ ${group} Part${part||TC.level} 完成！+${pts}分（累計 ${newCum}分）`);
+    }
+});
+
+// ── W8_STATE 轉發：老師端 tc-w8-iframe 廣播給學生 sg-iframe ──
+window.addEventListener('message', (e8) => {
+    if (!e8.data || e8.data.type !== 'W8_STATE') return;
+    if (window.state.perspective !== 'teacher') return;
+    // 老師控制台收到 W8 狀態更新，廣播給所有學生（透過 sg-iframe）
+    const sgIframe = document.getElementById('sg-iframe');
+    if (sgIframe && sgIframe.contentWindow) {
+        try { sgIframe.contentWindow.postMessage({ type: 'W8_STATE', state: e8.data.state }, '*'); } catch(e) {}
+    }
+    // 同步儲存到 rooms（供結算用分數）
+    if (e8.data.state && e8.data.state.teams) {
+        const rooms8 = window.getRooms();
+        if (rooms8[window.state.roomCode]) {
+            if (!rooms8[window.state.roomCode].scores) rooms8[window.state.roomCode].scores = {};
+            Object.values(e8.data.state.teams).forEach(t => {
+                const teamName = `第${t.id}組`;
+                rooms8[window.state.roomCode].scores[teamName] = t.score || 0;
+            });
+            window.saveRooms(rooms8);
+        }
     }
 });
 
@@ -1742,6 +1779,29 @@ function tcStartGame() {
               </div>`;
             w7RenderTCCards();
         }
+    } else if (window.state.selectedGame === 7) {
+        // W8：老師控制台 — 顯示各組分數和當前事件
+        const levelBadge    = document.getElementById('tc-level-badge');
+        const nextContainer = document.getElementById('tc-next-level-container');
+        if (levelBadge)   { levelBadge.style.display = '\; levelBadge.textContent = '🚀 大富翁'; }
+        if (nextContainer) nextContainer.style.display = 'none';
+        const sa = document.getElementById('tc-scores-area');
+        if (sa) {
+            sa.style.padding = '0';
+            sa.innerHTML = `<iframe id="tc-w8-iframe" src="W8_星際大富翁.html?role=teacher&room=${window.state.roomCode}&teams=${window.state.players.length}" style="flex:1;width:100%;height:100%;border:none;border-radius:0"></iframe>`;
+            const w8iframe = document.getElementById('tc-w8-iframe');
+            if (w8iframe) {
+                w8iframe.onload = () => setTimeout(() => {
+                    try {
+                        w8iframe.contentWindow.postMessage({
+                            type: 'PLATFORM_START', role: 'teacher',
+                            roomCode: window.state.roomCode,
+                            teamCount: window.state.players.length
+                        }, '*');
+                    } catch(e) {}
+                }, 400);
+            }
+        }
     } else if (window.state.selectedGame === 3) {
         // W4：老師控制台顯示即時分數排行，並顯示當前 mode/level badge
         const badge = document.getElementById('tc-level-badge');
@@ -1883,6 +1943,7 @@ function tcLaunchStudentIfNeeded() {
     const isW4 = selectedGame === 3;
     const isW6 = selectedGame === 5;
     const isW7 = selectedGame === 6;
+    const isW8 = selectedGame === 7;
 
     // 記錄目前載入的關卡狀態，防止輪詢重複觸發 iframe 重新載入
     pData.gameLevel = level;
@@ -1941,6 +2002,8 @@ function tcLaunchStudentIfNeeded() {
                 window.goTo('screen-student-game');
                 return; // 提早結束，不設 iframe.src
             }
+        } else if (isW8) {
+            url = gameFile + '?role=student&room=' + window.state.roomCode + '&team=' + encodeURIComponent(myGroup) + '&teams=' + (r.players ? r.players.length : 4);
         } else {
             url = gameFile + '?autostart=' + level + '&group=' + encodeURIComponent(myGroup);
         }
@@ -1958,6 +2021,13 @@ function tcLaunchStudentIfNeeded() {
                 if (isW7) {
                     iframe.contentWindow.postMessage({
                         type: 'PLATFORM_START', level, group: myGroup
+                    }, '*');
+                } else if (isW8) {
+                    iframe.contentWindow.postMessage({
+                        type: 'PLATFORM_START', role: 'student',
+                        roomCode: window.state.roomCode,
+                        teamId: myGroup,
+                        teamCount: r2.players ? r2.players.length : 4
                     }, '*');
                 } else {
                     iframe.contentWindow.postMessage({
@@ -2600,7 +2670,7 @@ const GAMES = [
   {id:5, name:'你畫我猜',   icon:'🎨', desc:'繪畫聯想猜謎',     available: true},
   {id:6, name:'雙人圈圈',   icon:'⭕', desc:'同步推入圈圈',     available: true},
   {id:7, name:'記憶大考驗', icon:'🧠', desc:'翻牌遊行解碼',     available: true},
-  {id:8, name:'星際大富翁', icon:'🚀', desc:'擲骰冒險奪寶',     available: false}
+  {id:8, name:'星際大富翁', icon:'🚀', desc:'擲骰冒險奪寶',     available: true}
   
 ];
 
