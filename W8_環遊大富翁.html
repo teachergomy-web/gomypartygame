@@ -154,32 +154,59 @@ body {
 @keyframes db { 0%, 100% { transform: translateY(0); box-shadow: 0 0 0 rgba(0,229,255,0); } 50% { transform: translateY(-6px); box-shadow: 0 0 10px rgba(0,229,255,0.8); } }
 
 /* ══════════════════════════════
-   STUDENT VIEW
+   STUDENT VIEW - 全螢幕地圖模式
    ══════════════════════════════ */
-#student-view { display: none; flex-direction: column; min-height: 100vh; padding: 10px; gap: 10px; position: relative; z-index: 10; }
+#student-view { 
+  display: none; flex-direction: column; 
+  width: 100vw; height: 100vh; 
+  position: fixed; inset: 0;
+  z-index: 10; overflow: hidden;
+}
 .s-header {
-  background: rgba(20, 20, 25, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
-  padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; backdrop-filter: blur(10px);
+  position: absolute; top: 0; left: 0; right: 0; z-index: 300;
+  background: rgba(5,5,8,0.85); border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; 
+  backdrop-filter: blur(12px); height: 52px; flex-shrink: 0;
 }
-.s-title { font-size: 1.1rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px var(--blue); }
+.s-title { font-size: 1rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px var(--blue); }
 .my-badge {
-  background: rgba(255, 214, 0, 0.2); color: var(--yellow); font-weight: 900; font-size: 0.85rem;
-  padding: 5px 14px; border-radius: 50px; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255, 214, 0, 0.5);
+  background: rgba(255, 214, 0, 0.2); color: var(--yellow); font-weight: 900; font-size: 0.82rem;
+  padding: 4px 12px; border-radius: 50px; display: flex; align-items: center; gap: 5px; border: 1px solid rgba(255, 214, 0, 0.5);
 }
-.s-scores { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.s-scores { 
+  position: absolute; top: 52px; left: 0; right: 0; z-index: 290;
+  display: flex; gap: 5px; flex-wrap: nowrap; justify-content: center; padding: 6px 10px;
+  background: rgba(5,5,8,0.6); backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.06); overflow-x: auto;
+}
 .score-chip {
-  display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 50px;
-  font-weight: 900; font-size: 0.85rem; color: rgba(255,255,255,0.7);
+  display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 50px;
+  font-weight: 900; font-size: 0.78rem; color: rgba(255,255,255,0.7); white-space: nowrap; flex-shrink: 0;
 }
-.score-chip.mine { background: rgba(0, 229, 255, 0.15); border-color: var(--blue); color: var(--blue); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
-.s-board-wrap {
-  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
+.score-chip.mine { background: rgba(0, 229, 255, 0.15); border-color: var(--blue); color: var(--blue); box-shadow: 0 0 8px rgba(0,229,255,0.2); }
+
+/* 地圖容器：全螢幕可拖動 */
+.s-map {
+  position: absolute; inset: 0;
+  overflow: hidden; cursor: grab; touch-action: none;
 }
+.s-map:active { cursor: grabbing; }
+.s-map-inner {
+  position: absolute; 
+  /* 會被JS動態設定transform來拖動 */
+}
+.s-map .iso-scene {
+  width: 100%; height: 100%; perspective: 2000px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* 底部固定Action區 */
 .s-action {
-  background: rgba(20, 20, 25, 0.8); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px; padding: 20px; text-align: center; backdrop-filter: blur(10px);
-  min-height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200;
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 300;
+  background: rgba(10,10,15,0.92); border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 14px 20px; text-align: center; backdrop-filter: blur(12px);
+  min-height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .wait-msg { color: rgba(255,255,255,0.6); font-size: 0.95rem; display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .pulse { width: 10px; height: 10px; background: var(--blue); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; box-shadow: 0 0 8px var(--blue); }
@@ -492,8 +519,11 @@ body {
     <div class="my-badge" id="my-badge">🐻 第1組</div>
   </div>
   <div class="s-scores" id="s-scores"></div>
-  <div class="s-board-wrap">
-    <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
+  <!-- 全螢幕可拖動地圖 -->
+  <div class="s-map" id="s-map">
+    <div class="s-map-inner" id="s-map-inner">
+      <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
+    </div>
   </div>
   <div class="s-action" id="s-action">
     <div class="wait-msg"><div class="pulse"></div><span>等待遊戲狀態同步...</span></div>
@@ -672,6 +702,7 @@ window.addEventListener('message', e => {
         document.getElementById('teacher-view').style.display = 'none';
         document.getElementById('student-view').style.display = 'flex';
         render();
+        centerOnMyPiece();
       }
     }
   }
@@ -713,6 +744,7 @@ window.addEventListener('load', () => {
         document.getElementById('student-view').style.display = 'flex';
         document.getElementById('s-action').innerHTML =
           `<div class="wait-msg"><div class="pulse"></div><span>等待遊戲開始...</span></div>`;
+        initStudentMap();
         resizeBoard();
         attachSync();
         _launched = true;
@@ -737,6 +769,7 @@ function launch() {
     } else {
       document.getElementById('teacher-view').style.display = 'none';
       document.getElementById('student-view').style.display = 'flex';
+      initStudentMap();
       // 嘗試讀取快取state
       try {
         const cached = localStorage.getItem('W8_STATE');
@@ -1053,6 +1086,101 @@ function resizeBoard() {
 }
 window.addEventListener('resize', resizeBoard);
 
+// ══════════════════════════════
+// 學生端地圖拖動 + 棋子置中
+// ══════════════════════════════
+let _mapX = 0, _mapY = 0;
+let _drag = false, _dragStartX = 0, _dragStartY = 0, _dragBaseX = 0, _dragBaseY = 0;
+
+function initStudentMap() {
+  const map = document.getElementById('s-map');
+  if (!map) return;
+
+  // 學生端棋盤：放大讓每格約佔螢幕 1/4 寬（約看到4-5格）
+  // 棋盤原始720px，等距後視覺寬~1018px，我們要讓每格約vh*0.22
+  const targetCellPx = Math.max(window.innerWidth, window.innerHeight) * 0.22;
+  const sScale = targetCellPx / C; // C=120px（角落格大小）
+  const sboard = document.getElementById('s-board');
+  if (sboard) sboard.style.transform = `scale(${sScale}) rotateX(55deg) rotateZ(-45deg)`;
+
+  // 拖動：mouse
+  map.addEventListener('mousedown', e => {
+    _drag = true; _dragStartX = e.clientX; _dragStartY = e.clientY;
+    _dragBaseX = _mapX; _dragBaseY = _mapY;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!_drag) return;
+    _mapX = _dragBaseX + (e.clientX - _dragStartX);
+    _mapY = _dragBaseY + (e.clientY - _dragStartY);
+    applyMapTransform();
+  });
+  window.addEventListener('mouseup', () => { _drag = false; });
+
+  // 拖動：touch
+  map.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    _drag = true;
+    _dragStartX = e.touches[0].clientX; _dragStartY = e.touches[0].clientY;
+    _dragBaseX = _mapX; _dragBaseY = _mapY;
+  }, { passive: true });
+  map.addEventListener('touchmove', e => {
+    if (!_drag || e.touches.length !== 1) return;
+    e.preventDefault();
+    _mapX = _dragBaseX + (e.touches[0].clientX - _dragStartX);
+    _mapY = _dragBaseY + (e.touches[0].clientY - _dragStartY);
+    applyMapTransform();
+  }, { passive: false });
+  map.addEventListener('touchend', () => { _drag = false; });
+}
+
+function applyMapTransform() {
+  const inner = document.getElementById('s-map-inner');
+  if (inner) inner.style.transform = `translate(${_mapX}px, ${_mapY}px)`;
+}
+
+function centerOnMyPiece() {
+  if (!gameState || !boardPos.length) return;
+  const myTeam = gameState.teams?.[myTeamId] || gameState.teams?.[String(myTeamId)];
+  if (!myTeam) return;
+  const pos = myTeam.position % TOTAL;
+  const bp = boardPos[pos];
+  if (!bp) return;
+
+  // 棋子在棋盤上的原始坐標中心
+  const cellW = (bp.type === 'top' || bp.type === 'bottom') ? M : C;
+  const cellH = (bp.type === 'left' || bp.type === 'right') ? M : C;
+  const pieceLocalX = bp.x + cellW / 2;
+  const pieceLocalY = bp.y + cellH / 2;
+
+  // 棋盤原點在map-inner中心（iso-scene flex center）
+  // 等距旋轉後棋子在畫面上的偏移：rotateZ(-45deg) + rotateX(55deg)
+  const sboard = document.getElementById('s-board');
+  if (!sboard) return;
+  const scaleMatch = sboard.style.transform.match(/scale\(([^)]+)\)/);
+  const sScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+
+  // 棋盤中心相對局部坐標 = (BOARD_SIZE/2, BOARD_SIZE/2)
+  const relX = (pieceLocalX - BOARD_SIZE / 2) * sScale;
+  const relY = (pieceLocalY - BOARD_SIZE / 2) * sScale;
+
+  // 等距旋轉後的畫面位移（rotateZ(-45deg)後X方向）
+  const angle = -45 * Math.PI / 180;
+  const cos45 = Math.cos(angle), sin45 = Math.sin(angle);
+  const screenX = relX * cos45 - relY * sin45;
+  const screenY = (relX * sin45 + relY * cos45) * Math.sin(55 * Math.PI / 180);
+
+  // 目標：讓棋子在可視區中央（扣掉header≈86px和action≈110px）
+  const mapEl = document.getElementById('s-map');
+  if (!mapEl) return;
+  const rect = mapEl.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = (rect.height + 86 - 110) / 2; // 稍微偏上讓action區不擋
+
+  _mapX = cx - screenX;
+  _mapY = cy - screenY;
+  applyMapTransform();
+}
+
 function toggleSidebar() {
   const sb = document.getElementById('t-sidebar');
   const icon = document.getElementById('toggle-icon');
@@ -1075,15 +1203,16 @@ function renderStudent() {
     const t = TEAMS.find(x => x.id === team.id);
     if(!t) return;
     const chip = document.createElement('div');
-    chip.className = 'score-chip' + (team.id === myTeamId ? ' mine' : '');
+    chip.className = 'score-chip' + (team.id == myTeamId ? ' mine' : '');
     chip.innerHTML = `${t.icon} ${team.score}分`;
     sr.appendChild(chip);
   });
   
   const sa = document.getElementById('s-action');
-  const isMyTurn = gs.currentTurn === myTeamId;
-  const ct = TEAMS.find(t => t.id === gs.currentTurn);
-  const myTD = gs.teams[myTeamId];
+  // 強制數字比較，避免字串/數字型態不符
+  const isMyTurn = Number(gs.currentTurn) === Number(myTeamId);
+  const ct = TEAMS.find(t => t.id == gs.currentTurn);
+  const myTD = gs.teams[myTeamId] || gs.teams[String(myTeamId)];
   sa.innerHTML = '';
 
   if (gs.phase === 'waiting_roll' && isMyTurn) {
@@ -1122,6 +1251,8 @@ function renderStudent() {
   } else {
     sa.innerHTML = `<div class="wait-msg"><div class="pulse"></div><span>等待繼續...</span></div>`;
   }
+  // 更新地圖：讓棋子置中
+  centerOnMyPiece();
 }
 
 function rollDice() {
