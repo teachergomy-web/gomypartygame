@@ -707,11 +707,24 @@ function launch() {
     boardPos = getBoardLayout();
     buildBoard();
     if (myRole === 'teacher') {
+      document.getElementById('teacher-view').style.display = 'block';
       gameState = makeInit();
       render(); broadcast();
+    } else {
+      // 學生端：顯示棋盤，等待老師的state廣播
+      document.getElementById('student-view').style.display = 'flex';
+      // 如果已有state(例如透過localStorage快取)直接渲染
+      try {
+        const cached = localStorage.getItem('W8_STATE');
+        if (cached) { gameState = JSON.parse(cached); render(); }
+      } catch(e) {}
+      if (!gameState) {
+        document.getElementById('s-action').innerHTML =
+          `<div class="wait-msg"><div class="pulse"></div><span>等待老師開始遊戲...</span></div>`;
+      }
     }
     resizeBoard();
-    attachSync(); // 啟動自動同步引擎
+    attachSync();
   }, 500);
 }
 
@@ -821,6 +834,7 @@ function render() {
   const isT = myRole === 'teacher';
   document.getElementById('teacher-view').style.display = isT ? 'block' : 'none';
   document.getElementById('student-view').style.display = isT ? 'none' : 'flex';
+  if (!gameState) return;
   renderPieces();
   if (isT) renderTeacher(); else renderStudent();
 }
@@ -1016,12 +1030,7 @@ function toggleSidebar() {
   const icon = document.getElementById('toggle-icon');
   sb.classList.toggle('collapsed');
   icon.style.transform = sb.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(90deg)';
-  setTimeout(resizeBoard, 400); // sidebar動畫結束後重算
-}
-  const sb = document.getElementById('t-sidebar');
-  const icon = document.getElementById('toggle-icon');
-  sb.classList.toggle('collapsed');
-  icon.style.transform = sb.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(90deg)';
+  setTimeout(resizeBoard, 400);
 }
 
 function renderStudent() {
