@@ -190,16 +190,29 @@ body {
   overflow: hidden; cursor: grab; touch-action: none; background: transparent;
 }
 .s-map:active { cursor: grabbing; }
+/* s-map-inner 就是拖動錨點，位置由JS控制 */
 .s-map-inner {
-  position: absolute; width: 0; height: 0;
-  /* transform 由JS控制拖動偏移 */
+  position: absolute;
+  left: 0; top: 0;
 }
+/* iso-scene 作為棋盤的旋轉舞台，絕對置中 */
 .s-map .iso-scene {
   position: absolute;
-  width: 1px; height: 1px;
   perspective: 2000px;
-  display: flex; align-items: center; justify-content: center;
   overflow: visible;
+  /* 由JS設定 left/top 讓棋盤幾何中心對準地圖中心 */
+}
+
+/* 全螢幕等待遮罩（覆蓋整個student-view） */
+.wait-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.72); backdrop-filter: blur(4px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+}
+.wait-overlay-icon { font-size: 3.5rem; animation: bounce 1.5s ease-in-out infinite; }
+.wait-overlay-text {
+  color: rgba(255,255,255,0.9); font-weight: 900; font-size: 1.2rem;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8); text-align: center; line-height: 1.5;
 }
 
 /* 底部固定Action區 */
@@ -208,17 +221,6 @@ body {
   background: rgba(8,8,14,0.94); border-top: 1px solid rgba(255,255,255,0.1);
   padding: 10px 20px; text-align: center; backdrop-filter: blur(14px);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-}
-
-/* 等待遮罩 */
-.wait-overlay {
-  position: absolute; inset: 0; z-index: 200;
-  background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-}
-.wait-overlay-text {
-  color: rgba(255,255,255,0.85); font-weight: 900; font-size: 1rem;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
 }
 
 /* 棋盤中心擲骰動畫 */
@@ -539,21 +541,16 @@ body {
 
 <!-- STUDENT VIEW -->
 <div id="student-view">
-  <!-- 頂部分數條（含組別標識） -->
+  <!-- 頂部分數條 -->
   <div class="s-scores" id="s-scores">
     <div class="my-badge" id="my-badge">🐻 第1組</div>
   </div>
   <!-- 全螢幕可拖動地圖 -->
   <div class="s-map" id="s-map">
     <div class="s-map-inner" id="s-map-inner">
-      <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
+      <div class="iso-scene" id="s-iso-scene"><div id="s-board" class="iso-board"></div></div>
     </div>
-    <!-- 等待遮罩（其他組回合時顯示） -->
-    <div class="wait-overlay" id="s-wait-overlay" style="display:none;">
-      <div class="pulse" style="width:16px;height:16px;"></div>
-      <div class="wait-overlay-text" id="s-wait-text">等待中...</div>
-    </div>
-    <!-- 擲骰動畫浮層 -->
+    <!-- 擲骰動畫浮層（在地圖上，不遮頂部和底部） -->
     <div class="dice-anim-overlay" id="s-dice-overlay" style="display:none;">
       <div class="dice-anim-box" id="s-dice-box"></div>
     </div>
@@ -561,6 +558,11 @@ body {
   <!-- 底部操作區 -->
   <div class="s-action" id="s-action">
     <div class="wait-msg"><div class="pulse"></div><span>等待遊戲狀態同步...</span></div>
+  </div>
+  <!-- 全螢幕等待遮罩（覆蓋整個畫面，含分數條） -->
+  <div class="wait-overlay" id="s-wait-overlay" style="display:none;">
+    <div class="wait-overlay-icon" id="s-wait-icon">⏳</div>
+    <div class="wait-overlay-text" id="s-wait-text">等待中...</div>
   </div>
 </div>
 
@@ -1129,14 +1131,26 @@ function initStudentMap() {
   const map = document.getElementById('s-map');
   if (!map) return;
 
-  // 棋盤放大：讓每格約佔畫面 28% 的寬（看到約3-4格）
-  // C=120px 是角落格，我們用可見寬的28%作為目標格子大小
+  // 棋盤寬度 = 設備寬度
+  // 等距視角後視覺寬 = BOARD_SIZE * scale * sqrt(2)
+  // 要讓視覺寬 = vw，所以 scale = vw / (BOARD_SIZE * sqrt(2))
   const vw = window.innerWidth;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const targetCellPx = Math.min(vw, vh) * 0.28;
-  const sScale = targetCellPx / C;
+  const sScale = vw / (BOARD_SIZE * Math.SQRT2);
   const sboard = document.getElementById('s-board');
   if (sboard) sboard.style.transform = `scale(${sScale}) rotateX(55deg) rotateZ(-45deg)`;
+
+  // 棋盤幾何中心 = (BOARD_SIZE/2, BOARD_SIZE/2)，乘以scale後為視覺中心偏移
+  // iso-scene 定位在 s-map-inner 的 (0,0)，s-board 的視覺中心在 scale*(BS/2, BS/2)
+  // 設定 s-iso-scene 的 left/top 讓 s-board 的幾何中心在 (0,0)
+  const scene = document.getElementById('s-iso-scene');
+  if (scene) {
+    // s-board 的幾何中心偏移（未旋轉時）= -BOARD_SIZE/2 * scale
+    const halfScaled = (BOARD_SIZE / 2) * sScale;
+    scene.style.left = (-halfScaled) + 'px';
+    scene.style.top = (-halfScaled) + 'px';
+    scene.style.width = (BOARD_SIZE * sScale) + 'px';
+    scene.style.height = (BOARD_SIZE * sScale) + 'px';
+  }
 
   // map-inner 起始置中於 s-map 中央
   const mapRect = map.getBoundingClientRect();
@@ -1144,11 +1158,9 @@ function initStudentMap() {
   _mapY = mapRect.height / 2;
   applyMapTransform();
 
-  let _mapInitDone = false;
-
   // 拖動：mouse
   map.addEventListener('mousedown', e => {
-    if (e.target.closest('.dice-anim-overlay, .wait-overlay')) return;
+    if (e.target.closest('.dice-anim-overlay')) return;
     _drag = true; _dragStartX = e.clientX; _dragStartY = e.clientY;
     _dragBaseX = _mapX; _dragBaseY = _mapY;
   });
@@ -1162,7 +1174,7 @@ function initStudentMap() {
 
   // 拖動：touch
   map.addEventListener('touchstart', e => {
-    if (e.target.closest('.dice-anim-overlay, .wait-overlay')) return;
+    if (e.target.closest('.dice-anim-overlay')) return;
     if (e.touches.length !== 1) return;
     _drag = true;
     _dragStartX = e.touches[0].clientX; _dragStartY = e.touches[0].clientY;
@@ -1178,7 +1190,20 @@ function initStudentMap() {
   map.addEventListener('touchend', () => { _drag = false; });
 
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', centerOnMyPiece);
+    window.visualViewport.addEventListener('resize', () => {
+      // 重算scale
+      const nvw = window.innerWidth;
+      const ns = nvw / (BOARD_SIZE * Math.SQRT2);
+      if (sboard) sboard.style.transform = `scale(${ns}) rotateX(55deg) rotateZ(-45deg)`;
+      if (scene) {
+        const h2 = (BOARD_SIZE / 2) * ns;
+        scene.style.left = (-h2) + 'px';
+        scene.style.top = (-h2) + 'px';
+        scene.style.width = (BOARD_SIZE * ns) + 'px';
+        scene.style.height = (BOARD_SIZE * ns) + 'px';
+      }
+      centerOnMyPiece();
+    });
   }
 }
 
@@ -1238,18 +1263,21 @@ function toggleSidebar() {
 
 function renderStudent() {
   const gs = gameState;
-  const myT = TEAMS.find(t => t.id === myTeamId);
-  if (myT) document.getElementById('my-badge').innerHTML = `${myT.icon} ${myT.name}`;
-  const sr = document.getElementById('s-scores'); 
-  // 清除舊chips但保留my-badge
-  Array.from(sr.children).forEach(c => { if (!c.classList.contains('my-badge')) c.remove(); });
-  
+  // 更新 my-badge（用id直接抓，不在scores裡面清除它）
+  const myT = TEAMS.find(t => t.id == myTeamId);
+  const badge = document.getElementById('my-badge');
+  if (myT && badge) badge.innerHTML = `${myT.icon} ${myT.name}`;
+
+  // 更新分數chips（清除舊的chip，保留badge）
+  const sr = document.getElementById('s-scores');
+  Array.from(sr.querySelectorAll('.score-chip')).forEach(c => c.remove());
+
   if (!gs || !gs.teams) {
     document.getElementById('s-action').innerHTML = `<div class="wait-msg"><div class="pulse"></div><span>等待遊戲狀態同步...</span></div>`;
     return;
   }
   Object.values(gs.teams).forEach(team => {
-    const t = TEAMS.find(x => x.id === team.id);
+    const t = TEAMS.find(x => x.id == team.id);
     if(!t) return;
     const chip = document.createElement('div');
     chip.className = 'score-chip' + (team.id == myTeamId ? ' mine' : '');
@@ -1263,21 +1291,23 @@ function renderStudent() {
   const myTD = gs.teams[myTeamId] || gs.teams[String(myTeamId)];
   sa.innerHTML = '';
 
-  // 等待遮罩：非自己回合時顯示
+  // 全螢幕等待遮罩
   const overlay = document.getElementById('s-wait-overlay');
+  const waitIcon = document.getElementById('s-wait-icon');
   const waitText = document.getElementById('s-wait-text');
+  const showOverlay = !isMyTurn && (gs.phase === 'waiting_roll' || gs.phase === 'rolled' || gs.phase === 'event');
   if (overlay) {
-    if (!isMyTurn && gs.phase === 'waiting_roll') {
-      overlay.style.display = 'flex';
-      if (waitText) waitText.textContent = `${ct?.icon || ''} ${ct?.name || ''} 的回合，等待擲骰...`;
-    } else {
-      overlay.style.display = 'none';
+    overlay.style.display = showOverlay ? 'flex' : 'none';
+    if (showOverlay && ct) {
+      if (waitIcon) waitIcon.textContent = ct.icon || '⏳';
+      if (waitText) waitText.innerHTML = `<strong>${ct.name}</strong> 的回合<br><span style="font-size:.85rem;opacity:.7">請等待...</span>`;
     }
   }
 
   if (gs.phase === 'waiting_roll' && isMyTurn) {
-    if (myTD?.skipTurn) { sa.innerHTML = `<div style="font-size:1.2rem;font-weight:900;color:var(--red)">⏸ 這回合停止行動！</div>`; }
-    else {
+    if (myTD?.skipTurn) {
+      sa.innerHTML = `<div style="font-size:1.2rem;font-weight:900;color:var(--red)">⏸ 這回合停止行動！</div>`;
+    } else {
       sa.innerHTML = `<div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-bottom:10px;font-weight:900;">輪到你們了！${myTD?.extraDice ? '<span style="color:var(--yellow)">🎲🎲 兩顆骰子</span>' : ''}</div>
         <button class="btn-roll" onclick="rollDice()">🎲 擲骰！</button>`;
     }
@@ -1287,20 +1317,21 @@ function renderStudent() {
     const d = gs.diceResult;
     if (d) {
       const f = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-      sa.innerHTML = `<div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-bottom:8px;font-weight:900;">${isMyTurn ? '你們' : ct?.icon+' 他們'}擲出了</div>
+      sa.innerHTML = `<div style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin-bottom:8px;font-weight:900;">${isMyTurn ? '你們' : (ct?.icon+' 他們')}擲出了</div>
         <div class="dice-show"><div class="dice-face">${f[(d.d1||1)-1]}</div>${d.d2?`<div class="dice-face">${f[(d.d2||1)-1]}</div>`:''}</div>
         <div class="dice-total">共 ${d.total} 步</div>`;
     }
   } else if (gs.phase === 'answering') {
     const q = gs.question;
-    if (!q) { sa.innerHTML = `<div class="ldots"><span></span><span></span><span></span><span style="margin-left:10px">AI 出題中...</span></div>`; }
-    else {
+    if (!q) {
+      sa.innerHTML = `<div class="ldots"><span></span><span></span><span></span><span style="margin-left:10px">AI 出題中...</span></div>`;
+    } else {
       sa.innerHTML = `
-      <div style="font-weight:900;font-size:1rem;color:#fff;margin-bottom:10px">${q.question}</div>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <div style="padding:8px 18px;background:rgba(0,229,255,0.15);border:2px solid rgba(0,229,255,0.4);border-radius:10px;font-weight:900;font-size:0.95rem;color:var(--blue)">A．${q.optionA}</div>
-        <div style="padding:8px 18px;background:rgba(255,23,68,0.15);border:2px solid rgba(255,23,68,0.4);border-radius:10px;font-weight:900;font-size:0.95rem;color:var(--red)">B．${q.optionB}</div>
-      </div>`;
+        <div style="font-weight:900;font-size:1rem;color:#fff;margin-bottom:10px">${q.question}</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <div style="padding:8px 18px;background:rgba(0,229,255,0.15);border:2px solid rgba(0,229,255,0.4);border-radius:10px;font-weight:900;font-size:0.95rem;color:var(--blue)">A．${q.optionA}</div>
+          <div style="padding:8px 18px;background:rgba(255,23,68,0.15);border:2px solid rgba(255,23,68,0.4);border-radius:10px;font-weight:900;font-size:0.95rem;color:var(--red)">B．${q.optionB}</div>
+        </div>`;
     }
   } else if (gs.phase === 'revealing') {
     const q = gs.question; const sa2 = gs.selectedAnswer; const correct = sa2 === q?.answer;
@@ -1377,11 +1408,36 @@ function rollDice() {
 
 function movePiece() {
   const gs = gameState;
-  const team = gs.teams[gs.currentTurn];
+  const tid = gs.currentTurn;
+  const team = gs.teams[tid];
   const steps = gs.diceResult?.total || 1;
-  const newPos = (team.position + steps) % TOTAL;
-  updateTeam(gs.currentTurn, { position: newPos });
-  setTimeout(() => triggerEvent(CTYPES[newPos], newPos), 700);
+  const startPos = team.position;
+
+  // 逐格跳動動畫
+  let step = 0;
+  function moveStep() {
+    if (step >= steps) {
+      // 全部走完，觸發事件
+      const finalPos = (startPos + steps) % TOTAL;
+      setTimeout(() => triggerEvent(CTYPES[finalPos], finalPos), 300);
+      return;
+    }
+    step++;
+    const newPos = (startPos + step) % TOTAL;
+    // 更新位置但不廣播（避免每格都廣播）
+    gameState = { ...gameState, teams: { ...gameState.teams, [tid]: { ...gameState.teams[tid], position: newPos } } };
+    renderPieces();
+    // 每格間隔：快速走格（200ms一格）
+    setTimeout(moveStep, step < steps ? 200 : 300);
+  }
+
+  // 廣播最終位置（只在最後）
+  const finalPos = (startPos + steps) % TOTAL;
+  updateTeam(tid, { position: finalPos });
+  // 但先從 startPos 開始逐格動畫（updateTeam 已更新 gameState，需要從 startPos 重建）
+  gameState = { ...gameState, teams: { ...gameState.teams, [tid]: { ...gameState.teams[tid], position: startPos } } };
+  renderPieces();
+  setTimeout(moveStep, 100);
 }
 
 function triggerEvent(type) {
