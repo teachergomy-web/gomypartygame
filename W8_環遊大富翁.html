@@ -614,26 +614,29 @@ function attachSync() {
       });
       return; 
     }
-  } catch(e) { console.log('Firebase 監聽失敗', e); }
+  } catch(e) {}
 
-  // 備用機制：每秒輪詢讀取主平台的最新狀態
+  // 備用機制：透過 localStorage 輪詢（跨 origin 安全，老師端已寫入）
   setInterval(() => {
     try {
-      if (!window.parent || !window.parent.state) return;
-      if (myRole === 'student' && window.parent.state.w8State) {
-        const stateStr = JSON.stringify(window.parent.state.w8State);
-        if (stateStr !== _lastStateStr) {
-          _lastStateStr = stateStr;
-          gameState = window.parent.state.w8State;
+      if (myRole === 'student') {
+        const raw = localStorage.getItem('W8_STATE');
+        if (raw && raw !== _lastStateStr) {
+          _lastStateStr = raw;
+          gameState = JSON.parse(raw);
           syncTeamsFromParent();
           render();
         }
       }
-      if (myRole === 'teacher' && window.parent.state.w8Action) {
-        processAction(window.parent.state.w8Action);
+      if (myRole === 'teacher') {
+        const raw = localStorage.getItem('W8_ROLL');
+        if (raw) {
+          const action = JSON.parse(raw);
+          if (action.ts && action.ts !== _lastActionTs) processAction(action);
+        }
       }
     } catch(e) {}
-  }, 1000);
+  }, 800);
 }
 
 function processAction(action) {
@@ -646,6 +649,8 @@ function processAction(action) {
   }
 }
 
+let _launched = false; // 防止重複launch
+
 // 舊版 postMessage 與 storage 同步（用於同電腦單機測試）
 window.addEventListener('message', e => {
   if (!e.data) return;
@@ -654,7 +659,21 @@ window.addEventListener('message', e => {
     myRole = role || 'student';
     let parsedId = parseInt(String(teamId).replace(/\D/g, ''));
     myTeamId = isNaN(parsedId) || parsedId === 0 ? 1 : parsedId;
-    launch();
+    if (!_launched) {
+      launch();
+    } else {
+      // 已啟動過，直接更新角色和重新渲染
+      if (myRole === 'teacher') {
+        document.getElementById('teacher-view').style.display = 'block';
+        document.getElementById('student-view').style.display = 'none';
+        if (!gameState) { gameState = makeInit(); broadcast(); }
+        render();
+      } else {
+        document.getElementById('teacher-view').style.display = 'none';
+        document.getElementById('student-view').style.display = 'flex';
+        render();
+      }
+    }
   }
   if (e.data.type === 'W8_STATE' && myRole === 'student') {
     gameState = e.data.state; syncTeamsFromParent(); render();
@@ -683,7 +702,7 @@ window.addEventListener('load', () => {
     } else if (!window.parent || window.parent === window) {
       myRole = 'teacher'; launch();
     } else {
-      // 在 iframe 內但尚未收到 PLATFORM_START：先以 student 身份顯示等待畫面
+      // 在 iframe 內：先以 student 顯示棋盤，等 PLATFORM_START
       myRole = 'student';
       document.getElementById('loading').style.opacity = '0';
       setTimeout(() => {
@@ -692,14 +711,18 @@ window.addEventListener('load', () => {
         boardPos = getBoardLayout();
         buildBoard();
         document.getElementById('student-view').style.display = 'flex';
+        document.getElementById('s-action').innerHTML =
+          `<div class="wait-msg"><div class="pulse"></div><span>等待遊戲開始...</span></div>`;
         resizeBoard();
         attachSync();
+        _launched = true;
       }, 500);
     }
   }, 500);
 });
 
 function launch() {
+  _launched = true;
   document.getElementById('loading').style.opacity = '0';
   setTimeout(() => {
     document.getElementById('loading').style.display = 'none';
@@ -708,19 +731,22 @@ function launch() {
     buildBoard();
     if (myRole === 'teacher') {
       document.getElementById('teacher-view').style.display = 'block';
+      document.getElementById('student-view').style.display = 'none';
       gameState = makeInit();
       render(); broadcast();
     } else {
-      // 學生端：顯示棋盤，等待老師的state廣播
+      document.getElementById('teacher-view').style.display = 'none';
       document.getElementById('student-view').style.display = 'flex';
-      // 如果已有state(例如透過localStorage快取)直接渲染
+      // 嘗試讀取快取state
       try {
         const cached = localStorage.getItem('W8_STATE');
-        if (cached) { gameState = JSON.parse(cached); render(); }
+        if (cached) { gameState = JSON.parse(cached); }
       } catch(e) {}
-      if (!gameState) {
+      if (gameState) {
+        render();
+      } else {
         document.getElementById('s-action').innerHTML =
-          `<div class="wait-msg"><div class="pulse"></div><span>等待老師開始遊戲...</span></div>`;
+          `<div class="wait-msg"><div class="pulse"></div><span>等待遊戲開始...</span></div>`;
       }
     }
     resizeBoard();
@@ -767,15 +793,16 @@ function buildBoard() {
 
       const contentAngle = isStart ? 0 : bp.angle;
 
-      // Start格在左下角(index=0)，棋子走向是往上(左側欄往上走)
-      // 內容：上方箭頭↑ / 中間START / 下方+1，不套用角度旋轉
+      // Start格在左下角(index=0)
+      // 格子本地「向上(↑)」= 等距畫面上棋子的移動方向（沿左側往上走）
+      // 版面：上方大箭頭↑，中間START，下方+1紅色標籤
       const contentHtml = i === 0 
-        ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:100%;padding:6px;">
-             <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--red)" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4));">
-               <path d="M12 2 L20 14 L15 14 L15 22 L9 22 L9 14 L4 14 Z"/>
+        ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:100%;padding:5px;">
+             <svg width="36" height="36" viewBox="0 0 24 24" fill="var(--red)" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35));">
+               <path d="M12 2 L20 13 L15.5 13 L15.5 22 L8.5 22 L8.5 13 L4 13 Z"/>
              </svg>
-             <span style="font-size:1rem;font-weight:900;color:var(--red);letter-spacing:1px;line-height:1.2;">START</span>
-             <span style="font-size:0.78rem;font-weight:900;color:#fff;background:var(--red);padding:1px 8px;border-radius:6px;line-height:1.5;">+1</span>
+             <span style="font-size:0.9rem;font-weight:900;color:var(--red);letter-spacing:1px;line-height:1.1;">START</span>
+             <span style="font-size:0.7rem;font-weight:900;color:#fff;background:var(--red);padding:1px 7px;border-radius:5px;line-height:1.5;">+1</span>
            </div>`
         : `<span class="c-icon">${CICONS[type] || '❓'}</span>`;
 
@@ -994,34 +1021,35 @@ function renderRevealPanel() {
 }
 
 function resizeBoard() {
-  // 棋盤在3D等距視角下，旋轉後的視覺尺寸大約是原始尺寸的:
-  // rotateX(55deg) + rotateZ(-45deg) 後，對角線方向約為 BOARD_SIZE * sin(55deg) ≈ 0.82
-  // 視覺寬度約 BOARD_SIZE * sqrt(2) * cos(55deg) ≈ BOARD_SIZE * 0.81
-  // 視覺高度約 BOARD_SIZE * sqrt(2) * sin(55deg) ≈ BOARD_SIZE * 1.16 (含3D深度)
+  // 正確數學推導：
+  // 棋盤 BOARD_SIZE×BOARD_SIZE，旋轉 rotateX(55deg) + rotateZ(-45deg)
+  // rotateZ(-45deg) 讓正方形變菱形，對角線 = BOARD_SIZE * sqrt(2)
+  // rotateX(55deg) 將 Y 軸壓縮 sin(55deg) = 0.819
+  // 視覺寬 = BOARD_SIZE * sqrt(2) = BOARD_SIZE * 1.414
+  // 視覺高 = BOARD_SIZE * sqrt(2) * sin(55deg) = BOARD_SIZE * 1.158
+  // (加上3D厚度20px視覺高再+0.05)
+  const VW = BOARD_SIZE * 1.414;   // 視覺寬
+  const VH = BOARD_SIZE * 1.22;    // 視覺高（含3D厚度）
+
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  
-  // 留一些邊距（左側事件面板310px，右側sidebar260px）
-  const availW_teacher = vw - 310 - 260 - 40;
-  const availH = vh - 40;
-  const availW_student = vw - 40;
 
-  // 視覺footprint係數（等距45度+55度傾斜後實際佔用比）
-  const visualW = BOARD_SIZE * 1.42; // 對角線寬
-  const visualH = BOARD_SIZE * 0.85; // 壓扁後高度（含3D厚度估算）
+  const isTeacher = myRole === 'teacher';
+  const sidebar = document.getElementById('t-sidebar');
+  const sidebarW = (isTeacher && sidebar && !sidebar.classList.contains('collapsed')) ? 268 : 42;
+  // 老師端：左邊事件面板寬320px，右邊sidebar
+  const leftPanel = isTeacher ? 328 : 0;
+  const availW = Math.max(200, vw - leftPanel - sidebarW - 16);
+  const availH = isTeacher ? vh - 16 : vh * 0.52;
 
-  const scaleW_t = availW_teacher / visualW;
-  const scaleH_t = availH / visualH;
-  const scale_t = Math.min(scaleW_t, scaleH_t, 1.4); // 最大放到140%
-
-  const scaleW_s = availW_student / visualW;
-  const scaleH_s = (availH * 0.6) / visualH; // 學生端留空給action區
-  const scale_s = Math.min(scaleW_s, scaleH_s, 1.2);
+  const scaleW = availW / VW;
+  const scaleH = availH / VH;
+  const scale = Math.min(scaleW, scaleH);
 
   const board = document.getElementById('board');
   const sboard = document.getElementById('s-board');
-  if (board) board.style.transform = `scale(${scale_t}) rotateX(55deg) rotateZ(-45deg)`;
-  if (sboard) sboard.style.transform = `scale(${scale_s}) rotateX(55deg) rotateZ(-45deg)`;
+  if (board) board.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+  if (sboard) sboard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
 }
 window.addEventListener('resize', resizeBoard);
 
