@@ -362,7 +362,7 @@ body {
 .score-pop { position: fixed; font-weight: 900; font-size: 2.5rem; pointer-events: none; z-index: 9999; animation: sup 1.5s forwards; text-shadow: 0 4px 10px rgba(0,0,0,0.8); }
 @keyframes sup { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-80px) scale(1.4); } }
 
-/* RESULT SCREEN (隱藏，由外部平台控制) */
+/* RESULT SCREEN */
 #result-screen {
   display: none; position: fixed; inset: 0; background: rgba(5,5,5,0.95);
   z-index: 8000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(20px);
@@ -450,7 +450,7 @@ body {
     <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
   </div>
   <div class="s-action" id="s-action">
-    <div class="wait-msg"><div class="pulse"></div><span>等待遊戲開始...</span></div>
+    <div class="wait-msg"><div class="pulse"></div><span>等待遊戲狀態同步...</span></div>
   </div>
 </div>
 
@@ -464,7 +464,8 @@ body {
 <div class="toast" id="toast"></div>
 
 <script>
-const TEAMS = [
+// 動態組別系統：將會自動抓取主平台 index.html 內學生選好的符號(頭像)
+let TEAMS = [
   {id: 1, name: '第1組', icon: '🐻', color: '#FF8A65'},
   {id: 2, name: '第2組', icon: '🐼', color: '#81C784'},
   {id: 3, name: '第3組', icon: '🦊', color: '#FFB74D'},
@@ -472,13 +473,39 @@ const TEAMS = [
   {id: 5, name: '第5組', icon: '🐧', color: '#CE93D8'},
 ];
 
-// 正方環形棋盤設定：角落為正方形(C)，邊緣為長方形(M)
+// 自動向主平台同步頭像與隊伍資料
+function syncTeamsFromParent() {
+  try {
+    if (window.parent && window.parent.state && window.parent.state.players) {
+      const parentPlayers = window.parent.state.players;
+      if (parentPlayers.length > 0) {
+        const colors = ['#FF8A65', '#81C784', '#FFB74D', '#4FC3F7', '#CE93D8', '#FFD54F', '#4DB6AC', '#7986CB'];
+        const newTeams = [];
+        parentPlayers.forEach((p, i) => {
+          const gId = parseInt(String(p.group).replace(/\D/g, '')) || (i + 1);
+          if (!newTeams.find(t => t.id === gId)) {
+            newTeams.push({
+              id: gId,
+              name: p.name || `第${gId}組`,
+              icon: p.symbol || p.avatar || '🐻',
+              color: colors[newTeams.length % colors.length]
+            });
+          }
+        });
+        if (newTeams.length > 0) {
+          TEAMS = newTeams;
+          teamCount = TEAMS.length;
+        }
+      }
+    }
+  } catch(e) {}
+}
+
 const TOTAL = 28;
 const C = 120; // 角落格子大小
 const M = 80;  // 邊緣格子短邊大小
-const BOARD_SIZE = 720; // 總寬度 (120*2 + 80*6 = 720)
+const BOARD_SIZE = 720; 
 
-// 第 0 格設定為 START, 其他 3 角落為 SPECIAL
 const CTYPES = [
   'start','q','lucky','q','bad','q','lucky',
   'special','q','bad','q','lucky','q','bad',
@@ -487,97 +514,112 @@ const CTYPES = [
 ];
 const CICONS = { q:'❓', lucky:'🍀', bad:'💀', special:'⭐' };
 
-// 計算大富翁環形軌道座標與旋轉角度
 function getBoardLayout() {
   const path = [];
-  
-  // 0: Left Corner (左側角落) - 改變旋轉角度
+  // 左下開始格，向右前進
   path.push({x: 0, y: C + 6*M, type: 'corner', angle: 90}); 
-  // 1-6: Left Edge (左側邊緣)
   for(let i=5; i>=0; i--) path.push({x: 0, y: C + i*M, type: 'left', angle: 90}); 
-
-  // 7: Top Corner (上方角落 - 朝內)
   path.push({x: 0, y: 0, type: 'corner', angle: -45}); 
-  // 8-13: Top Edge (上方邊緣)
   for(let i=0; i<6; i++) path.push({x: C + i*M, y: 0, type: 'top', angle: 180}); 
-
-  // 14: Right Corner (右側角落 - 朝內)
   path.push({x: C + 6*M, y: 0, type: 'corner', angle: 45}); 
-  // 15-20: Right Edge (右側邊緣)
   for(let i=0; i<6; i++) path.push({x: C + 6*M, y: C + i*M, type: 'right', angle: -90}); 
-
-  // 21: Bottom Corner (下方角落)
   path.push({x: C + 6*M, y: C + 6*M, type: 'corner', angle: -45}); 
-  // 22-27: Bottom Edge (下方邊緣)
   for(let i=5; i>=0; i--) path.push({x: C + i*M, y: C + 6*M, type: 'bottom', angle: 0}); 
-
-  return path; // length 28
+  return path;
 }
 
 let myRole = '', myTeamId = 1, teamCount = 4;
 let gameState = null, boardPos = [];
 let selectedAnswer = null;
 
-// 側邊欄開關邏輯
-function toggleSidebar() {
-  const sb = document.getElementById('t-sidebar');
-  const icon = document.getElementById('toggle-icon');
-  sb.classList.toggle('collapsed');
-  if (sb.classList.contains('collapsed')) {
-    icon.style.transform = 'rotate(-90deg)'; // 指向左
-  } else {
-    icon.style.transform = 'rotate(90deg)';  // 指向右
+// 取得主平台資料庫捷徑 (如果有的話)
+let parentDb = null;
+try {
+  if (window.parent && window.parent.firebase) {
+    parentDb = window.parent.firebase.firestore();
+  } else if (window.parent && window.parent.db) {
+    parentDb = window.parent.db;
+  }
+} catch(e) {}
+
+// ====== 強力跨裝置自動同步機制 ======
+let _lastStateStr = '';
+let _lastActionTs = 0;
+
+function attachSync() {
+  // 嘗試使用 Firebase 即時監聽
+  try {
+    const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
+    if (parentDb && roomId) {
+      parentDb.collection('rooms').doc(roomId).onSnapshot(doc => {
+        const data = doc.data();
+        if (data && data.w8State && myRole === 'student') {
+          const stateStr = JSON.stringify(data.w8State);
+          if (stateStr !== _lastStateStr) {
+            _lastStateStr = stateStr;
+            gameState = data.w8State;
+            syncTeamsFromParent();
+            render();
+          }
+        }
+        if (data && data.w8Action && myRole === 'teacher') {
+          processAction(data.w8Action);
+        }
+      });
+      return; 
+    }
+  } catch(e) { console.log('Firebase 監聽失敗', e); }
+
+  // 備用機制：每秒輪詢讀取主平台的最新狀態
+  setInterval(() => {
+    try {
+      if (!window.parent || !window.parent.state) return;
+      if (myRole === 'student' && window.parent.state.w8State) {
+        const stateStr = JSON.stringify(window.parent.state.w8State);
+        if (stateStr !== _lastStateStr) {
+          _lastStateStr = stateStr;
+          gameState = window.parent.state.w8State;
+          syncTeamsFromParent();
+          render();
+        }
+      }
+      if (myRole === 'teacher' && window.parent.state.w8Action) {
+        processAction(window.parent.state.w8Action);
+      }
+    } catch(e) {}
+  }, 1000);
+}
+
+function processAction(action) {
+  if (!gameState) return;
+  if (parseInt(action.teamId) === gameState.currentTurn && action.ts !== _lastActionTs) {
+    _lastActionTs = action.ts;
+    updateState({ phase: 'rolled', diceResult: action.diceResult });
+    const team = TEAMS.find(t => t.id === parseInt(action.teamId));
+    showToast(`🎲 ${team?.icon || ''} 擲出 ${action.diceResult.total} 步！`);
   }
 }
 
-// 根據視窗大小自動縮放 3D 棋盤
-function resizeBoard() {
-  ['board', 's-board'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const wrap = el.parentElement.parentElement; // board-container or s-board-wrap
-    const baseSize = 850; // 基礎尺寸加上周圍邊距
-    const scale = Math.min(wrap.clientWidth / (baseSize * 1.4), wrap.clientHeight / (baseSize * 0.9), 1.2);
-    // 基礎等距視角變換
-    el.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
-  });
-}
-window.addEventListener('resize', resizeBoard);
-
-// 跨裝置同步：接收主平台或自己的訊息
+// 舊版 postMessage 與 storage 同步（用於同電腦單機測試）
 window.addEventListener('message', e => {
   if (!e.data) return;
-  
   if (e.data.type === 'PLATFORM_START') {
     const { role, teamId, teamCount: tc } = e.data;
     myRole = role || 'student';
-    
-    // 更強健的 teamId 解析 (過濾 "P1" 等字串確保轉為數字)
     let parsedId = parseInt(String(teamId).replace(/\D/g, ''));
     myTeamId = isNaN(parsedId) || parsedId === 0 ? 1 : parsedId;
-    teamCount = parseInt(tc) || 4;
-    
     launch();
   }
-  
-  // 傳統 postMessage 同步
   if (e.data.type === 'W8_STATE' && myRole === 'student') {
-    gameState = e.data.state;
-    render();
+    gameState = e.data.state; syncTeamsFromParent(); render();
   }
-  // 容錯：有些主平台可能只回傳 state
-  if (e.data.state && e.data.state.teams && myRole === 'student') {
-    gameState = e.data.state;
-    render();
-  }
-  
   if (e.data.type === 'W8_ROLL' && myRole === 'teacher') {
-    const action = e.data;
-    if (gameState && parseInt(action.teamId) === gameState.currentTurn) {
-      updateState({ phase: 'rolled', diceResult: action.diceResult });
-      showToast(`🎲 ${TEAMS[parseInt(action.teamId)-1]?.icon} 擲出 ${action.diceResult.total} 步！`);
-    }
+    processAction(e.data);
   }
+});
+window.addEventListener('storage', e => {
+  if (e.key === 'W8_STATE' && myRole === 'student') { gameState = JSON.parse(e.newValue); syncTeamsFromParent(); render(); }
+  if (e.key === 'W8_ROLL' && myRole === 'teacher') { processAction(JSON.parse(e.newValue)); }
 });
 
 window.addEventListener('load', () => {
@@ -585,59 +627,15 @@ window.addEventListener('load', () => {
     const btnSettle = document.getElementById('btn-settle');
     if (btnSettle) btnSettle.style.display = 'none';
   }
-
-  // ===== 跨裝置即時同步機制 (自動攔截主平台 Firebase) =====
+  
   setTimeout(() => {
-    try {
-      if (window.parent && window.parent.db && window.parent.state && window.parent.state.roomId) {
-        window.parent.db.collection('rooms').doc(window.parent.state.roomId).onSnapshot(doc => {
-          const data = doc.data();
-          // 學生端接收遊戲狀態
-          if (data && data.w8State && myRole === 'student') {
-            gameState = data.w8State;
-            render();
-          }
-          // 老師端接收學生擲骰動作
-          if (data && data.w8Action && myRole === 'teacher') {
-            const action = data.w8Action;
-            // 防重複觸發
-            if (gameState && parseInt(action.teamId) === gameState.currentTurn && action.ts !== window._lastActionTs) {
-              window._lastActionTs = action.ts;
-              updateState({ phase: 'rolled', diceResult: action.diceResult });
-              showToast(`🎲 ${TEAMS[parseInt(action.teamId)-1]?.icon} 擲出 ${action.diceResult.total} 步！`);
-            }
-          }
-        });
-      }
-    } catch(e) { console.log('Firebase sync attach failed'); }
-
-    // ===== 同裝置多視窗備用同步機制 (Local testing) =====
-    window.addEventListener('storage', e => {
-      if (e.key === 'W8_STATE' && myRole === 'student') {
-        gameState = JSON.parse(e.newValue);
-        render();
-      }
-      if (e.key === 'W8_ROLL' && myRole === 'teacher') {
-        const action = JSON.parse(e.newValue);
-        if (gameState && parseInt(action.teamId) === gameState.currentTurn && action.ts !== window._lastActionTs) {
-          window._lastActionTs = action.ts;
-          updateState({ phase: 'rolled', diceResult: action.diceResult });
-          showToast(`🎲 ${TEAMS[parseInt(action.teamId)-1]?.icon} 擲出 ${action.diceResult.total} 步！`);
-        }
-      }
-    });
-
     const p = new URLSearchParams(location.search);
     if (p.get('role')) {
       myRole = p.get('role') || 'student';
-      const t = p.get('team') || '1';
-      myTeamId = parseInt(String(t).replace(/\D/g, '')) || 1;
-      teamCount = parseInt(p.get('teams') || '4');
+      myTeamId = parseInt(String(p.get('team')).replace(/\D/g, '')) || 1;
       launch();
     } else if (!window.parent || window.parent === window) {
-      myRole = 'teacher'; myTeamId = 0; teamCount = 4; launch();
-    } else {
-      document.querySelector('.sub').textContent = '等待平台啟動...';
+      myRole = 'teacher'; launch();
     }
   }, 500);
 });
@@ -646,10 +644,15 @@ function launch() {
   document.getElementById('loading').style.opacity = '0';
   setTimeout(() => {
     document.getElementById('loading').style.display = 'none';
+    syncTeamsFromParent();
     boardPos = getBoardLayout();
     buildBoard();
-    initState();
+    if (myRole === 'teacher') {
+      gameState = makeInit();
+      render(); broadcast();
+    }
     resizeBoard();
+    attachSync(); // 啟動自動同步引擎
   }, 500);
 }
 
@@ -662,7 +665,6 @@ function buildBoard() {
     el.style.width = BOARD_SIZE + 'px';
     el.style.height = BOARD_SIZE + 'px';
 
-    // 加入棋盤中心底板
     const center = document.createElement('div');
     center.className = 'board-center';
     center.innerHTML = `
@@ -687,7 +689,7 @@ function buildBoard() {
       cell.style.left = bp.x + 'px';
       cell.style.top = bp.y + 'px';
 
-      // Start 點渲染 START 字樣及巨大方向箭頭 (指向盤面順時針方向)、+1 標籤
+      // 巨型箭頭及開始標籤
       const contentHtml = i === 0 
         ? `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0px; height:100%;">
              <span class="c-num" style="font-size:1.3rem; color:var(--red); margin:0;">START</span>
@@ -713,36 +715,30 @@ function buildBoard() {
   });
 }
 
-function initState() {
-  if (myRole === 'teacher') {
-    gameState = makeInit();
-    render();
-    broadcast();
-  } else {
-    gameState = null;
-    render();
-  }
-}
-
 function makeInit() {
+  syncTeamsFromParent();
   const teams = {};
-  for (let i = 1; i <= teamCount; i++) teams[i] = { id: i, position: 0, score: 0, extraDice: false, skipTurn: false };
-  return { teams, currentTurn: 1, phase: 'waiting_roll', diceResult: null, event: null, question: null, selectedAnswer: null, teamCount };
+  TEAMS.forEach(t => {
+    teams[t.id] = { id: t.id, position: 0, score: 0, extraDice: false, skipTurn: false };
+  });
+  const firstTurnId = TEAMS.length > 0 ? TEAMS[0].id : 1;
+  return { teams, currentTurn: firstTurnId, phase: 'waiting_roll', diceResult: null, event: null, question: null, selectedAnswer: null, teamCount: TEAMS.length };
 }
 
 function broadcast() {
-  if (myRole === 'teacher') {
-    // 1. postMessage 廣播 (如果主平台有轉發機制)
-    try { window.parent.postMessage({ type: 'W8_STATE', state: gameState }, '*'); } catch (e) {}
-    // 2. LocalStorage 同步 (同電腦雙視窗測試用)
-    try { localStorage.setItem('W8_STATE', JSON.stringify(gameState)); } catch (e) {}
-    // 3. 自動寫入主平台 Firebase (跨裝置最穩健)
-    try {
-      if (window.parent && window.parent.db && window.parent.state && window.parent.state.roomId) {
-        window.parent.db.collection('rooms').doc(window.parent.state.roomId).update({ w8State: gameState });
-      }
-    } catch(e) {}
-  }
+  if (myRole !== 'teacher') return;
+  try { window.parent.postMessage({ type: 'W8_STATE', state: gameState }, '*'); } catch (e) {}
+  try { localStorage.setItem('W8_STATE', JSON.stringify(gameState)); } catch (e) {}
+  
+  try {
+    const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
+    if (parentDb && roomId) {
+      parentDb.collection('rooms').doc(roomId).update({ w8State: gameState });
+    } else if (window.parent && window.parent.state && typeof window.parent.saveRooms === 'function') {
+      window.parent.state.w8State = gameState;
+      window.parent.saveRooms(); // 終極同步備援
+    }
+  } catch(e) {}
 }
 
 function updateState(patch) {
@@ -777,7 +773,7 @@ function renderPieces() {
     
     const cellIndices = {};
     Object.values(gameState.teams || {}).forEach(team => {
-      const t = TEAMS[team.id - 1]; if (!t) return;
+      const t = TEAMS.find(x => x.id === team.id); if (!t) return;
       const pos = team.position % TOTAL;
       const bp = boardPos[pos]; if (!bp) return;
       
@@ -825,12 +821,13 @@ function renderPieces() {
 
 function renderTeacher() {
   const gs = gameState;
-  const ct = TEAMS[gs.currentTurn - 1];
+  const ct = TEAMS.find(t => t.id === gs.currentTurn);
   if (ct) document.getElementById('turn-chip').textContent = `${ct.icon} ${ct.name} 的回合`;
   
   const sc = document.getElementById('t-scores'); sc.innerHTML = '';
   Object.values(gs.teams).forEach(team => {
-    const t = TEAMS[team.id - 1];
+    const t = TEAMS.find(x => x.id === team.id);
+    if (!t) return;
     const row = document.createElement('div');
     row.className = 'score-row' + (team.id === gs.currentTurn ? ' active' : '');
     row.innerHTML = `<span class="sr-icon">${t.icon}</span>
@@ -854,7 +851,7 @@ function renderEventPanel() {
 
   if (ph === 'waiting_roll') {
     eb.className = 'event-box';
-    const ct = TEAMS[gs.currentTurn - 1];
+    const ct = TEAMS.find(t => t.id === gs.currentTurn);
     eb.innerHTML = `<div class="wait-msg" style="justify-content:center;padding:1rem"><div class="pulse"></div> 等待 ${ct?.icon || ''} 擲骰...</div>`;
   } else if (ph === 'rolled') {
     eb.className = 'event-box';
@@ -915,9 +912,16 @@ function renderRevealPanel() {
   exb.style.display = 'block'; exb.textContent = '💡 ' + (q.explanation || '');
 }
 
+function toggleSidebar() {
+  const sb = document.getElementById('t-sidebar');
+  const icon = document.getElementById('toggle-icon');
+  sb.classList.toggle('collapsed');
+  icon.style.transform = sb.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(90deg)';
+}
+
 function renderStudent() {
   const gs = gameState;
-  const myT = TEAMS[myTeamId - 1];
+  const myT = TEAMS.find(t => t.id === myTeamId);
   if (myT) document.getElementById('my-badge').innerHTML = `${myT.icon} ${myT.name}`;
   const sr = document.getElementById('s-scores'); sr.innerHTML = '';
   
@@ -926,7 +930,8 @@ function renderStudent() {
     return;
   }
   Object.values(gs.teams).forEach(team => {
-    const t = TEAMS[team.id - 1];
+    const t = TEAMS.find(x => x.id === team.id);
+    if(!t) return;
     const chip = document.createElement('div');
     chip.className = 'score-chip' + (team.id === myTeamId ? ' mine' : '');
     chip.innerHTML = `${t.icon} ${team.score}分`;
@@ -935,7 +940,7 @@ function renderStudent() {
   
   const sa = document.getElementById('s-action');
   const isMyTurn = gs.currentTurn === myTeamId;
-  const ct = TEAMS[gs.currentTurn - 1];
+  const ct = TEAMS.find(t => t.id === gs.currentTurn);
   const myTD = gs.teams[myTeamId];
   sa.innerHTML = '';
 
@@ -988,20 +993,22 @@ function rollDice() {
   const action = { teamId: myTeamId, diceResult: { d1, d2, total }, ts: Date.now() };
 
   if (myRole === 'student') {
-    // 1. postMessage 回傳
     try { window.parent.postMessage({ type: 'W8_ROLL', ...action }, '*'); } catch (e) {}
-    // 2. LocalStorage 備用
     try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
-    // 3. 直接寫入主平台 Firebase
     try {
-      if (window.parent && window.parent.db && window.parent.state && window.parent.state.roomId) {
-        window.parent.db.collection('rooms').doc(window.parent.state.roomId).update({ w8Action: action });
+      const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
+      if (parentDb && roomId) {
+        parentDb.collection('rooms').doc(roomId).update({ w8Action: action });
+      } else if (window.parent && window.parent.state && typeof window.parent.saveRooms === 'function') {
+        window.parent.state.w8Action = action;
+        window.parent.saveRooms();
       }
     } catch(e) {}
+    
+    const sa = document.getElementById('s-action');
+    if (sa) sa.innerHTML = `<div class="wait-msg"><div class="pulse"></div><span>骰子已擲出，請看老師畫面...</span></div>`;
   } else {
-    // 老師自己玩測試時直接更新狀態
-    updateState({ phase: 'rolled', diceResult: { d1, d2, total } });
-    showToast(`🎲 ${TEAMS[myTeamId - 1]?.icon} 擲出 ${total} 步！`);
+    processAction(action);
   }
 }
 
@@ -1104,17 +1111,23 @@ function publishAnswer() {
 
 function nextTurn() {
   const gs = gameState;
-  const tc = parseInt(gs.teamCount) || teamCount;
-  let next = (gs.currentTurn % tc) + 1;
+  const currentIdx = TEAMS.findIndex(t => t.id === gs.currentTurn);
+  let nextIdx = (currentIdx + 1) % TEAMS.length;
   let safe = 0;
-  while (safe < tc) {
-    if (gs.teams[next]?.skipTurn) {
-      updateTeam(next, { skipTurn: false });
-      showToast(`⏸ ${TEAMS[next - 1]?.icon} 停一回合，跳過！`);
-      next = (next % tc) + 1; safe++;
-    } else break;
+  
+  while (safe < TEAMS.length) {
+    let nextId = TEAMS[nextIdx].id;
+    if (gs.teams[nextId]?.skipTurn) {
+      updateTeam(nextId, { skipTurn: false });
+      showToast(`⏸ ${TEAMS[nextIdx].icon} 停一回合，跳過！`);
+      nextIdx = (nextIdx + 1) % TEAMS.length;
+      safe++;
+    } else {
+      break;
+    }
   }
-  updateState({ currentTurn: next, phase: 'waiting_roll', diceResult: null, event: null, question: null, selectedAnswer: null });
+  const finalNextId = TEAMS[nextIdx].id;
+  updateState({ currentTurn: finalNextId, phase: 'waiting_roll', diceResult: null, event: null, question: null, selectedAnswer: null });
 }
 
 function showResult() {
@@ -1123,7 +1136,7 @@ function showResult() {
   const rl = document.getElementById('r-list'); rl.innerHTML = '';
   const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
   sorted.forEach((team, i) => {
-    const t = TEAMS[team.id - 1];
+    const t = TEAMS.find(x => x.id === team.id);
     const item = document.createElement('div'); item.className = 'r-item';
     item.style.animationDelay = (i * 0.12) + 's';
     item.innerHTML = `<span class="r-rank">${medals[i]}</span><span class="r-icon">${t.icon}</span>
