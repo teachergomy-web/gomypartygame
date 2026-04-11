@@ -78,7 +78,7 @@ body {
 
 /* 摺疊側邊欄 */
 .sidebar {
-  position: absolute; right: 0; top: 70px; bottom: 12px; width: 320px;
+  position: absolute; right: 0; top: 12px; bottom: 12px; width: 260px;
   background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.1);
   border-right: none; border-radius: 16px 0 0 16px;
   transform: translateX(0); transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -118,8 +118,8 @@ body {
 .sr-tag { font-size: 0.65rem; font-weight: 700; color: var(--orange); background: rgba(255,140,0,0.2); padding: 2px 6px; border-radius: 6px; }
 
 .event-box {
-  background: rgba(0,0,0,0.5); border-radius: 12px; padding: 14px; min-height: 120px;
-  margin-bottom: 8px; color: #fff; font-size: 0.9rem; line-height: 1.6; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.5); border-radius: 12px; padding: 12px; min-height: 80px;
+  margin-bottom: 0px; color: #fff; font-size: 0.88rem; line-height: 1.6; border: 1px solid rgba(255,255,255,0.1);
 }
 .q-text { font-weight: 900; font-size: 0.95rem; margin-bottom: 10px; color: #fff; }
 .opt-btn {
@@ -211,8 +211,7 @@ body {
 }
 .iso-board { 
   position: relative; transform-style: preserve-3d; 
-  /* 等距視角: X軸傾斜 55 度, Z軸旋轉 -45 度 */
-  transform: scale(1) rotateX(55deg) rotateZ(-45deg); 
+  /* transform 由 resizeBoard() 動態設定 */
   transition: transform 0.3s;
 }
 
@@ -292,20 +291,44 @@ body {
   margin-top: 4px;
 }
 
-/* 方塊的厚度面 (四個面全包以防破圖空心) */
-.cell-s, .cell-n {
-  position: absolute; left: -3px; width: calc(100% + 6px); height: 20px;
-  background: #f0f0f0; border: 3px solid var(--outline);
+/* 方塊的厚度面 - 從頂面(Z=20)向下延伸到底面(Z=0) */
+/* 高度=20px 剛好等於 translateZ(20px) 的厚度 */
+.cell-s {
+  position: absolute;
+  left: 0; bottom: 0; width: 100%; height: 20px;
+  background: color-mix(in srgb, var(--c-color, #d0d0d0) 55%, #666);
+  border: 1px solid var(--outline);
+  transform-origin: bottom center;
+  transform: translateZ(20px) rotateX(90deg);
 }
-.cell-e, .cell-w {
-  position: absolute; top: -3px; width: 20px; height: calc(100% + 6px);
-  background: #e0e0e0; border: 3px solid var(--outline);
+.cell-n {
+  position: absolute;
+  left: 0; top: 0; width: 100%; height: 20px;
+  background: color-mix(in srgb, var(--c-color, #d0d0d0) 45%, #555);
+  border: 1px solid var(--outline);
+  transform-origin: top center;
+  transform: translateZ(20px) rotateX(-90deg);
 }
-
-.cell-s { top: 100%; transform-origin: top; transform: translateZ(20px) rotateX(-90deg); border-top: none; }
-.cell-n { top: 0; transform-origin: top; transform: translateZ(20px) rotateX(-90deg); border-bottom: none; }
-.cell-e { left: 100%; transform-origin: left; transform: translateZ(20px) rotateY(90deg); border-left: none; }
-.cell-w { left: 0; transform-origin: left; transform: translateZ(20px) rotateY(90deg); border-right: none; }
+.cell-e {
+  position: absolute;
+  right: 0; top: 0; width: 20px; height: 100%;
+  background: color-mix(in srgb, var(--c-color, #d0d0d0) 50%, #666);
+  border: 1px solid var(--outline);
+  transform-origin: right center;
+  transform: translateZ(20px) rotateY(-90deg);
+}
+.cell-w {
+  position: absolute;
+  left: 0; top: 0; width: 20px; height: 100%;
+  background: color-mix(in srgb, var(--c-color, #d0d0d0) 60%, #777);
+  border: 1px solid var(--outline);
+  transform-origin: left center;
+  transform: translateZ(20px) rotateY(90deg);
+}
+.cell.corner .cell-s { background: #bbb; }
+.cell.corner .cell-n { background: #aaa; }
+.cell.corner .cell-e { background: #b8b8b8; }
+.cell.corner .cell-w { background: #c8c8c8; }
 
 .cell.active .cell-top { animation: cellGlow 0.8s ease-in-out infinite alternate; }
 @keyframes cellGlow {
@@ -388,6 +411,28 @@ body {
 }
 .btn-restart:hover { transform: scale(1.05); }
 
+/* ══════════════════════════════
+   EVENT PANEL - 左上角浮動
+   ══════════════════════════════ */
+.event-float {
+  position: absolute; top: 12px; left: 12px; z-index: 400;
+  width: 300px;
+  background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px; backdrop-filter: blur(15px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.event-float-header {
+  background: rgba(255,255,255,0.06); padding: 10px 14px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.event-float-title { font-size: 0.8rem; font-weight: 900; color: rgba(255,255,255,0.5); letter-spacing: 0.1em; text-transform: uppercase; }
+.turn-chip-inline {
+  margin-left: auto; background: rgba(255, 214, 0, 0.2); color: var(--yellow); font-weight: 900; font-size: 0.8rem;
+  padding: 4px 12px; border-radius: 50px; border: 1px solid rgba(255, 214, 0, 0.5);
+}
+.event-float-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .ev-lucky { background: rgba(0, 230, 118, 0.1) !important; border: 1px solid rgba(0, 230, 118, 0.3) !important; }
 .ev-bad { background: rgba(255, 23, 68, 0.1) !important; border: 1px solid rgba(255, 23, 68, 0.3) !important; }
 </style>
@@ -404,36 +449,37 @@ body {
 
 <!-- TEACHER VIEW -->
 <div id="teacher-view">
-  <div class="t-header">
-    <div class="t-title">✈️ 環遊大富翁</div>
-    <div class="turn-chip" id="turn-chip">🐻 第1組 的回合</div>
+  <!-- 左上角事件面板 (取代原標題) -->
+  <div class="event-float" id="event-float">
+    <div class="event-float-header">
+      <span class="event-float-title">📋 事件面板</span>
+      <span class="turn-chip-inline" id="turn-chip">🐻 第1組 的回合</span>
+    </div>
+    <div class="event-float-body">
+      <div id="event-box" class="event-box">
+        <div class="wait-msg" style="justify-content:center;padding:1rem"><div class="pulse"></div> 等待擲骰...</div>
+      </div>
+      <div id="explain-box" class="explain-box"></div>
+      <button class="btn-pub" id="btn-pub" onclick="publishAnswer()">🎯 公布答案</button>
+      <button class="btn-next" id="btn-next" onclick="nextTurn()">➡️ 下一組</button>
+    </div>
   </div>
   
   <div class="board-container">
     <div class="iso-scene"><div id="board" class="iso-board"></div></div>
   </div>
   
-  <!-- 摺疊側邊欄 -->
+  <!-- 摺疊側邊欄 (只保留分數) -->
   <div class="sidebar" id="t-sidebar">
     <div class="toggle-btn" onclick="toggleSidebar()">
       <span class="toggle-icon" id="toggle-icon">▼</span>
-      控制面板
+      分數板
     </div>
     <div class="sidebar-content">
       <div class="panel">
         <div class="panel-title">🏆 各組分數</div>
         <div id="t-scores"></div>
-      </div>
-      <div class="panel" style="flex:1; display:flex; flex-direction:column;">
-        <div class="panel-title">📋 事件面板</div>
-        <div id="event-box" class="event-box">
-          <div class="wait-msg" style="justify-content:center;padding:1rem"><div class="pulse"></div> 等待擲骰...</div>
-        </div>
-        <div id="explain-box" class="explain-box"></div>
-        <button class="btn-pub" id="btn-pub" onclick="publishAnswer()">🎯 公布答案</button>
-        <button class="btn-next" id="btn-next" onclick="nextTurn()">➡️ 下一組</button>
-        <!-- 結算按鈕僅在獨立測試時顯示，嵌入平台時隱藏以免衝突 -->
-        <button class="btn-settle" id="btn-settle" onclick="showResult()">🏆 內部結算</button>
+        <button class="btn-settle" id="btn-settle" onclick="showResult()" style="margin-top:10px;">🏆 內部結算</button>
       </div>
     </div>
   </div>
@@ -636,6 +682,19 @@ window.addEventListener('load', () => {
       launch();
     } else if (!window.parent || window.parent === window) {
       myRole = 'teacher'; launch();
+    } else {
+      // 在 iframe 內但尚未收到 PLATFORM_START：先以 student 身份顯示等待畫面
+      myRole = 'student';
+      document.getElementById('loading').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('loading').style.display = 'none';
+        syncTeamsFromParent();
+        boardPos = getBoardLayout();
+        buildBoard();
+        document.getElementById('student-view').style.display = 'flex';
+        resizeBoard();
+        attachSync();
+      }, 500);
     }
   }, 500);
 });
@@ -678,31 +737,38 @@ function buildBoard() {
     boardPos.forEach((bp, i) => {
       const type = CTYPES[i] || 'q';
       const cell = document.createElement('div');
-      cell.className = `cell type-${type} ${bp.type}`;
-      cell.id = (id === 'board' ? 'cell-' : 'sc-') + i;
-      
-      const cellW = bp.type === 'top' || bp.type === 'bottom' ? M : C;
-      const cellH = bp.type === 'left' || bp.type === 'right' ? M : C;
+      // Start格強制corner類型 + 不旋轉內容
+      const isStart = i === 0;
+      cell.className = `cell type-${type} ${isStart ? 'corner' : bp.type}`;
 
-      cell.style.width = cellW + 'px';
-      cell.style.height = cellH + 'px';
+      const cellW = (bp.type === 'top' || bp.type === 'bottom') ? M : C;
+      const cellH = (bp.type === 'left' || bp.type === 'right') ? M : C;
+      const finalW = isStart ? C : cellW;
+      const finalH = isStart ? C : cellH;
+
+      cell.style.width = finalW + 'px';
+      cell.style.height = finalH + 'px';
+      cell.id = (id === 'board' ? 'cell-' : 'sc-') + i;
       cell.style.left = bp.x + 'px';
       cell.style.top = bp.y + 'px';
 
-      // 巨型箭頭及開始標籤
+      const contentAngle = isStart ? 0 : bp.angle;
+
+      // Start格在左下角(index=0)，棋子走向是往上(左側欄往上走)
+      // 內容：上方箭頭↑ / 中間START / 下方+1，不套用角度旋轉
       const contentHtml = i === 0 
-        ? `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0px; height:100%;">
-             <span class="c-num" style="font-size:1.3rem; color:var(--red); margin:0;">START</span>
-             <svg width="42" height="42" viewBox="0 0 24 24" fill="var(--red)" stroke="#b81010" stroke-width="1.5" style="filter: drop-shadow(0 3px 3px rgba(0,0,0,0.3)); margin: 2px 0;">
-               <path d="M2 12 L10 4 L10 9 L22 9 L22 15 L10 15 L10 20 Z" stroke-linejoin="round"/>
+        ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:100%;padding:6px;">
+             <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--red)" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4));">
+               <path d="M12 2 L20 14 L15 14 L15 22 L9 22 L9 14 L4 14 Z"/>
              </svg>
-             <span class="start-bonus" style="font-size:0.9rem; padding: 2px 10px;">+1</span>
+             <span style="font-size:1rem;font-weight:900;color:var(--red);letter-spacing:1px;line-height:1.2;">START</span>
+             <span style="font-size:0.78rem;font-weight:900;color:#fff;background:var(--red);padding:1px 8px;border-radius:6px;line-height:1.5;">+1</span>
            </div>`
         : `<span class="c-icon">${CICONS[type] || '❓'}</span>`;
 
       cell.innerHTML = `
         <div class="cell-top">
-          <div class="cell-content" style="transform: rotate(${bp.angle}deg);">
+          <div class="cell-content" style="transform: rotate(${contentAngle}deg);">
             ${contentHtml}
           </div>
         </div>
@@ -822,7 +888,8 @@ function renderPieces() {
 function renderTeacher() {
   const gs = gameState;
   const ct = TEAMS.find(t => t.id === gs.currentTurn);
-  if (ct) document.getElementById('turn-chip').textContent = `${ct.icon} ${ct.name} 的回合`;
+  const chipEl = document.getElementById('turn-chip');
+  if (ct && chipEl) chipEl.textContent = `${ct.icon} ${ct.name} 的回合`;
   
   const sc = document.getElementById('t-scores'); sc.innerHTML = '';
   Object.values(gs.teams).forEach(team => {
@@ -912,7 +979,45 @@ function renderRevealPanel() {
   exb.style.display = 'block'; exb.textContent = '💡 ' + (q.explanation || '');
 }
 
+function resizeBoard() {
+  // 棋盤在3D等距視角下，旋轉後的視覺尺寸大約是原始尺寸的:
+  // rotateX(55deg) + rotateZ(-45deg) 後，對角線方向約為 BOARD_SIZE * sin(55deg) ≈ 0.82
+  // 視覺寬度約 BOARD_SIZE * sqrt(2) * cos(55deg) ≈ BOARD_SIZE * 0.81
+  // 視覺高度約 BOARD_SIZE * sqrt(2) * sin(55deg) ≈ BOARD_SIZE * 1.16 (含3D深度)
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  
+  // 留一些邊距（左側事件面板310px，右側sidebar260px）
+  const availW_teacher = vw - 310 - 260 - 40;
+  const availH = vh - 40;
+  const availW_student = vw - 40;
+
+  // 視覺footprint係數（等距45度+55度傾斜後實際佔用比）
+  const visualW = BOARD_SIZE * 1.42; // 對角線寬
+  const visualH = BOARD_SIZE * 0.85; // 壓扁後高度（含3D厚度估算）
+
+  const scaleW_t = availW_teacher / visualW;
+  const scaleH_t = availH / visualH;
+  const scale_t = Math.min(scaleW_t, scaleH_t, 1.4); // 最大放到140%
+
+  const scaleW_s = availW_student / visualW;
+  const scaleH_s = (availH * 0.6) / visualH; // 學生端留空給action區
+  const scale_s = Math.min(scaleW_s, scaleH_s, 1.2);
+
+  const board = document.getElementById('board');
+  const sboard = document.getElementById('s-board');
+  if (board) board.style.transform = `scale(${scale_t}) rotateX(55deg) rotateZ(-45deg)`;
+  if (sboard) sboard.style.transform = `scale(${scale_s}) rotateX(55deg) rotateZ(-45deg)`;
+}
+window.addEventListener('resize', resizeBoard);
+
 function toggleSidebar() {
+  const sb = document.getElementById('t-sidebar');
+  const icon = document.getElementById('toggle-icon');
+  sb.classList.toggle('collapsed');
+  icon.style.transform = sb.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(90deg)';
+  setTimeout(resizeBoard, 400); // sidebar動畫結束後重算
+}
   const sb = document.getElementById('t-sidebar');
   const icon = document.getElementById('toggle-icon');
   sb.classList.toggle('collapsed');
