@@ -1618,16 +1618,15 @@ const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 // Three.js 3D 骰子系統
 // ══════════════════════════════
 
-// 骰子各面對應旋轉（讓該面朝「上」，因為相機從上往下看）
-// BoxGeometry 面順序: +x=右(3), -x=左(4), +y=上(2), -y=下(5), +z=前(1), -z=後(6)
-// 讓第 N 點朝上：旋轉對應面到 +y 位置
+// 骰子各面旋轉：靜止時讓 finalVal 朝上（+y 面）
+// 策略：直接把 finalVal 貼在 +y 面，靜止旋轉全為 0
 const DICE_FACE_ROT = {
-  1: { x:  Math.PI/2, y: 0 },        // 前面(1) 朝上
-  2: { x:  0,         y: 0 },        // 上面(2) 已朝上
-  3: { x:  0,         y: Math.PI/2 },// 右面(3) 朝上
-  4: { x:  0,         y:-Math.PI/2 },// 左面(4) 朝上
-  5: { x:  Math.PI,   y: 0 },        // 下面(5) 朝上
-  6: { x: -Math.PI/2, y: 0 },        // 後面(6) 朝上
+  1: { x: 0, y: 0 },
+  2: { x: 0, y: 0 },
+  3: { x: 0, y: 0 },
+  4: { x: 0, y: 0 },
+  5: { x: 0, y: 0 },
+  6: { x: 0, y: 0 },
 };
 
 function createDiceScene(canvas, finalVal) {
@@ -1703,15 +1702,22 @@ function createDiceScene(canvas, finalVal) {
     return new THREE.CanvasTexture(c);
   }
 
-  // 六個面貼圖（BoxGeometry 面順序: +x,-x,+y,-y,+z,-z = 右左上下前後）
-  // 骰子標準：1對6，2對5，3對4
+  // BoxGeometry 面順序: 0=+x(右), 1=-x(左), 2=+y(上), 3=-y(下), 4=+z(前), 5=-z(後)
+  // 直接把 finalVal 貼在上面（index 2），其餘面填其他點數
+  const otherVals = [1,2,3,4,5,6].filter(v => v !== finalVal);
+  // 對面相加=7：下面貼 7-finalVal
+  const bottomVal = 7 - finalVal;
+  const sideVals = [1,2,3,4,5,6].filter(v => v !== finalVal && v !== bottomVal);
+  // 隨機打亂側面
+  sideVals.sort(() => Math.random() - 0.5);
+
   const faceMats = [
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(3) }), // +x = 3
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(4) }), // -x = 4
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(2) }), // +y = 2
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(5) }), // -y = 5
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(1) }), // +z = 1 (正面)
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(6) }), // -z = 6
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[0] || 3) }), // +x 右
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[1] || 4) }), // -x 左
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(finalVal) }),          // +y 上（目標點數）
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(bottomVal) }),         // -y 下（對面）
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[2] || 2) }), // +z 前
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[3] || 5) }), // -z 後
   ];
   faceMats.forEach(m => { m.shininess = 80; });
 
@@ -1789,18 +1795,24 @@ function animateDice(state, elapsed) {
       state.t = 0;
     }
   } else if (state.phase === 'settle') {
-    state.t += dt * 3;
-    const p = Math.min(state.t, 1);
-    const ease = 1 - Math.pow(1-p, 3);
-    // 插值到目標旋轉
+    state.t += dt * 4;
+    // 讓旋轉速度衰減到0，骰子自然停下
+    // 上面那面已經是 finalVal，不需要額外旋轉
+    state.spinX *= Math.max(0, 1 - dt * 8);
+    state.spinY *= Math.max(0, 1 - dt * 8);
+    state.spinZ *= Math.max(0, 1 - dt * 8);
+    dice.rotation.x += state.spinX * dt;
+    dice.rotation.y += state.spinY * dt;
+    dice.rotation.z += state.spinZ * dt;
+    // 確保最終 X/Z 旋轉回到讓上面朝上的角度（整數倍 PI/2）
+    const snapX = Math.round(dice.rotation.x / (Math.PI/2)) * (Math.PI/2);
+    const snapZ = Math.round(dice.rotation.z / (Math.PI/2)) * (Math.PI/2);
+    dice.rotation.x += (snapX - dice.rotation.x) * dt * 5;
+    dice.rotation.z += (snapZ - dice.rotation.z) * dt * 5;
     dice.position.y = -0.8;
-    dice.rotation.x += (state.targetX - dice.rotation.x) * ease * 0.12;
-    dice.rotation.y += (state.targetY - dice.rotation.y) * ease * 0.12;
-    dice.rotation.z += (0 - dice.rotation.z) * ease * 0.15;
-    if (p >= 1 || (Math.abs(dice.rotation.x - state.targetX) < 0.01)) {
-      dice.rotation.x = state.targetX;
-      dice.rotation.y = state.targetY;
-      dice.rotation.z = 0;
+    if (state.t > 1.0) {
+      dice.rotation.x = snapX;
+      dice.rotation.z = snapZ;
       state.done = true;
     }
   }
@@ -1836,10 +1848,6 @@ function showDiceAnim(d1, d2, total) {
     wrap.appendChild(canvas);
     const state = createDiceScene(canvas, val);
     if (state) {
-      const fr = DICE_FACE_ROT[val] || DICE_FACE_ROT[1];
-      // 目標旋轉：從當前旋轉角度插值到目標（確保方向正確）
-      state.targetX = fr.x;
-      state.targetY = fr.y;
       diceData.push(state);
     }
   });
