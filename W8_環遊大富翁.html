@@ -98,7 +98,7 @@ body {
 }
 .sc-icon { font-size: 1.2rem; }
 .sc-name { color: #fff; font-weight: 700; font-size: 0.9rem; }
-.sc-pts { font-weight: 900; font-size: 1.1rem; color: var(--yellow); margin-left: 4px; }
+.sc-pts { font-weight: 900; font-size: 1.1rem; color: var(--green); margin-left: 4px; }
 
 .btn-settle-small {
   background: linear-gradient(135deg, #FF8C00, #E65100); color: #fff;
@@ -139,9 +139,9 @@ body {
   border: 1px solid rgba(0,229,255,0.4); white-space: nowrap;
 }
 .my-score {
-  font-weight: 900; font-size: 0.9rem; color: var(--yellow);
+  font-weight: 900; font-size: 0.95rem; color: var(--green);
   padding: 4px 12px; border-radius: 50px;
-  background: rgba(255,214,0,0.12); border: 1px solid rgba(255,214,0,0.3);
+  background: rgba(0,230,118,0.12); border: 1px solid rgba(0,230,118,0.3);
   white-space: nowrap;
 }
 .turn-indicator {
@@ -361,7 +361,7 @@ body {
 }
 @keyframes rs { from { transform: translateX(-50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .r-rank { font-size: 1.8rem; width: 40px; } .r-icon { font-size: 2rem; }
-.r-name { flex: 1; color: #fff; font-weight: 900; font-size: 1.1rem; } .r-score { font-size: 1.6rem; font-weight: 900; color: var(--blue); }
+.r-name { flex: 1; color: #fff; font-weight: 900; font-size: 1.1rem; } .r-score { font-size: 1.6rem; font-weight: 900; color: var(--green); }
 .confetti-wrap { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 .confetti-bit { position: absolute; border-radius: 4px; animation: cf linear forwards; }
 @keyframes cf { 0% { transform: translateY(-20px) rotate(0); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
@@ -421,7 +421,7 @@ body {
   <!-- 頂部分數條 -->
   <div class="s-scores" id="s-scores">
     <div class="my-badge" id="my-badge">🐻 第1組</div>
-    <div class="my-score" id="my-score">0 分</div>
+    <div class="my-score" id="my-score">$ 0</div>
     <div class="turn-indicator" id="turn-indicator"></div>
   </div>
   <!-- 全螢幕地圖 -->
@@ -536,11 +536,132 @@ const BOARD_SIZE = 720;
 
 const CTYPES = [
   'start','q','lucky','q','bad','q','lucky',
-  'special','q','bad','q','lucky','q','bad',
+  'special','q','lucky','q','bad','q','q',
   'special','q','lucky','q','bad','q','lucky',
-  'special','q','bad','q','lucky','q','bad'
+  'special','q','lucky','q','bad','q','q'
 ];
-const CICONS = { q:'❓', lucky:'🍀', bad:'💀', special:'⭐' };
+const CICONS = { q:'❓', lucky:'💰', bad:'💸', special:'⭐' };
+
+const LUCKY_DATA = [
+  ['考卷滿分獎勵', 100], ['幫助學弟妹解答題目', 150], ['擔任一週糾察隊津貼', 200], ['打掃區域被評為最乾淨', 250],
+  ['回答出老師的加分題', 300], ['校外比賽代表學校得獎', 350], ['在操場撿到校長的金幣', 400], ['作業書寫極其工整獲獎', 450],
+  ['全勤獎勵金', 500], ['冬令營期間表現最優異', 550], ['星際挖礦發現高純度金礦', 600], ['校園路跑獲得第一名', 700],
+  ['拾金不昧交給教務處獎勵', 800], ['科學實驗大成功獲得專利', 900], ['贏得「大富翁」年度爭霸賽', 1000],
+  ['製作環保作品獲得環保獎項', 120], ['期末同樂會抽中頭獎', 220], ['協助老師整理辦公室', 320], ['獲選為校園禮貌之星', 420],
+  ['分享個人讀書筆記大受好評', 520], ['修復教室損壞的教具', 620], ['外籍老師稱讚 Good Job 獎勵', 720],
+  ['班級佈置競賽獲得冠金', 820], ['段考進入全校前十名', 1000], ['獲得神祕的星際勳章補給', 500],
+  ['成功破解老師留下的邏輯難題', 480], ['擔任課堂小組長帶領奪冠', 380], ['寫作作品被刊登在校刊上', 280],
+  ['發現隱藏在走廊的寶箱', 580], ['獲得家長會贊助的圓夢基金', 680]
+];
+
+const LUCKY = LUCKY_DATA.map(([title, amt]) => ({
+  title, desc: `+$${amt}`, fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + amt })
+}));
+
+const BAD_DATA = [
+  ['上課遲到 5 分鐘罰款', 100], ['忘記帶當天要用的課本', 120], ['在走廊奔跑不慎撞到人醫藥費', 150],
+  ['作業沒寫完被要求留下來補寫', 200], ['弄丟班級公共區域的鑰匙', 250], ['上課愛講話被老師扣點', 300],
+  ['教室電燈沒關被總務處罰款', 350], ['考卷忘記寫名字處理費', 400], ['午休時間太吵鬧影響他人', 450],
+  ['不慎弄壞高米教室的飲水機', 500], ['桌遊競賽失敗支付賭注', 550], ['違反營隊生活守則罰金', 600],
+  ['不慎掉進旗津的海水浴場洗衣服', 700], ['實驗器材操作不當損壞賠償', 750], ['被沒收課堂禁止攜帶的玩具', 800],
+  ['追趕跑跳碰受傷的診療費', 850], ['模擬股市大崩盤資產縮水', 900], ['遺失了珍貴的星際挖礦機具', 950],
+  ['繳納校園建設與維護稅', 1000], ['忘記關水龍頭造成水費暴漲', 130], ['圖書館借書逾期未還罰款', 230],
+  ['浪費午餐食材被要求勞動服務', 330], ['服裝儀容不整被糾察隊登記', 530], ['筆電沒充電導致無法上課檢修', 630],
+  ['弄丟老師最心愛的原子筆', 730], ['錯過班級接送的交通專車', 830], ['忘記關窗戶導致雨水潑入教室', 930],
+  ['遇到教務主任稽查不合格罰款', 1000], ['電腦中病毒需要支付重灌費', 480], ['午餐剩下太多廚餘扣點', 180]
+];
+
+const BAD = BAD_DATA.map(([title, amt]) => ({
+  title, desc: `-$${amt}`, fx: (tid, gs) => updateTeam(tid, { score: Math.max(0, (Number(gs.teams[tid].score) || 0) - amt) })
+}));
+
+const SPECIAL = [
+  { title: '【大風吹】', desc: '所有人重新洗牌，隨機交換目前在地圖上的位置。', fx: (tid, gs) => {
+     const tIds = Object.keys(gs.teams).filter(k => !isNaN(k));
+     const positions = tIds.map(id => gs.teams[id].position);
+     positions.sort(() => Math.random() - 0.5);
+     const patch = {};
+     tIds.forEach((id, i) => { 
+        patch[id] = { ...gs.teams[id], position: positions[i] }; 
+        patch[String(id)] = patch[id]; 
+     });
+     updateState({ teams: patch });
+  }},
+  { title: '【校慶園遊會】', desc: '向所有對手組別收取每組 $200 的門票費。', fx: (tid, gs) => {
+     const patch = {};
+     let totalGained = 0;
+     const tIds = Object.keys(gs.teams).filter(k => !isNaN(k));
+     tIds.forEach(id => {
+       if (id != tid) {
+         const tScore = Number(gs.teams[id].score) || 0;
+         const deduct = Math.min(200, tScore);
+         patch[id] = { ...gs.teams[id], score: tScore - deduct };
+         patch[String(id)] = patch[id];
+         totalGained += deduct;
+       }
+     });
+     patch[tid] = { ...gs.teams[tid], score: (Number(gs.teams[tid].score)||0) + totalGained };
+     patch[String(tid)] = patch[tid];
+     updateState({ teams: patch });
+  }},
+  { title: '【強烈颱風過境】', desc: '每組損失 $300 修補房屋。', fx: (tid, gs) => {
+     const patch = {};
+     const tIds = Object.keys(gs.teams).filter(k => !isNaN(k));
+     tIds.forEach(id => {
+       const tScore = Number(gs.teams[id].score) || 0;
+       patch[id] = { ...gs.teams[id], score: Math.max(0, tScore - 300) };
+       patch[String(id)] = patch[id];
+     });
+     updateState({ teams: patch });
+  }},
+  { title: '【得腸病毒停課】', desc: '「停課」停走一回合。', fx: (tid) => {
+     updateTeam(tid, { skipTurn: true });
+  }},
+  { title: '【小財神降臨】', desc: '與場上總資產最高的組別交換現金。', fx: (tid, gs) => {
+     let maxT = null; let maxS = -1;
+     const tIds = Object.keys(gs.teams).filter(k => !isNaN(k));
+     tIds.forEach(id => {
+       const t = gs.teams[id];
+       if (id != tid && (Number(t.score)||0) > maxS) { maxS = Number(t.score)||0; maxT = t; }
+     });
+     if (maxT) {
+       const myS = Number(gs.teams[tid].score)||0;
+       const patch = {};
+       patch[tid] = { ...gs.teams[tid], score: maxS };
+       patch[String(tid)] = patch[tid];
+       patch[maxT.id] = { ...gs.teams[maxT.id], score: myS };
+       patch[String(maxT.id)] = patch[maxT.id];
+       updateState({ teams: patch });
+     }
+  }},
+  { title: '【小窮鬼降臨】', desc: '與場上總資產最低的組別交換現金。', fx: (tid, gs) => {
+     let minT = null; let minS = Infinity;
+     const tIds = Object.keys(gs.teams).filter(k => !isNaN(k));
+     tIds.forEach(id => {
+       const t = gs.teams[id];
+       if (id != tid && (Number(t.score)||0) < minS) { minS = Number(t.score)||0; minT = t; }
+     });
+     if (minT && minS !== Infinity) {
+       const myS = Number(gs.teams[tid].score)||0;
+       const patch = {};
+       patch[tid] = { ...gs.teams[tid], score: minS };
+       patch[String(tid)] = patch[tid];
+       patch[minT.id] = { ...gs.teams[minT.id], score: myS };
+       patch[String(minT.id)] = patch[minT.id];
+       updateState({ teams: patch });
+     }
+  }},
+  { title: '【誰亂丟香蕉皮】', desc: '跌倒，倒退兩格。', fx: (tid, gs) => {
+     const p = gs.teams[tid].position;
+     updateTeam(tid, { position: (p - 2 + TOTAL) % TOTAL });
+  }},
+  { title: '【買了新腳踏車】', desc: '獲得第二顆骰子，下回合開始擲兩顆。', fx: (tid) => {
+     updateTeam(tid, { extraDice: true });
+  }},
+  { title: '【放手騎腳踏車】', desc: '(兩顆骰子限定)摔車了，變回一顆骰子。', fx: (tid) => {
+     updateTeam(tid, { extraDice: false });
+  }}
+];
 
 function getBoardLayout() {
   const path = [];
@@ -618,8 +739,8 @@ function applyTransform() {
     const tBoard = document.getElementById('board');
     if (tBoard) tBoard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   } else {
-    // 學生端高倍率模式，利用 translate 移動鏡頭來跟蹤棋子 (調降為 750 以顯示更多範圍)
-    const scale = Math.max(vw, vh) / 750; 
+    // 學生端高倍率模式，利用 translate 移動鏡頭來跟蹤棋子 (調降為 800 以顯示更多範圍)
+    const scale = Math.max(vw, vh) / 800; 
     const tx = (_cameraOffsetX + _panOffsetX) * scale;
     const ty = (_cameraOffsetY + _panOffsetY) * scale;
     
@@ -648,7 +769,7 @@ function setupDrag(elementId) {
       if (myRole === 'teacher') {
           scale = Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120));
       } else {
-          scale = Math.max(window.innerWidth, window.innerHeight) / 750;
+          scale = Math.max(window.innerWidth, window.innerHeight) / 800;
       }
       _panOffsetX += (e.clientX - startX) / scale;
       _panOffsetY += (e.clientY - startY) / scale;
@@ -669,7 +790,7 @@ function setupDrag(elementId) {
       if (myRole === 'teacher') {
           scale = Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120));
       } else {
-          scale = Math.max(window.innerWidth, window.innerHeight) / 750;
+          scale = Math.max(window.innerWidth, window.innerHeight) / 800;
       }
       _panOffsetX += (e.touches[0].clientX - startX) / scale;
       _panOffsetY += (e.touches[0].clientY - startY) / scale;
@@ -833,15 +954,17 @@ function processAction(action) {
     showDiceAnim(d.d1, d.d2, d.total);
     updateState({ phase: 'rolled', diceResult: d });
     
-    const savedDice = { ...d };
-    // 等待 3 秒鐘讓 3D 骰子動畫與結果完全播完，雙端一起觸發跑棋子
-    setTimeout(() => {
-      if (gameState) {
-        gameState.phase = 'rolled';
-        gameState.diceResult = savedDice;
-        movePiece();
-      }
-    }, 3000);
+    if (myRole === 'teacher') {
+      const savedDice = { ...d };
+      // 等待 3 秒鐘讓 3D 骰子動畫與結果完全播完，再開始跑棋子
+      setTimeout(() => {
+        if (gameState) {
+          gameState.phase = 'rolled';
+          gameState.diceResult = savedDice;
+          movePiece();
+        }
+      }, 3000);
+    }
   }
 }
 
@@ -1060,7 +1183,7 @@ function buildBoard() {
                <path d="M12 2 L20 13 L15.5 13 L15.5 22 L8.5 22 L8.5 13 L4 13 Z"/>
              </svg>
              <span style="font-size:0.9rem;font-weight:900;color:var(--red);letter-spacing:1px;line-height:1.1;">START</span>
-             <span style="font-size:0.7rem;font-weight:900;color:#fff;background:var(--red);padding:1px 7px;border-radius:5px;line-height:1.5;">+1</span>
+             <span style="font-size:0.7rem;font-weight:900;color:#fff;background:var(--red);padding:1px 7px;border-radius:5px;line-height:1.5;">+$500</span>
            </div>`
         : `<span class="c-icon">${CICONS[type] || '❓'}</span>`;
 
@@ -1096,7 +1219,7 @@ function makeInit() {
 
   const teams = {};
   TEAMS.forEach(t => {
-    teams[t.id] = { id: t.id, position: 0, score: 0, extraDice: false, skipTurn: false };
+    teams[t.id] = { id: t.id, position: 0, score: 3000, extraDice: false, skipTurn: false };
   });
 
   const playOrder = [...TEAMS].sort((a, b) => a.id - b.id).map(t => t.id);
@@ -1210,12 +1333,20 @@ function render() {
       overlay.style.display = 'flex';
       let html = '';
 
+      if (gameState.phase === 'waiting_roll' || gameState.phase === 'rolled') {
+          coBox.style.padding = '15px 30px';
+          coBox.style.background = 'rgba(20,20,30,0.75)';
+      } else {
+          coBox.style.padding = '30px 40px';
+          coBox.style.background = 'rgba(20,20,30,0.95)';
+      }
+
       if (gameState.phase === 'intro') {
           html = `<div class="co-title" style="font-size:2.5rem; color:var(--yellow); margin-bottom:16px;">🚀 環遊大富翁</div>
                   <div class="co-desc" style="color:#fff; font-size:1.1rem; line-height:1.6; text-align:left; margin-bottom:24px;">
                       1. 各組輪流擲骰子前進。<br>
                       2. 停留格子將觸發 <b>機會、命運、或問答挑戰</b>。<br>
-                      3. 答對題目可獲得積分，善用運氣與智慧累積最高分！
+                      3. 答對題目可獲得資金，善用運氣與智慧累積最高財富！
                   </div>`;
           if (isT) html += `<button class="btn-pub" style="display:block; font-size:1.3rem; padding:16px;" onclick="startGame()">🎲 遊戲開始</button>`;
           else html += `<div class="wait-msg"><div class="pulse"></div> 等待老師開始遊戲...</div>`;
@@ -1233,16 +1364,19 @@ function render() {
           const lt = gameState.landType;
           let i = '❓', t = '機會命運', d = '抽題中...';
           if (lt === 'start') { i = '🏁'; t = '到達起點'; d = '獲得獎勵！'; }
-          else if (lt === 'special') { i = '⭐'; t = '特殊挑戰'; d = '答對可得高分！'; }
-          else if (lt === 'lucky') { i = '🍀'; t = '幸運事件'; d = '好運降臨！'; }
-          else if (lt === 'bad') { i = '💀'; t = '突發狀況'; d = '糟糕了...'; }
+          else if (lt === 'special') { i = '⭐'; t = '特殊事件'; d = '命運的齒輪轉動...'; }
+          else if (lt === 'lucky') { i = '💰'; t = '幸運事件'; d = '好運降臨！'; }
+          else if (lt === 'bad') { i = '💸'; t = '突發狀況'; d = '糟糕了...'; }
           else if (lt === 'q') { i = '❓'; t = '機會問答'; d = '準備挑戰！'; }
           html = `<div class="co-icon">${i}</div><div class="co-title">${t}</div><div class="co-desc" style="margin-bottom:0;">${d}</div>`;
       } 
       else if (gameState.phase === 'event') {
           const ev = gameState.event;
-          const evIcon = ev.type === 'lucky' ? '🍀' : '💀';
-          const evColor = ev.type === 'lucky' ? 'var(--green)' : 'var(--red)';
+          let evIcon = '❓', evColor = '#fff';
+          if(ev.type === 'lucky') { evIcon = '💰'; evColor = 'var(--green)'; }
+          else if(ev.type === 'bad') { evIcon = '💸'; evColor = 'var(--red)'; }
+          else if(ev.type === 'special') { evIcon = '⭐'; evColor = 'var(--purple)'; }
+
           html = `<div class="co-icon" style="animation:none;">${evIcon}</div>
                   <div class="co-title" style="color:${evColor}">${ev.title}</div>
                   <div class="co-desc" style="margin-bottom:20px; color:#fff; font-size:1.1rem;">${ev.desc}</div>`;
@@ -1252,7 +1386,7 @@ function render() {
       else if (gameState.phase === 'answering') {
           const q = gameState.question;
           if (!q) {
-              html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> AI 出題中...</div>`;
+              html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> 讀取題庫中...</div>`;
           } else {
               const sa = gameState.selectedAnswer;
               if (isT) {
@@ -1395,7 +1529,7 @@ function renderTeacher() {
     row.innerHTML = `
       <span class="sc-icon">${t.icon}</span>
       <span class="sc-name" style="color:${t.color}">${t.name}</span>
-      <span class="sc-pts">${Number(team.score) || 0}</span>`;
+      <span class="sc-pts">$${Number(team.score) || 0}</span>`;
     sc.appendChild(row);
   });
 }
@@ -1413,7 +1547,7 @@ function renderStudent() {
 
   const myTD = gs?.teams?.[myTeamId] || gs?.teams?.[String(myTeamId)];
   const scoreEl = document.getElementById('my-score');
-  if (scoreEl) scoreEl.textContent = `${Number(myTD?.score) || 0} 分`;
+  if (scoreEl) scoreEl.innerHTML = `$<span style="margin-left: 2px;">${Number(myTD?.score) || 0}</span>`;
 
   if (!gs || !gs.teams) {
     setHud('⏳ 等待遊戲狀態同步...');
@@ -1755,10 +1889,9 @@ function movePiece() {
         updateCameraTarget(curPos);
         _panOffsetX = 0; _panOffsetY = 0; 
         applyTransform();
-    } else {
-        broadcast(); // 只有老師端廣播，以免互相覆蓋導致頓挫
     }
 
+    broadcast();
     renderPieces();
     
     if (step < steps) {
@@ -1788,12 +1921,13 @@ function triggerEvent(type, finalPos) {
       const _curTeam = gameState.teams[tidStr] || gameState.teams[tid] || {};
       
       if (type === 'start') {
-        showToast('🏁 經過起點！+1分');
-        updateTeam(tid, { score: (Number(_curTeam.score) || 0) + 1 });
+        showToast('🏁 經過起點！+$500');
+        showPop('+$500', 'var(--green)');
+        updateTeam(tid, { score: (Number(_curTeam.score) || 0) + 500 });
         updateState({ phase: 'done', event: null });
       }
       else if (type === 'q') { updateState({ phase: 'answering', event: null, selectedAnswer: null }); fetchQ(false); }
-      else if (type === 'special') { updateState({ phase: 'answering', event: { specialQ: true }, selectedAnswer: null }); fetchQ(true); }
+      else if (type === 'special') { doSpecial(tid); }
       else if (type === 'lucky') doLucky(tid);
       else if (type === 'bad') doBad(tid);
       else updateState({ phase: 'done', event: null });
@@ -1801,31 +1935,27 @@ function triggerEvent(type, finalPos) {
   }
 }
 
-const LUCKY = [
-  { title: '幸運之星！', desc: '+3 分！', fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + 3 }) },
-  { title: '順風！', desc: '前進 2 格！', fx: (tid, gs) => { updateTeam(tid, { position: (Number(gs.teams[tid].position) + 2) % TOTAL }); } },
-  { title: '全組加分！', desc: '所有組各 +1 分！', fx: (tid, gs) => {
-    const t2 = { ...gs.teams }; Object.values(t2).forEach(t => { t2[t.id] = { ...t2[t.id], score: (Number(t2[t.id].score) || 0) + 1 }; }); updateState({ teams: t2 }); } },
-  { title: '🎲 獲得第二顆骰子！', desc: '之後每回合擲兩顆！', fx: (tid) => updateTeam(tid, { extraDice: true }) },
-  { title: '神秘禮物！', desc: '+2 分！', fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + 2 }) },
-];
-const BAD = [
-  { title: '倒楣！', desc: '-1 分', fx: (tid, gs) => updateTeam(tid, { score: Math.max(0, (Number(gs.teams[tid].score) || 0) - 1) }) },
-  { title: '滑倒！', desc: '退後 2 格', fx: (tid, gs) => { updateTeam(tid, { position: ((Number(gs.teams[tid].position) - 2) + TOTAL) % TOTAL }); } },
-  { title: '⏸ 停一回合！', desc: '下回合跳過', fx: (tid) => updateTeam(tid, { skipTurn: true }) },
-];
+function doSpecial(tid) {
+  const ev = SPECIAL[Math.floor(Math.random() * SPECIAL.length)];
+  ev.fx(tid, gameState);
+  updateState({ phase: 'event', event: { type: 'special', title: ev.title, desc: ev.desc } });
+  showToast(`⭐ ${ev.title}`); 
+}
 
 function doLucky(tid) {
   const ev = LUCKY[Math.floor(Math.random() * LUCKY.length)];
   ev.fx(tid, gameState);
   updateState({ phase: 'event', event: { type: 'lucky', title: ev.title, desc: ev.desc } });
-  showToast(`🍀 ${ev.title}`); showPop('+', 'var(--green)');
+  showToast(`💰 ${ev.title}`); 
+  showPop(ev.desc, 'var(--green)');
 }
+
 function doBad(tid) {
   const ev = BAD[Math.floor(Math.random() * BAD.length)];
   ev.fx(tid, gameState);
   updateState({ phase: 'event', event: { type: 'bad', title: ev.title, desc: ev.desc } });
-  showToast(`💀 ${ev.title}`); showPop('-1', 'var(--red)');
+  showToast(`💸 ${ev.title}`); 
+  showPop(ev.desc, 'var(--red)');
 }
 
 let cachedQuestions = null;
@@ -1842,6 +1972,7 @@ async function fetchQ(isSpecial) {
       
       cachedQuestions = [];
       data.table.rows.forEach(row => {
+        // 第一欄為題號，第二欄為題目
         if (row.c && row.c.length > 1 && row.c[1] && row.c[1].v) {
           const qText = String(row.c[1].v).trim();
           if (qText !== '題目' && qText !== 'Question') {
@@ -1880,14 +2011,14 @@ function publishAnswer() {
   const gs = gameState;
   if (!gs.selectedAnswer) { showToast('請等待學生選擇答案！'); return; }
   const correct = gs.selectedAnswer === gs.question.answer;
-  const bonus = gs.event?.specialQ ? 4 : 2;
+  const bonus = 500; 
   if (correct) {
     const curTeam = gs.teams[gs.currentTurn];
     updateTeam(gs.currentTurn, { score: (Number(curTeam.score) || 0) + bonus });
-    showPop('+' + bonus, 'var(--green)');
+    showPop('+$' + bonus, 'var(--green)');
   }
   updateState({ phase: 'revealing' });
-  showToast(correct ? `🎉 答對！+${bonus}分` : '❌ 答錯了！');
+  showToast(correct ? `🎉 答對！+$${bonus}` : '❌ 答錯了！');
 }
 
 function nextTurn() {
@@ -1939,7 +2070,7 @@ function showResult() {
     const item = document.createElement('div'); item.className = 'r-item';
     item.style.animationDelay = (i * 0.12) + 's';
     item.innerHTML = `<span class="r-rank">${medals[i]||''}</span><span class="r-icon">${t?.icon||'🐻'}</span>
-      <span class="r-name">${t?.name||`第${team.id}組`}</span><span class="r-score">${Number(team.score)||0}分</span>`;
+      <span class="r-name">${t?.name||`第${team.id}組`}</span><span class="r-score">$${Number(team.score)||0}</span>`;
     rl.appendChild(item);
   });
   
