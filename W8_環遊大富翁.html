@@ -1403,32 +1403,43 @@ function resizeBoard() {
   const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
 
-  let scale;
   if (myRole === 'teacher') {
     const sidebar = document.getElementById('t-sidebar');
     const sidebarW = (sidebar && !sidebar.classList.contains('collapsed')) ? Math.min(260, vw * 0.22) : 42;
     const eventW = Math.min(300, Math.max(180, vw - sidebarW - 80));
     const availW = Math.max(150, vw - eventW - 20 - sidebarW - 16);
     const availH = vh - 16;
-    scale = Math.min(availW / VW, availH / VH);
+    const scale = Math.min(availW / VW, availH / VH);
     const board = document.getElementById('board');
     if (board) board.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   } else {
+    // 學生端：棋盤完整顯示在可見區（頂部40px + 底部110px）
     const topH = 40;
     const botH = 110;
-    const availW = vw;
-    const availH = vh - topH - botH;
-    scale = Math.min(availW / VW, availH / VH) * 2.5;
+    const availW = vw - 20;          // 左右留 10px 邊距
+    const availH = vh - topH - botH - 20; // 上下再留 10px 邊距
+    const scale = Math.min(availW / VW, availH / VH);
+
     const sboard = document.getElementById('s-board');
     if (sboard) sboard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
 
+    // iso-scene 的幾何中心 = 棋盤中心，對齊到 (0,0)
     const scene = document.getElementById('s-iso-scene');
     if (scene) {
       const half = (BOARD_SIZE / 2) * scale;
       scene.style.left = (-half) + 'px';
-      scene.style.top = (-half) + 'px';
-      scene.style.width = (BOARD_SIZE * scale) + 'px';
+      scene.style.top  = (-half) + 'px';
+      scene.style.width  = (BOARD_SIZE * scale) + 'px';
       scene.style.height = (BOARD_SIZE * scale) + 'px';
+    }
+
+    // map-inner 移到 s-map 中央，讓棋盤完整顯示
+    const map = document.getElementById('s-map');
+    if (map) {
+      const rect = map.getBoundingClientRect();
+      _mapX = rect.width  / 2;
+      _mapY = rect.height / 2;
+      applyMapTransform();
     }
   }
 }
@@ -1444,26 +1455,42 @@ let _mapX = 0, _mapY = 0;
 
 function initStudentMap() {
   const map = document.getElementById('s-map');
-  if (!map) return;
+  if (!map || map._dragInit) return;
+  map._dragInit = true;
 
+  // 與 resizeBoard 學生端邏輯一致，棋盤完整顯示
+  const VW = BOARD_SIZE * 1.414;
+  const VH = BOARD_SIZE * 1.22;
   const vw = window.innerWidth;
-  const sScale = (vw / (BOARD_SIZE * Math.SQRT2)) * 2.5;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const sScale = Math.min((vw - 20) / VW, (vh - 40 - 110 - 20) / VH);
+
   const sboard = document.getElementById('s-board');
   if (sboard) sboard.style.transform = `scale(${sScale}) rotateX(55deg) rotateZ(-45deg)`;
 
   const scene = document.getElementById('s-iso-scene');
   if (scene) {
-    const halfScaled = (BOARD_SIZE / 2) * sScale;
-    scene.style.left = (-halfScaled) + 'px';
-    scene.style.top = (-halfScaled) + 'px';
-    scene.style.width = (BOARD_SIZE * sScale) + 'px';
+    const half = (BOARD_SIZE / 2) * sScale;
+    scene.style.left   = (-half) + 'px';
+    scene.style.top    = (-half) + 'px';
+    scene.style.width  = (BOARD_SIZE * sScale) + 'px';
     scene.style.height = (BOARD_SIZE * sScale) + 'px';
   }
 
   const mapRect = map.getBoundingClientRect();
-  _mapX = mapRect.width / 2;
+  _mapX = mapRect.width  / 2;
   _mapY = mapRect.height / 2;
   applyMapTransform();
+
+  // 拖動 mouse
+  let _drag = false, _sx = 0, _sy = 0, _bx = 0, _by = 0;
+  map.addEventListener('mousedown', e => { _drag=true; _sx=e.clientX; _sy=e.clientY; _bx=_mapX; _by=_mapY; });
+  window.addEventListener('mousemove', e => { if(!_drag) return; _mapX=_bx+(e.clientX-_sx); _mapY=_by+(e.clientY-_sy); applyMapTransform(); });
+  window.addEventListener('mouseup', () => { _drag=false; });
+  // 拖動 touch
+  map.addEventListener('touchstart', e => { if(e.touches.length!==1) return; _drag=true; _sx=e.touches[0].clientX; _sy=e.touches[0].clientY; _bx=_mapX; _by=_mapY; }, {passive:true});
+  map.addEventListener('touchmove', e => { if(!_drag||e.touches.length!==1) return; e.preventDefault(); _mapX=_bx+(e.touches[0].clientX-_sx); _mapY=_by+(e.touches[0].clientY-_sy); applyMapTransform(); }, {passive:false});
+  map.addEventListener('touchend', () => { _drag=false; });
 }
 
 function applyMapTransform() {
