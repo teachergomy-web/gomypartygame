@@ -143,7 +143,7 @@ body {
   border: 2px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #fff;
   cursor: pointer; font-family: var(--font); font-size: 0.85rem; font-weight: 900; text-align: left; transition: all 0.2s;
 }
-.opt-btn:hover { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1); }
+.opt-btn:hover:not(:disabled) { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1); }
 .opt-btn.selected { border-color: var(--yellow); background: rgba(255, 214, 0, 0.15); box-shadow: 0 0 10px rgba(255,214,0,0.3); }
 .opt-btn.correct { border-color: var(--green); background: rgba(0, 230, 118, 0.15); color: var(--green); }
 .opt-btn.wrong { border-color: var(--red); background: rgba(255, 23, 68, 0.15); color: var(--red); }
@@ -160,9 +160,10 @@ body {
   transition: all 0.2s; margin-bottom: 6px;
 }
 .btn-pub { background: linear-gradient(135deg, #d500f9, #aa00ff); color: #fff; display: none; box-shadow: 0 4px 15px rgba(213,0,249,0.3); }
+.btn-pub:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 .btn-next { background: linear-gradient(135deg, #00e676, #00c853); color: #000; display: none; box-shadow: 0 4px 15px rgba(0,230,118,0.3); }
 .btn-settle { background: linear-gradient(135deg, #FF8C00, #E65100); color: #fff; box-shadow: 0 4px 15px rgba(255,140,0,0.3); }
-.btn-pub:active, .btn-next:active, .btn-settle:active { transform: scale(0.96); }
+.btn-pub:not(:disabled):active, .btn-next:active, .btn-settle:active { transform: scale(0.96); }
 
 .ldots { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 1rem; color: rgba(255,255,255,0.5); }
 .ldots span { width: 8px; height: 8px; background: var(--blue); border-radius: 50%; animation: db 0.7s ease-in-out infinite; }
@@ -255,7 +256,7 @@ body {
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 16px;
   padding: 10px 16px;
-  max-width: 220px;
+  max-width: 250px;
   min-width: 130px;
   text-align: center;
   font-size: 0.82rem;
@@ -267,7 +268,7 @@ body {
   box-shadow: 0 6px 24px rgba(0,0,0,0.6);
 }
 
-/* 擲骰面板：骰子圖示 + GO 按鈕橫排（比照大富翁截圖） */
+/* 擲骰面板：骰子圖示 + GO 按鈕橫排 */
 .s-hud-roll-panel {
   display: flex;
   align-items: center;
@@ -321,6 +322,28 @@ body {
 }
 
 /* ══════════════════════════════
+   全螢幕事件揭曉遮罩 (Land Reveal)
+   ══════════════════════════════ */
+.center-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,0.75);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  animation: coFadeIn 0.3s ease-out;
+}
+@keyframes coFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.co-box {
+  background: rgba(20,20,30,0.9); border: 3px solid var(--yellow);
+  border-radius: 24px; padding: 40px 60px; text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,214,0,0.2);
+  transform: scale(0.8); animation: coPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes coPop { to { transform: scale(1); } }
+.co-icon { font-size: 5.5rem; margin-bottom: 10px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); animation: bounce 2s infinite; }
+.co-title { font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 8px; text-shadow: 0 4px 10px rgba(0,0,0,0.8); }
+.co-desc { font-size: 1.1rem; font-weight: 700; color: var(--yellow); }
+
+/* ══════════════════════════════
    3D 骰子動畫系統（Three.js）
    ══════════════════════════════ */
 #dice3d-overlay {
@@ -363,10 +386,6 @@ body {
   color: var(--yellow); font-weight: 900; font-size: 1.5rem; letter-spacing: 2px;
   box-shadow: 0 4px 20px rgba(255,214,0,0.35);
 }
-
-.wait-msg { color: rgba(255,255,255,0.6); font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; width: 100%; text-align: center; }
-.pulse { width: 10px; height: 10px; background: var(--blue); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; box-shadow: 0 0 8px var(--blue); flex-shrink: 0; }
-@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.6); } }
 
 /* ══════════════════════════════
    ISO BOARD (等距視角 + 完美無死角 3D 立體)
@@ -576,30 +595,6 @@ body {
 }
 .btn-restart:hover { transform: scale(1.05); }
 
-/* ══════════════════════════════
-   EVENT PANEL - 左上角浮動
-   ══════════════════════════════ */
-.event-float {
-  position: absolute; top: 12px; left: 12px; z-index: 400;
-  width: 300px;
-  background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 16px; backdrop-filter: blur(15px);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.7);
-  display: flex; flex-direction: column; overflow: hidden;
-}
-.event-float-header {
-  background: rgba(255,255,255,0.06); padding: 10px 14px;
-  display: flex; align-items: center; gap: 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-.event-float-title { font-size: 0.8rem; font-weight: 900; color: rgba(255,255,255,0.5); letter-spacing: 0.1em; text-transform: uppercase; }
-.turn-chip-inline {
-  margin-left: auto; background: rgba(255, 214, 0, 0.2); color: var(--yellow); font-weight: 900; font-size: 0.8rem;
-  padding: 4px 12px; border-radius: 50px; border: 1px solid rgba(255, 214, 0, 0.5);
-}
-.event-float-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.ev-lucky { background: rgba(0, 230, 118, 0.1) !important; border: 1px solid rgba(0, 230, 118, 0.3) !important; }
-.ev-bad { background: rgba(255, 23, 68, 0.1) !important; border: 1px solid rgba(255, 23, 68, 0.3) !important; }
 </style>
 </head>
 <body>
@@ -682,6 +677,14 @@ body {
 <!-- 3D 骰子 canvas 遮罩 -->
 <div id="dice3d-overlay">
   <div id="dice3d-canvas-wrap"></div>
+</div>
+<!-- 置中事件揭曉大遮罩 -->
+<div id="center-event-overlay" class="center-overlay">
+  <div class="co-box">
+    <div class="co-icon" id="co-icon">❓</div>
+    <div class="co-title" id="co-title">機會命運</div>
+    <div class="co-desc" id="co-desc">即將揭曉...</div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -838,22 +841,30 @@ function attachSync() {
   setInterval(pollNow, 400);
 }
 
-// 統一接收訊號處理骰子動畫並移動 (注意: 此處只處理正確的 W8_ROLL 訊號)
+// 統一接收訊號處理骰子動畫並移動 
 function processAction(action) {
   if (!gameState) return;
   if (action.ts === _lastActionTs) return;
   _lastActionTs = action.ts;
 
-  if (action.type === 'W8_ROLL') {
+  // 處理學生回答訊號
+  if (action.type === 'W8_ANSWER') {
+    if (gameState && gameState.phase === 'answering' && (Number(action.teamId) === Number(gameState.currentTurn))) {
+      updateState({ selectedAnswer: action.answer });
+      const team = TEAMS.find(t => t.id == action.teamId);
+      showToast(`✅ ${team?.name || '學生'} 已選擇答案！`);
+    }
+    return;
+  }
+
+  if (action.type === 'W8_ROLL' || action.type === 'W8_MOVE_ROLL') {
     if (Number(action.teamId) !== Number(gameState.currentTurn) &&
-        String(action.teamId) !== String(gameState.currentTurn)) return;
-        
+        String(action.teamId) !== String(gameState.currentTurn)) {
+      return;
+    }
     const d = action.diceResult;
     showDiceAnim(d.d1, d.d2, d.total);
     updateState({ phase: 'rolled', diceResult: d });
-    
-    const team = TEAMS.find(t => t.id == action.teamId);
-    showToast(`🎲 ${team?.icon || ''} 擲出 ${d.total} 步！`);
     
     if (myRole === 'teacher') {
       const savedDice = { ...d };
@@ -930,7 +941,7 @@ window.addEventListener('message', e => {
     syncTeamsFromParent(); syncTeamsFromState();
     render(); centerOnMyPiece();
   }
-  if (e.data.type === 'W8_ROLL' && myRole === 'teacher') {
+  if ((e.data.type === 'W8_ROLL' || e.data.type === 'W8_MOVE_ROLL' || e.data.type === 'W8_ANSWER') && myRole === 'teacher') {
     processAction(e.data);
   }
 });
@@ -1159,6 +1170,25 @@ function render() {
   if (!gameState) return;
   syncTeamsFromState();
   renderPieces();
+  
+  // 處理大遮罩的顯示
+  const overlay = document.getElementById('center-event-overlay');
+  if (gameState.phase === 'land_reveal') {
+      overlay.style.display = 'flex';
+      const lt = gameState.landType;
+      let i = '❓', t = '機會命運', d = '抽題中...';
+      if (lt === 'start') { i = '🏁'; t = '到達起點'; d = '獲得獎勵！'; }
+      else if (lt === 'special') { i = '⭐'; t = '特殊挑戰'; d = '答對可得高分！'; }
+      else if (lt === 'lucky') { i = '🍀'; t = '幸運事件'; d = '好運降臨！'; }
+      else if (lt === 'bad') { i = '💀'; t = '突發狀況'; d = '糟糕了...'; }
+      else if (lt === 'q') { i = '❓'; t = '機會問答'; d = '準備挑戰！'; }
+      document.getElementById('co-icon').textContent = i;
+      document.getElementById('co-title').textContent = t;
+      document.getElementById('co-desc').textContent = d;
+  } else {
+      if (overlay) overlay.style.display = 'none';
+  }
+
   if (isT) renderTeacher(); else renderStudent();
 }
 
@@ -1283,16 +1313,31 @@ function renderEventPanel() {
     eb.innerHTML = `<div class="wait-msg" style="justify-content:center;padding:1rem"><div class="pulse"></div> 等待 ${ct?.icon || ''} 擲骰...</div>`;
   } else if (ph === 'rolled') {
     eb.className = 'event-box';
-    const d = gs.diceResult; const f = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+    const d = gs.diceResult; 
     eb.innerHTML = `<div style="text-align:center">
-      <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-bottom:8px">骰子結果</div>
-      <div class="dice-show"><div class="dice-face">${f[(d.d1 || 1) - 1]}</div>${d.d2 ? `<div class="dice-face">${f[(d.d2 || 1) - 1]}</div>` : ''}</div>
-      <div class="dice-total">共 ${d.total} 步</div></div>`;
-    bnext.style.display = 'block'; bnext.textContent = '▶ 移動棋子'; bnext.onclick = () => movePiece();
+      <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-bottom:8px">擲骰結果</div>
+      <div class="dice-total" style="font-size:2.2rem; margin:10px 0;">共 ${d.total} 步</div>
+      <div style="color:var(--yellow); font-size: 0.85rem;">棋子移動中...</div></div>`;
+    bnext.style.display = 'none'; 
+  } else if (ph === 'land_reveal') {
+    eb.className = 'event-box';
+    eb.innerHTML = `<div class="wait-msg" style="justify-content:center;padding:1rem"><div class="pulse"></div> 準備揭曉事件...</div>`;
   } else if (ph === 'event') {
     renderEventCard();
   } else if (ph === 'answering') {
-    renderQuestionPanel(); bpub.style.display = 'block';
+    renderQuestionPanel(); 
+    bpub.style.display = 'block';
+    if (gs.selectedAnswer) {
+      bpub.disabled = false;
+      bpub.style.opacity = '1';
+      bpub.style.cursor = 'pointer';
+      bpub.textContent = '🎯 公布答案';
+    } else {
+      bpub.disabled = true;
+      bpub.style.opacity = '0.5';
+      bpub.style.cursor = 'not-allowed';
+      bpub.textContent = '等待學生作答...';
+    }
   } else if (ph === 'revealing') {
     renderRevealPanel();
     bnext.style.display = 'block'; bnext.textContent = '➡️ 下一組'; bnext.onclick = () => nextTurn();
@@ -1322,8 +1367,8 @@ function renderQuestionPanel() {
   eb.className = 'event-box';
   const sa = gameState.selectedAnswer;
   eb.innerHTML = `<div class="q-text">${q.question}</div>
-    <button class="opt-btn ${sa === 'A' ? 'selected' : ''}" onclick="selectAnswer('A')">A．${q.optionA}</button>
-    <button class="opt-btn ${sa === 'B' ? 'selected' : ''}" onclick="selectAnswer('B')">B．${q.optionB}</button>`;
+    <div class="opt-btn ${sa === 'A' ? 'selected' : ''}" style="cursor:default;">A．${q.optionA}</div>
+    <div class="opt-btn ${sa === 'B' ? 'selected' : ''}" style="cursor:default;">B．${q.optionB}</div>`;
 }
 
 function renderRevealPanel() {
@@ -1333,8 +1378,8 @@ function renderRevealPanel() {
   const correct = sa === q.answer;
   eb.className = 'event-box';
   eb.innerHTML = `<div class="q-text">${q.question}</div>
-    <button class="opt-btn ${sa === 'A' ? (correct ? 'correct' : 'wrong') : q.answer === 'A' ? 'correct' : ''}" disabled>A．${q.optionA}${q.answer === 'A' ? ' ✅' : ''}</button>
-    <button class="opt-btn ${sa === 'B' ? (correct ? 'correct' : 'wrong') : q.answer === 'B' ? 'correct' : ''}" disabled>B．${q.optionB}${q.answer === 'B' ? ' ✅' : ''}</button>
+    <div class="opt-btn ${sa === 'A' ? (correct ? 'correct' : 'wrong') : q.answer === 'A' ? 'correct' : ''}" style="cursor:default;">A．${q.optionA}${q.answer === 'A' ? ' ✅' : ''}</div>
+    <div class="opt-btn ${sa === 'B' ? (correct ? 'correct' : 'wrong') : q.answer === 'B' ? 'correct' : ''}" style="cursor:default;">B．${q.optionB}${q.answer === 'B' ? ' ✅' : ''}</div>
     <div style="text-align:center;font-weight:900;font-size:1.1rem;margin-top:10px;color:${correct ? 'var(--green)' : 'var(--red)'}">
       ${correct ? `🎉 答對！+${gs.event?.specialQ ? 4 : 2}分` : '❌ 答錯了！'}</div>`;
   exb.style.display = 'block'; exb.textContent = '💡 ' + (q.explanation || '');
@@ -1562,23 +1607,43 @@ function renderStudent() {
   } else if (gs.phase === 'rolled' || gs.phase === 'event') {
     const d = gs.diceResult;
     if (d) {
-      const f = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-      setHud(`<div style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin-bottom:4px;">你們擲出了</div>
-        <div style="font-size:1.8rem;line-height:1;">${f[(d.d1||1)-1]}${d.d2?f[(d.d2||1)-1]:''}</div>
-        <div style="color:var(--yellow);font-weight:900;margin-top:4px;">共 ${d.total} 步</div>`);
+      setHud(`<div style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin-bottom:4px;">${isMyTurn ? '你們' : '他們'}擲出了</div>
+        <div style="color:var(--yellow);font-weight:900;font-size:1.8rem;margin:8px 0;">${d.total} 步</div>
+        <div style="font-size:0.75rem;color:rgba(255,255,255,0.8);">棋子移動中...</div>`);
     }
+
+  } else if (gs.phase === 'land_reveal') {
+    setHud(`<div class="wait-msg"><div class="pulse"></div><span>準備揭曉事件...</span></div>`);
 
   } else if (gs.phase === 'answering') {
     const q = gs.question;
     if (!q) {
       setHud(`<div class="ldots"><span></span><span></span><span></span><span style="margin-left:8px;font-size:0.82rem;">AI 出題中...</span></div>`);
     } else {
-      setHud(`<div style="font-size:0.8rem;color:var(--yellow);font-weight:900;margin-bottom:6px;">💬 討論後告訴老師答案！</div>
-        <div style="font-size:0.78rem;color:#fff;margin-bottom:6px;">${q.question}</div>
-        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
-          <div style="padding:4px 10px;background:rgba(0,229,255,0.15);border:1px solid rgba(0,229,255,0.4);border-radius:8px;font-size:0.78rem;color:var(--blue);font-weight:900;">A．${q.optionA}</div>
-          <div style="padding:4px 10px;background:rgba(255,23,68,0.15);border:1px solid rgba(255,23,68,0.4);border-radius:8px;font-size:0.78rem;color:var(--red);font-weight:900;">B．${q.optionB}</div>
-        </div>`);
+      const sa = gs.selectedAnswer;
+      if (isMyTurn && !sa) {
+        setHud(`
+          <div style="font-size:0.8rem;color:var(--yellow);font-weight:900;margin-bottom:6px;">💬 請討論後選擇答案！</div>
+          <div style="font-size:0.78rem;color:#fff;margin-bottom:8px;text-align:left;">${q.question}</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;width:100%;">
+            <button class="opt-btn" style="text-align:center;padding:8px 12px;margin:0;" onclick="studentSelectAnswer('A')">A．${q.optionA}</button>
+            <button class="opt-btn" style="text-align:center;padding:8px 12px;margin:0;" onclick="studentSelectAnswer('B')">B．${q.optionB}</button>
+          </div>`);
+      } else if (sa) {
+        setHud(`
+          <div style="font-size:0.78rem;color:#fff;margin-bottom:8px;text-align:left;">${q.question}</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;width:100%;">
+            <div class="opt-btn ${sa==='A'?'selected':''}" style="text-align:center;padding:8px 12px;margin:0;opacity:${sa==='A'?1:0.4};cursor:default;">A．${q.optionA}</div>
+            <div class="opt-btn ${sa==='B'?'selected':''}" style="text-align:center;padding:8px 12px;margin:0;opacity:${sa==='B'?1:0.4};cursor:default;">B．${q.optionB}</div>
+          </div>
+          <div style="font-size:0.75rem;color:var(--yellow);margin-top:8px;">等待老師公布答案...</div>
+        `);
+      } else {
+        setHud(`
+          <div style="font-size:0.78rem;color:#fff;margin-bottom:8px;text-align:left;">${q.question}</div>
+          <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-top:8px;">等待作答中...</div>
+        `);
+      }
     }
 
   } else if (gs.phase === 'revealing') {
@@ -1593,6 +1658,27 @@ function renderStudent() {
 
   centerOnMyPiece();
 }
+
+window.studentSelectAnswer = function(ans) {
+  if (!gameState || gameState.phase !== 'answering') return;
+  const action = { type: 'W8_ANSWER', teamId: myTeamId, answer: ans, ts: Date.now() };
+  if (myRole === 'student') {
+    try { window.parent.postMessage(action, '*'); } catch (e) {}
+    try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
+    try {
+      const roomId = window.parent?.state?.roomId;
+      if (parentDb && roomId) {
+        parentDb.collection('rooms').doc(roomId).update({ w8Action: action });
+      } else if (window.parent?.state && typeof window.parent.saveRooms === 'function') {
+        window.parent.state.w8Action = action;
+        window.parent.saveRooms();
+      }
+    } catch(e) {}
+    processAction(action);
+  } else {
+    processAction(action);
+  }
+};
 
 // ══════════════════════════════
 // Three.js 3D 骰子系統
@@ -1856,7 +1942,6 @@ function rollDice() {
   const d2 = team.extraDice ? Math.ceil(Math.random() * 6) : null;
   const total = d1 + (d2 || 0);
   
-  // 請務必確保發送的是 'W8_ROLL'，讓 index.html 能夠攔截與記錄
   const action = { type: 'W8_ROLL', teamId: myTeamId, diceResult: { d1, d2, total }, ts: Date.now() };
 
   if (myRole === 'student') {
@@ -1872,7 +1957,7 @@ function rollDice() {
       }
     } catch(e) {}
     
-    // 學生端也立刻自己播放 3D 骰子動畫 (但不做 movePiece 控制權判斷)
+    // 學生端也立刻自己播放 3D 骰子動畫
     processAction(action);
     setHud(`<div style="font-size:0.78rem;color:rgba(255,255,255,0.6);">骰子已擲出</div><div style="color:var(--yellow);font-weight:900;font-size:1rem;">請看老師畫面...</div>`);
   } else {
@@ -1915,20 +2000,32 @@ function movePiece() {
   moveStep();
 }
 
-function triggerEvent(type) {
+function triggerEvent(type, finalPos) {
   const tid = gameState.currentTurn;
-  const tidStr = String(tid);
-  const _curTeam = gameState.teams[tidStr] || gameState.teams[tid] || {};
-  if (type === 'start') {
-    showToast('🏁 經過起點！+1分');
-    updateTeam(tid, { score: (_curTeam.score || 0) + 1 });
-    updateState({ phase: 'done', event: null });
+  
+  // 顯示全螢幕事件大遮罩
+  updateState({ phase: 'land_reveal', landType: type, landPos: finalPos });
+  
+  if (myRole === 'teacher') {
+    setTimeout(() => {
+      // 確保沒有被其他操作干擾
+      if (gameState.phase !== 'land_reveal') return;
+      
+      const tidStr = String(tid);
+      const _curTeam = gameState.teams[tidStr] || gameState.teams[tid] || {};
+      
+      if (type === 'start') {
+        showToast('🏁 經過起點！+1分');
+        updateTeam(tid, { score: (_curTeam.score || 0) + 1 });
+        updateState({ phase: 'done', event: null });
+      }
+      else if (type === 'q') { updateState({ phase: 'answering', event: null, selectedAnswer: null }); fetchQ(false); }
+      else if (type === 'special') { updateState({ phase: 'answering', event: { specialQ: true }, selectedAnswer: null }); fetchQ(true); }
+      else if (type === 'lucky') doLucky(tid);
+      else if (type === 'bad') doBad(tid);
+      else updateState({ phase: 'done', event: null });
+    }, 2500); // 停留 2.5 秒製造懸念
   }
-  else if (type === 'q') { updateState({ phase: 'answering', event: null }); fetchQ(false); }
-  else if (type === 'special') { updateState({ phase: 'answering', event: { specialQ: true } }); fetchQ(true); }
-  else if (type === 'lucky') doLucky(tid);
-  else if (type === 'bad') doBad(tid);
-  else updateState({ phase: 'done', event: null });
 }
 
 const LUCKY = [
@@ -1973,7 +2070,7 @@ async function fetchQ(isSpecial) {
     const data = await resp.json();
     const text = data.content?.[0]?.text || '';
     const q = JSON.parse(text.replace(/```[\w]*|```/g, '').trim());
-    updateState({ question: q, phase: 'answering' });
+    updateState({ question: q, phase: 'answering', selectedAnswer: null });
   } catch (e) {
     const pool = [
       { question: '「一石二鳥」的意思是？', optionA: '做一件事達成兩個目的', optionB: '用石頭打兩隻鳥', answer: 'A', explanation: '一石二鳥比喻做一件事情，同時達到兩個目的。' },
@@ -1982,19 +2079,13 @@ async function fetchQ(isSpecial) {
       { question: '「半途而廢」的意思？', optionA: '做事到一半就放棄', optionB: '做事非常努力', answer: 'A', explanation: '半途而廢形容事情做到一半就放棄，沒有堅持到底。' },
       { question: '台灣最高的山是？', optionA: '雪山', optionB: '玉山', answer: 'B', explanation: '玉山海拔3952公尺，是台灣第一高峰。' }
     ];
-    updateState({ question: pool[Math.floor(Math.random() * pool.length)], phase: 'answering' });
+    updateState({ question: pool[Math.floor(Math.random() * pool.length)], phase: 'answering', selectedAnswer: null });
   }
-}
-
-function selectAnswer(ans) {
-  selectedAnswer = ans;
-  updateState({ selectedAnswer: ans });
-  renderEventPanel();
 }
 
 function publishAnswer() {
   const gs = gameState;
-  if (!gs.selectedAnswer) { showToast('請先選擇答案！'); return; }
+  if (!gs.selectedAnswer) { showToast('請等待學生選擇答案！'); return; }
   const correct = gs.selectedAnswer === gs.question.answer;
   const bonus = gs.event?.specialQ ? 4 : 2;
   if (correct) {
