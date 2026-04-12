@@ -191,7 +191,7 @@ body {
 }
 
 /* ══════════════════════════════
-   右下角懸浮 HUD 視窗 (僅供學生端顯示提示及擲骰按鈕)
+   右下角懸浮 HUD 視窗 (僅供學生端顯示擲骰按鈕)
    ══════════════════════════════ */
 .s-hud {
   position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
@@ -238,18 +238,20 @@ body {
    統一全螢幕中央大遮罩 (Center Event Overlay)
    ══════════════════════════════ */
 .center-overlay {
-  position: fixed; inset: 0; z-index: 9000; pointer-events: auto; /* 阻擋下方操作 */
-  background: rgba(0,0,0,0.75); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  position: fixed; inset: 0; z-index: 9000; pointer-events: none; /* 背景不阻擋拖曳 */
+  background: rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
   display: none; flex-direction: column; align-items: center; justify-content: center;
-  animation: coFadeIn 0.3s ease-out;
+  animation: coFadeIn 0.3s ease-out; transition: all 0.3s;
 }
 @keyframes coFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .co-box {
+  pointer-events: auto; /* 遮罩內容可以點擊 */
   background: rgba(20,20,30,0.95); border: 3px solid var(--yellow);
   border-radius: 24px; padding: 30px 40px; text-align: center;
   box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,214,0,0.2);
   transform: scale(0.8); animation: coPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   width: 90%; max-width: 500px; display: flex; flex-direction: column; align-items: center;
+  transition: all 0.3s ease;
 }
 @keyframes coPop { to { transform: scale(1); } }
 .co-icon { font-size: 5.5rem; margin-bottom: 10px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); animation: bounce 2s infinite; }
@@ -263,9 +265,9 @@ body {
   cursor: pointer; font-family: var(--font); font-size: 1.1rem; font-weight: 900; text-align: left; transition: all 0.2s;
 }
 .co-opt-btn:hover:not(:disabled) { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1); }
-.co-opt-btn.selected { border-color: var(--yellow); background: rgba(255, 214, 0, 0.2); box-shadow: 0 0 15px rgba(255,214,0,0.4); }
-.co-opt-btn.correct { border-color: var(--green); background: rgba(0, 230, 118, 0.2); color: var(--green); }
-.co-opt-btn.wrong { border-color: var(--red); background: rgba(255, 23, 68, 0.2); color: var(--red); }
+.co-opt-btn.selected { border-color: var(--yellow) !important; background: rgba(255, 214, 0, 0.2) !important; box-shadow: 0 0 15px rgba(255,214,0,0.4) !important; opacity: 1 !important; }
+.co-opt-btn.correct { border-color: var(--green) !important; background: rgba(0, 230, 118, 0.2) !important; color: var(--green) !important; opacity: 1 !important; }
+.co-opt-btn.wrong { border-color: var(--red) !important; background: rgba(255, 23, 68, 0.2) !important; color: var(--red) !important; opacity: 1 !important; }
 .co-opt-btn:disabled { cursor: not-allowed; }
 
 .btn-pub, .btn-next {
@@ -281,7 +283,7 @@ body {
    3D 骰子動畫系統（Three.js）
    ══════════════════════════════ */
 #dice3d-overlay {
-  position: fixed; inset: 0; z-index: 800; pointer-events: none;
+  position: fixed; inset: 0; z-index: 8000; pointer-events: none;
   display: none; flex-direction: column; align-items: center; justify-content: center;
   background: rgba(0,0,0,0.65);
   -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
@@ -312,7 +314,7 @@ body {
 }
 .iso-board { 
   position: relative; transform-style: preserve-3d; 
-  transition: transform 0.4s ease-out; /* 讓運鏡跟隨變得平滑 */
+  transition: transform 0.4s ease-out; 
 }
 
 /* 中央區域底板 */
@@ -660,15 +662,29 @@ function updateCameraTarget(posIndex) {
 function applyTransform() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const scale = Math.max(vw, vh) / 650; 
-  const tx = (_cameraOffsetX + _panOffsetX) * scale;
-  const ty = (_cameraOffsetY + _panOffsetY) * scale;
-  const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
-
-  const tBoard = document.getElementById('board');
-  if (tBoard) tBoard.style.transform = transformStr;
-  const sBoard = document.getElementById('s-board');
-  if (sBoard) sBoard.style.transform = transformStr;
+  
+  if (myRole === 'teacher') {
+    // 老師端全覽模式，固定視角，確保整個棋盤納入視窗中
+    const VW_TARGET = BOARD_SIZE * 1.414 + 120;
+    const VH_TARGET = BOARD_SIZE * 1.22 + 120;
+    const scale = Math.min(vw / VW_TARGET, vh / VH_TARGET); 
+    
+    // 加上 _panOffset 讓老師端也可以拖曳，但預設在正中央
+    const tx = _panOffsetX * scale;
+    const ty = _panOffsetY * scale;
+    
+    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    const tBoard = document.getElementById('board');
+    if (tBoard) tBoard.style.transform = transformStr;
+  } else {
+    // 學生端高倍率模式，跟蹤棋子
+    const scale = Math.max(vw, vh) / 650; 
+    const tx = (_cameraOffsetX + _panOffsetX) * scale;
+    const ty = (_cameraOffsetY + _panOffsetY) * scale;
+    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    const sBoard = document.getElementById('s-board');
+    if (sBoard) sBoard.style.transform = transformStr;
+  }
 }
 
 window.addEventListener('resize', applyTransform);
@@ -685,7 +701,9 @@ function setupDrag(elementId) {
   });
   window.addEventListener('mousemove', e => {
       if (!isDragging) return;
-      const scale = Math.max(window.innerWidth, window.innerHeight) / 650;
+      const scale = myRole === 'teacher' 
+            ? Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120))
+            : Math.max(window.innerWidth, window.innerHeight) / 650;
       _panOffsetX += (e.clientX - startX) / scale;
       _panOffsetY += (e.clientY - startY) / scale;
       startX = e.clientX; startY = e.clientY;
@@ -701,7 +719,9 @@ function setupDrag(elementId) {
   }, {passive:true});
   window.addEventListener('touchmove', e => {
       if(!isDragging || e.touches.length !== 1) return;
-      const scale = Math.max(window.innerWidth, window.innerHeight) / 650;
+      const scale = myRole === 'teacher' 
+            ? Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120))
+            : Math.max(window.innerWidth, window.innerHeight) / 650;
       _panOffsetX += (e.touches[0].clientX - startX) / scale;
       _panOffsetY += (e.touches[0].clientY - startY) / scale;
       startX = e.touches[0].clientX; startY = e.touches[0].clientY;
@@ -767,6 +787,7 @@ function processAction(action) {
 
   if (action.type === 'W8_ANSWER') {
     if (gameState && gameState.phase === 'answering') {
+      // 收到作答訊號，即時更新選取狀態
       updateState({ selectedAnswer: action.answer });
       const team = TEAMS.find(t => t.id == action.teamId);
       showToast(`✅ ${team?.name || '學生'} 已選擇答案！`);
@@ -947,6 +968,15 @@ function launch() {
         }, 200);
       }
     }
+    
+    // 初始化時強制鎖定開始位置
+    setTimeout(() => {
+      const curTeam = gameState?.teams?.[gameState.currentTurn];
+      if (curTeam) updateCameraTarget(curTeam.position % TOTAL);
+      else updateCameraTarget(0);
+      applyTransform();
+    }, 100);
+
     attachSync();
   }, 500);
 }
@@ -1104,14 +1134,34 @@ function render() {
   // 中心事件大遮罩統合渲染
   const overlay = document.getElementById('center-event-overlay');
   const coBox = document.getElementById('co-box');
-  const showCenter = ['land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  
+  // 決定何時顯示中心遮罩
+  const showCenter = isT 
+      ? ['waiting_roll', 'rolled', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase)
+      : ['land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
   
   if (showCenter) {
       overlay.style.display = 'flex';
       let html = '';
       const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || String(gameState.currentTurn) === String(myTeamId);
 
-      if (gameState.phase === 'land_reveal') {
+      // 動態調整遮罩樣式，等待狀態比較不干擾背景
+      if (gameState.phase === 'waiting_roll' || gameState.phase === 'rolled') {
+          coBox.style.padding = '15px 30px';
+          coBox.style.background = 'rgba(20,20,30,0.75)';
+      } else {
+          coBox.style.padding = '30px 40px';
+          coBox.style.background = 'rgba(20,20,30,0.95)';
+      }
+
+      if (gameState.phase === 'waiting_roll') {
+          const ct = TEAMS.find(t => t.id === gameState.currentTurn);
+          html = `<div style="font-size:1.4rem; font-weight:900; color:#fff;">等待 ${ct?.icon || ''} <span style="color:var(--yellow)">${ct?.name || ''}</span> 擲骰...</div>`;
+      }
+      else if (gameState.phase === 'rolled') {
+          html = `<div class="wait-msg" style="font-size:1.2rem; color:var(--yellow); padding:10px;"><div class="pulse"></div> 棋子移動中...</div>`;
+      }
+      else if (gameState.phase === 'land_reveal') {
           const lt = gameState.landType;
           let i = '❓', t = '機會命運', d = '抽題中...';
           if (lt === 'start') { i = '🏁'; t = '到達起點'; d = '獲得獎勵！'; }
@@ -1137,23 +1187,33 @@ function render() {
               html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> AI 出題中...</div>`;
           } else {
               const sa = gameState.selectedAnswer;
-              html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
               
               if (isT) {
-                  html += `<button class="co-opt-btn ${sa==='A'?'selected':''}" disabled>A．${q.optionA}</button>
-                           <button class="co-opt-btn ${sa==='B'?'selected':''}" disabled>B．${q.optionB}</button>`;
+                  // 老師端：顯示題目，按鈕被選中時會亮起
+                  html += `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
+                  html += `<button class="co-opt-btn ${sa==='A'?'selected':''}" disabled style="opacity:1;">A．${q.optionA}</button>
+                           <button class="co-opt-btn ${sa==='B'?'selected':''}" disabled style="opacity:1;">B．${q.optionB}</button>`;
                   if (sa) html += `<button class="btn-pub" onclick="publishAnswer()">🎯 公布答案</button>`;
                   else html += `<button class="btn-pub" disabled style="opacity:0.5;cursor:not-allowed;">等待學生作答...</button>`;
               } else {
+                  // 學生端
                   if (isMyTurn && !sa) {
+                      // 自己的回合，可以作答
+                      html += `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
                       html += `<div class="co-desc" style="font-size:0.9rem; margin-bottom:12px;">💬 討論後點選答案！</div>
                                <button class="co-opt-btn" onclick="studentSelectAnswer('A')">A．${q.optionA}</button>
                                <button class="co-opt-btn" onclick="studentSelectAnswer('B')">B．${q.optionB}</button>`;
+                  } else if (isMyTurn && sa) {
+                      // 自己的回合，已作答，等待公布
+                      html += `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
+                      html += `<button class="co-opt-btn ${sa==='A'?'selected':''}" disabled style="opacity:1;">A．${q.optionA}</button>
+                               <button class="co-opt-btn ${sa==='B'?'selected':''}" disabled style="opacity:1;">B．${q.optionB}</button>`;
+                      html += `<div class="co-desc" style="font-size:0.9rem; margin-top:10px;">等待老師公布答案...</div>`;
                   } else {
-                      html += `<button class="co-opt-btn ${sa==='A'?'selected':''}" disabled>A．${q.optionA}</button>
-                               <button class="co-opt-btn ${sa==='B'?'selected':''}" disabled>B．${q.optionB}</button>`;
-                      if (sa) html += `<div class="co-desc" style="font-size:0.9rem; margin-top:10px;">等待老師公布答案...</div>`;
-                      else html += `<div class="co-desc" style="font-size:0.9rem; margin-top:10px;">等待該組作答中...</div>`;
+                      // 等待組，不顯示題目，引導他們看大螢幕
+                      html += `<div class="co-icon" style="animation:none;">👀</div>
+                               <div class="co-title">請看老師畫面</div>
+                               <div class="co-desc">該組正在進行挑戰...</div>`;
                   }
               }
           }
@@ -1162,12 +1222,21 @@ function render() {
           const q = gameState.question;
           const sa = gameState.selectedAnswer;
           const correct = sa === q.answer;
-          html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
-          html += `<button class="co-opt-btn ${sa==='A'?(correct?'correct':'wrong'):(q.answer==='A'?'correct':'')}" disabled>A．${q.optionA}${q.answer==='A'?' ✅':''}</button>
-                   <button class="co-opt-btn ${sa==='B'?(correct?'correct':'wrong'):(q.answer==='B'?'correct':'')}" disabled>B．${q.optionB}${q.answer==='B'?' ✅':''}</button>`;
-          html += `<div style="font-size:2rem; font-weight:900; color:${correct?'var(--green)':'var(--red)'}; margin:15px 0;">${correct ? '🎉 答對了！' : '😢 答錯了...'}</div>`;
-          html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
-          if (isT) html += `<button class="btn-next" onclick="nextTurn()">➡️ 下一組</button>`;
+          
+          if (!isT && !isMyTurn) {
+              // 等待組
+              html += `<div class="co-icon" style="animation:none;">👀</div>
+                       <div class="co-title">請看老師畫面</div>
+                       <div class="co-desc">該組挑戰結果揭曉中...</div>`;
+          } else {
+              // 老師與挑戰組
+              html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
+              html += `<button class="co-opt-btn ${sa==='A'?(correct?'correct':'wrong'):(q.answer==='A'?'correct':'')}" disabled style="opacity:1;">A．${q.optionA}${q.answer==='A'?' ✅':''}</button>
+                       <button class="co-opt-btn ${sa==='B'?(correct?'correct':'wrong'):(q.answer==='B'?'correct':'')}" disabled style="opacity:1;">B．${q.optionB}${q.answer==='B'?' ✅':''}</button>`;
+              html += `<div style="font-size:2rem; font-weight:900; color:${correct?'var(--green)':'var(--red)'}; margin:15px 0;">${correct ? '🎉 答對了！' : '😢 答錯了...'}</div>`;
+              html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
+              if (isT) html += `<button class="btn-next" onclick="nextTurn()">➡️ 下一組</button>`;
+          }
       }
       else if (gameState.phase === 'done') {
           html = `<div class="co-title" style="font-size:1.8rem; margin:20px 0;">回合結束</div>`;
@@ -1360,17 +1429,13 @@ function renderStudent() {
       setHud(`<div style="color:var(--yellow);font-weight:900;font-size:0.9rem;">✨ 輪到你們了！</div>`);
       setHudRoll(myTD?.extraDice);
     }
-  } else if (gs.phase === 'rolled') {
-    setHud(`<div class="wait-msg"><div class="pulse"></div><span>棋子移動中...</span></div>`);
   } else {
-    // Other phases handled by center overlay. Hide the HUD text or make it minimal.
+    // 進入中間遮罩的環節，隱藏右下角的提示，保持版面乾淨
     const card = document.getElementById('s-hud-card');
-    if (card) card.innerHTML = '';
-    if (card) card.style.display = 'none'; // hide completely during center overlay
+    if (card) card.style.display = 'none'; 
   }
 
-  // Restore hud display if it's waiting_roll or rolled
-  if (gs.phase === 'waiting_roll' || gs.phase === 'rolled' || !isMyTurn) {
+  if (gs.phase === 'waiting_roll' || !isMyTurn) {
     const card = document.getElementById('s-hud-card');
     if (card) card.style.display = 'block';
   }
@@ -1378,7 +1443,7 @@ function renderStudent() {
 
 window.studentSelectAnswer = function(ans) {
   if (!gameState || gameState.phase !== 'answering') return;
-  if (gameState.selectedAnswer) return; // Prevent double clicking
+  if (gameState.selectedAnswer) return; 
   
   const action = { type: 'W8_ANSWER', teamId: myTeamId, answer: ans, ts: Date.now() };
   if (myRole === 'student') {
@@ -1581,7 +1646,6 @@ function showDiceAnim(d1, d2, total) {
   overlay.classList.add('show');
   wrap.innerHTML = '';
   
-  // 清除舊的結果徽章
   const oldBadge = overlay.querySelector('.dt-total-badge');
   if (oldBadge) oldBadge.remove();
 
@@ -1618,7 +1682,7 @@ function showDiceAnim(d1, d2, total) {
     if (!allDone) {
       rafId = requestAnimationFrame(loop);
     } else {
-      // 動畫結束，顯示「共 X 步」標籤並保留 3D 骰子畫面 1.5 秒
+      // 動畫播完後，直接保留實體骰子，顯示步數徽章
       const badge = document.createElement('div');
       badge.className = 'dt-total-badge';
       badge.textContent = `共 ${total} 步`;
