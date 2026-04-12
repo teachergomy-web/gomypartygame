@@ -61,6 +61,12 @@ body {
 .spinner { width: 42px; height: 42px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* 全局暫停遮罩 */
+#pause-overlay {
+  position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.85);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+}
+
 /* ══════════════════════════════
    TEACHER VIEW (全螢幕棋盤 + 摺疊側邊欄)
    ══════════════════════════════ */
@@ -183,19 +189,12 @@ body {
   overflow: hidden; touch-action: none; background: transparent;
 }
 
-/* 等待時透明阻擋層 */
-.wait-blocker {
-  position: fixed; top: calc(40px + env(safe-area-inset-top, 0px));
-  left: 0; right: 0; bottom: 0; z-index: 400;
-  pointer-events: auto; background: transparent; cursor: not-allowed;
-}
-
 /* ══════════════════════════════
-   右下角懸浮 HUD 視窗 (僅供學生端顯示擲骰按鈕)
+   右下角懸浮 HUD 視窗 (僅供學生端顯示提示)
    ══════════════════════════════ */
 .s-hud {
   position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto;
+  z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none;
 }
 
 .s-hud-card {
@@ -203,43 +202,15 @@ body {
   border-radius: 16px; padding: 10px 16px; max-width: 250px; min-width: 130px;
   text-align: center; font-size: 0.82rem; font-weight: 700; color: rgba(255,255,255,0.85);
   line-height: 1.5; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6); pointer-events: auto;
 }
-
-.s-hud-roll-panel {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(8, 8, 18, 0.92); border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 50px; padding: 8px 10px 8px 16px;
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.7);
-}
-
-.s-hud-dice-area { display: flex; gap: 6px; align-items: center; }
-.s-hud-die {
-  width: 42px; height: 42px; background: #fff; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 -3px 0 rgba(0,0,0,0.15);
-  animation: dieFloat 2s ease-in-out infinite;
-}
-.s-hud-die:nth-child(2) { animation-delay: 0.4s; }
-@keyframes dieFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-
-.s-hud-go-btn {
-  width: 70px; height: 70px; border-radius: 50%; border: none;
-  background: radial-gradient(circle at 35% 30%, #ff5252, #c62828);
-  box-shadow: 0 6px 0 #7f0000, 0 10px 20px rgba(0,0,0,0.5), inset 0 3px 5px rgba(255,150,150,0.4);
-  color: #fff; font-family: var(--font); font-weight: 900; font-size: 1.5rem; letter-spacing: 1px;
-  cursor: pointer; outline: none; display: flex; align-items: center; justify-content: center;
-  transition: transform 0.08s, box-shadow 0.08s; text-shadow: 0 2px 4px rgba(0,0,0,0.4);
-}
-.s-hud-go-btn:active { transform: translateY(5px); box-shadow: 0 1px 0 #7f0000, 0 3px 8px rgba(0,0,0,0.4), inset 0 3px 5px rgba(255,150,150,0.4); }
 
 /* ══════════════════════════════
    統一全螢幕中央大遮罩 (Center Event Overlay)
    ══════════════════════════════ */
 .center-overlay {
-  position: fixed; inset: 0; z-index: 9000; pointer-events: none; /* 背景不阻擋拖曳 */
-  background: rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  position: fixed; inset: 0; z-index: 9000; pointer-events: auto; /* 阻擋下方操作 */
+  background: rgba(0,0,0,0.85); /* 移除 blur，改為純深色半透明 */
   display: none; flex-direction: column; align-items: center; justify-content: center;
   animation: coFadeIn 0.3s ease-out; transition: all 0.3s;
 }
@@ -310,11 +281,10 @@ body {
    ══════════════════════════════ */
 .iso-scene { 
   perspective: 2000px; display: flex; align-items: center; justify-content: center; 
-  width: 100%; height: 100%; overflow: hidden;
+  width: 100%; height: 100%; overflow: visible;
 }
 .iso-board { 
   position: relative; transform-style: preserve-3d; 
-  transition: transform 0.4s ease-out; 
 }
 
 /* 中央區域底板 */
@@ -452,15 +422,22 @@ body {
   <div class="spinner"></div>
 </div>
 
+<!-- 老師暫停遮罩 -->
+<div id="pause-overlay">
+  <div style="font-size:5rem; margin-bottom:20px;">⏸</div>
+  <div style="color:var(--yellow); font-size:2.5rem; font-weight:900;">遊戲暫停中</div>
+</div>
+
 <!-- TEACHER VIEW -->
 <div id="teacher-view">
   <div class="t-header">
     <div class="t-title">✈️ 環遊大富翁</div>
-    <div class="turn-chip" id="turn-chip">🐻 第1組 的回合</div>
   </div>
   
   <div class="board-container" id="t-map-container">
-    <div class="iso-scene"><div id="board" class="iso-board"></div></div>
+    <div id="t-camera-rig" style="position: absolute; transition: transform 0.4s ease-out;">
+        <div class="iso-scene"><div id="board" class="iso-board"></div></div>
+    </div>
   </div>
   
   <!-- 摺疊側邊欄 -->
@@ -489,10 +466,10 @@ body {
   </div>
   <!-- 全螢幕地圖 -->
   <div class="s-map" id="s-map">
-    <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
+    <div id="s-camera-rig" style="position: absolute; transition: transform 0.4s ease-out;">
+        <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
+    </div>
   </div>
-  <!-- 等待時透明阻擋層 -->
-  <div class="wait-blocker" id="s-wait-blocker" style="display:none;"></div>
   <!-- 右下角 HUD 懸浮視窗 -->
   <div class="s-hud" id="s-hud">
     <div class="s-hud-card" id="s-hud-card">⏳ 等待遊戲狀態同步...</div>
@@ -662,28 +639,22 @@ function updateCameraTarget(posIndex) {
 function applyTransform() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  // 縮放率：放大拉近到剛好顯示前後數格
+  const scale = Math.max(vw, vh) / 500; 
   
+  const tx = (_cameraOffsetX + _panOffsetX) * scale;
+  const ty = (_cameraOffsetY + _panOffsetY) * scale;
+
   if (myRole === 'teacher') {
-    // 老師端全覽模式，固定視角，確保整個棋盤納入視窗中
-    const VW_TARGET = BOARD_SIZE * 1.414 + 120;
-    const VH_TARGET = BOARD_SIZE * 1.22 + 120;
-    const scale = Math.min(vw / VW_TARGET, vh / VH_TARGET); 
-    
-    // 加上 _panOffset 讓老師端也可以拖曳，但預設在正中央
-    const tx = _panOffsetX * scale;
-    const ty = _panOffsetY * scale;
-    
-    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    const rig = document.getElementById('t-camera-rig');
+    if (rig) rig.style.transform = `translate(${tx}px, ${ty}px)`;
     const tBoard = document.getElementById('board');
-    if (tBoard) tBoard.style.transform = transformStr;
+    if (tBoard) tBoard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   } else {
-    // 學生端高倍率模式，跟蹤棋子
-    const scale = Math.max(vw, vh) / 650; 
-    const tx = (_cameraOffsetX + _panOffsetX) * scale;
-    const ty = (_cameraOffsetY + _panOffsetY) * scale;
-    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    const rig = document.getElementById('s-camera-rig');
+    if (rig) rig.style.transform = `translate(${tx}px, ${ty}px)`;
     const sBoard = document.getElementById('s-board');
-    if (sBoard) sBoard.style.transform = transformStr;
+    if (sBoard) sBoard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   }
 }
 
@@ -701,9 +672,7 @@ function setupDrag(elementId) {
   });
   window.addEventListener('mousemove', e => {
       if (!isDragging) return;
-      const scale = myRole === 'teacher' 
-            ? Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120))
-            : Math.max(window.innerWidth, window.innerHeight) / 650;
+      const scale = Math.max(window.innerWidth, window.innerHeight) / 500;
       _panOffsetX += (e.clientX - startX) / scale;
       _panOffsetY += (e.clientY - startY) / scale;
       startX = e.clientX; startY = e.clientY;
@@ -719,9 +688,7 @@ function setupDrag(elementId) {
   }, {passive:true});
   window.addEventListener('touchmove', e => {
       if(!isDragging || e.touches.length !== 1) return;
-      const scale = myRole === 'teacher' 
-            ? Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120))
-            : Math.max(window.innerWidth, window.innerHeight) / 650;
+      const scale = Math.max(window.innerWidth, window.innerHeight) / 500;
       _panOffsetX += (e.touches[0].clientX - startX) / scale;
       _panOffsetY += (e.touches[0].clientY - startY) / scale;
       startX = e.touches[0].clientX; startY = e.touches[0].clientY;
@@ -732,10 +699,10 @@ function setupDrag(elementId) {
 
 function setTransition(enabled) {
   const val = enabled ? 'transform 0.4s ease-out' : 'none';
-  const tBoard = document.getElementById('board');
-  const sBoard = document.getElementById('s-board');
-  if (tBoard) tBoard.style.transition = val;
-  if (sBoard) sBoard.style.transition = val;
+  const tRig = document.getElementById('t-camera-rig');
+  const sRig = document.getElementById('s-camera-rig');
+  if (tRig) tRig.style.transition = val;
+  if (sRig) sRig.style.transition = val;
 }
 
 function attachSync() {
@@ -770,6 +737,19 @@ function attachSync() {
           const action = JSON.parse(raw);
           if (action.ts && action.ts !== _lastActionTs) {
             processAction(action);
+          }
+        }
+      } catch(e) {}
+      
+      // 處理暫停偵測
+      try {
+        if (window.parent && window.parent.state && window.parent.getRooms) {
+          const rooms = window.parent.getRooms();
+          const r = rooms[window.parent.state.roomCode];
+          if (r && r.paused) {
+            document.getElementById('pause-overlay').style.display = 'flex';
+          } else {
+            document.getElementById('pause-overlay').style.display = 'none';
           }
         }
       } catch(e) {}
@@ -842,6 +822,13 @@ function updateBadge() {
 
 window.addEventListener('message', e => {
   if (!e.data) return;
+  if (e.data.type === 'PLATFORM_PAUSE') {
+      document.getElementById('pause-overlay').style.display = 'flex';
+  }
+  if (e.data.type === 'PLATFORM_RESUME') {
+      document.getElementById('pause-overlay').style.display = 'none';
+  }
+
   if (e.data.type === 'PLATFORM_START') {
     const { role, teamId, players } = e.data;
     myRole = role || 'student';
@@ -917,8 +904,7 @@ window.addEventListener('load', () => {
         try {
           const raw = localStorage.getItem('W8_STATE');
           if (raw) { gameState = JSON.parse(raw); syncTeamsFromState(); render(); }
-          else setHud('⏳ 等待遊戲開始...');
-        } catch(e) { setHud('⏳ 等待遊戲開始...'); }
+        } catch(e) { }
         attachSync();
         setupDrag('s-map');
         _launched = true;
@@ -960,7 +946,6 @@ function launch() {
         return false;
       };
       if (!tryLoadState()) {
-        setHud('⏳ 等待遊戲開始...');
         let retries = 0;
         const retryTimer = setInterval(() => {
           retries++;
@@ -969,11 +954,10 @@ function launch() {
       }
     }
     
-    // 初始化時強制鎖定開始位置
+    // 初始化時強制鎖定開始位置，確保第一組擲骰前看的到所有棋子
     setTimeout(() => {
-      const curTeam = gameState?.teams?.[gameState.currentTurn];
-      if (curTeam) updateCameraTarget(curTeam.position % TOTAL);
-      else updateCameraTarget(0);
+      updateCameraTarget(0);
+      _panOffsetX = 0; _panOffsetY = 0;
       applyTransform();
     }, 100);
 
@@ -1066,17 +1050,24 @@ function makeInit() {
 
   const playOrder = [...TEAMS].sort((a, b) => a.id - b.id).map(t => t.id);
   
+  // 新增 intro 階段
   return { 
     teams, 
     playOrder,
     currentTurn: playOrder[0], 
-    phase: 'waiting_roll', 
+    phase: 'intro', 
     diceResult: null, 
     event: null, 
     question: null, 
     selectedAnswer: null, 
     teamCount: TEAMS.length 
   };
+}
+
+// 老師端點擊開始遊戲
+window.startGame = function() {
+    if (myRole !== 'teacher') return;
+    updateState({ phase: 'waiting_roll' });
 }
 
 function broadcast() {
@@ -1111,6 +1102,11 @@ function updateTeam(tid, patch) {
   t[tidStr] = updated;
   t[tid] = updated;
   updateState({ teams: t });
+  
+  // 順便廣播分數更新給平台 (W8_SCORE)
+  if (patch.score !== undefined && myRole === 'teacher') {
+      try { window.parent.postMessage({ type: 'W8_SCORE', group: TEAMS.find(x=>x.id==tid)?.name, score: patch.score }, '*'); } catch(e) {}
+  }
 }
 
 function render() {
@@ -1121,8 +1117,12 @@ function render() {
   syncTeamsFromState();
   renderPieces();
 
-  // 攝影機鎖定當前回合隊伍（若不在拖曳狀態且不在移動中）
-  if (gameState.currentTurn && gameState.phase !== 'rolled') {
+  // 攝影機鎖定當前回合隊伍（如果是開場，鎖定 0 格；如果是其他狀態鎖定當前隊伍）
+  if (gameState.phase === 'intro') {
+      updateCameraTarget(0);
+      _panOffsetX = 0; _panOffsetY = 0;
+      applyTransform();
+  } else if (gameState.currentTurn && gameState.phase !== 'rolled') {
       const curTeam = gameState.teams[gameState.currentTurn] || gameState.teams[String(gameState.currentTurn)];
       if (curTeam) {
           updateCameraTarget(curTeam.position % TOTAL);
@@ -1135,17 +1135,27 @@ function render() {
   const overlay = document.getElementById('center-event-overlay');
   const coBox = document.getElementById('co-box');
   
-  // 決定何時顯示中心遮罩
-  const showCenter = isT 
-      ? ['waiting_roll', 'rolled', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase)
-      : ['land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || String(gameState.currentTurn) === String(myTeamId) || gameState.currentTurn == myTeamId;
+  const showCenterPhase = ['intro', 'waiting_roll', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  
+  let showCenter = false;
+  if (isT) {
+      showCenter = showCenterPhase;
+  } else {
+      if (gameState.phase === 'intro') {
+          showCenter = true;
+      } else if (isMyTurn) {
+          showCenter = showCenterPhase;
+      } else {
+          // 等待組不需要看任何事件提示，全部隱藏，專心看老師畫面
+          showCenter = false;
+      }
+  }
   
   if (showCenter) {
       overlay.style.display = 'flex';
       let html = '';
-      const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || String(gameState.currentTurn) === String(myTeamId);
 
-      // 動態調整遮罩樣式，等待狀態比較不干擾背景
       if (gameState.phase === 'waiting_roll' || gameState.phase === 'rolled') {
           coBox.style.padding = '15px 30px';
           coBox.style.background = 'rgba(20,20,30,0.75)';
@@ -1154,12 +1164,29 @@ function render() {
           coBox.style.background = 'rgba(20,20,30,0.95)';
       }
 
-      if (gameState.phase === 'waiting_roll') {
-          const ct = TEAMS.find(t => t.id === gameState.currentTurn);
-          html = `<div style="font-size:1.4rem; font-weight:900; color:#fff;">等待 ${ct?.icon || ''} <span style="color:var(--yellow)">${ct?.name || ''}</span> 擲骰...</div>`;
+      if (gameState.phase === 'intro') {
+          html = `<div class="co-title" style="font-size:2.5rem; color:var(--yellow); margin-bottom:16px;">🚀 環遊大富翁</div>
+                  <div class="co-desc" style="color:#fff; font-size:1.1rem; line-height:1.6; text-align:left; margin-bottom:24px;">
+                      1. 各組輪流擲骰子前進。<br>
+                      2. 停留格子將觸發 <b>機會、命運、或問答挑戰</b>。<br>
+                      3. 答對題目可獲得積分，善用運氣與智慧累積最高分！
+                  </div>`;
+          if (isT) html += `<button class="btn-pub" style="display:block; font-size:1.3rem; padding:16px;" onclick="startGame()">🎲 遊戲開始</button>`;
+          else html += `<div class="wait-msg"><div class="pulse"></div> 等待老師開始遊戲...</div>`;
       }
-      else if (gameState.phase === 'rolled') {
-          html = `<div class="wait-msg" style="font-size:1.2rem; color:var(--yellow); padding:10px;"><div class="pulse"></div> 棋子移動中...</div>`;
+      else if (gameState.phase === 'waiting_roll') {
+          const ct = TEAMS.find(t => t.id === gameState.currentTurn);
+          if (isT) {
+              html = `<div class="co-title">等待 ${ct?.icon || ''} <span style="color:var(--yellow)">${ct?.name || ''}</span> 擲骰...</div>`;
+          } else {
+              const myTD = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
+              if (myTD?.skipTurn) {
+                  html = `<div class="co-title" style="color:var(--red);">⏸ 這回合停止行動！</div>`;
+              } else {
+                  html = `<div class="co-title">✨ 輪到你們了！</div>
+                          <button class="btn-pub" style="display:block; font-size:1.5rem; padding:16px; margin-top:20px;" onclick="rollDice()">🎲 擲骰！</button>`;
+              }
+          }
       }
       else if (gameState.phase === 'land_reveal') {
           const lt = gameState.landType;
@@ -1178,7 +1205,7 @@ function render() {
           html = `<div class="co-icon" style="animation:none;">${evIcon}</div>
                   <div class="co-title" style="color:${evColor}">${ev.title}</div>
                   <div class="co-desc" style="margin-bottom:20px; color:#fff; font-size:1.1rem;">${ev.desc}</div>`;
-          if (isT) html += `<button class="btn-next" onclick="nextTurn()">➡️ 下一組</button>`;
+          if (isT) html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
           else html += `<div class="co-desc" style="font-size:0.9rem;">等待老師繼續...</div>`;
       }
       else if (gameState.phase === 'answering') {
@@ -1187,33 +1214,23 @@ function render() {
               html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> AI 出題中...</div>`;
           } else {
               const sa = gameState.selectedAnswer;
-              
               if (isT) {
-                  // 老師端：顯示題目，按鈕被選中時會亮起
                   html += `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
                   html += `<button class="co-opt-btn ${sa==='A'?'selected':''}" disabled style="opacity:1;">A．${q.optionA}</button>
                            <button class="co-opt-btn ${sa==='B'?'selected':''}" disabled style="opacity:1;">B．${q.optionB}</button>`;
-                  if (sa) html += `<button class="btn-pub" onclick="publishAnswer()">🎯 公布答案</button>`;
-                  else html += `<button class="btn-pub" disabled style="opacity:0.5;cursor:not-allowed;">等待學生作答...</button>`;
+                  if (sa) html += `<button class="btn-pub" style="display:block;" onclick="publishAnswer()">🎯 公布答案</button>`;
+                  else html += `<button class="btn-pub" style="display:block; opacity:0.5; cursor:not-allowed;" disabled>等待學生作答...</button>`;
               } else {
-                  // 學生端
                   if (isMyTurn && !sa) {
-                      // 自己的回合，可以作答
                       html += `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
                       html += `<div class="co-desc" style="font-size:0.9rem; margin-bottom:12px;">💬 討論後點選答案！</div>
                                <button class="co-opt-btn" onclick="studentSelectAnswer('A')">A．${q.optionA}</button>
                                <button class="co-opt-btn" onclick="studentSelectAnswer('B')">B．${q.optionB}</button>`;
                   } else if (isMyTurn && sa) {
-                      // 自己的回合，已作答，等待公布
                       html += `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
                       html += `<button class="co-opt-btn ${sa==='A'?'selected':''}" disabled style="opacity:1;">A．${q.optionA}</button>
                                <button class="co-opt-btn ${sa==='B'?'selected':''}" disabled style="opacity:1;">B．${q.optionB}</button>`;
                       html += `<div class="co-desc" style="font-size:0.9rem; margin-top:10px;">等待老師公布答案...</div>`;
-                  } else {
-                      // 等待組，不顯示題目，引導他們看大螢幕
-                      html += `<div class="co-icon" style="animation:none;">👀</div>
-                               <div class="co-title">請看老師畫面</div>
-                               <div class="co-desc">該組正在進行挑戰...</div>`;
                   }
               }
           }
@@ -1223,24 +1240,16 @@ function render() {
           const sa = gameState.selectedAnswer;
           const correct = sa === q.answer;
           
-          if (!isT && !isMyTurn) {
-              // 等待組
-              html += `<div class="co-icon" style="animation:none;">👀</div>
-                       <div class="co-title">請看老師畫面</div>
-                       <div class="co-desc">該組挑戰結果揭曉中...</div>`;
-          } else {
-              // 老師與挑戰組
-              html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
-              html += `<button class="co-opt-btn ${sa==='A'?(correct?'correct':'wrong'):(q.answer==='A'?'correct':'')}" disabled style="opacity:1;">A．${q.optionA}${q.answer==='A'?' ✅':''}</button>
-                       <button class="co-opt-btn ${sa==='B'?(correct?'correct':'wrong'):(q.answer==='B'?'correct':'')}" disabled style="opacity:1;">B．${q.optionB}${q.answer==='B'?' ✅':''}</button>`;
-              html += `<div style="font-size:2rem; font-weight:900; color:${correct?'var(--green)':'var(--red)'}; margin:15px 0;">${correct ? '🎉 答對了！' : '😢 答錯了...'}</div>`;
-              html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
-              if (isT) html += `<button class="btn-next" onclick="nextTurn()">➡️ 下一組</button>`;
-          }
+          html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
+          html += `<button class="co-opt-btn ${sa==='A'?(correct?'correct':'wrong'):(q.answer==='A'?'correct':'')}" disabled style="opacity:1;">A．${q.optionA}${q.answer==='A'?' ✅':''}</button>
+                   <button class="co-opt-btn ${sa==='B'?(correct?'correct':'wrong'):(q.answer==='B'?'correct':'')}" disabled style="opacity:1;">B．${q.optionB}${q.answer==='B'?' ✅':''}</button>`;
+          html += `<div style="font-size:2rem; font-weight:900; color:${correct?'var(--green)':'var(--red)'}; margin:15px 0;">${correct ? '🎉 答對了！' : '😢 答錯了...'}</div>`;
+          html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
+          if (isT) html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
       }
       else if (gameState.phase === 'done') {
           html = `<div class="co-title" style="font-size:1.8rem; margin:20px 0;">回合結束</div>`;
-          if (isT) html += `<button class="btn-next" onclick="nextTurn()">➡️ 下一組</button>`;
+          if (isT) html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
           else html += `<div class="co-desc" style="font-size:0.9rem;">等待老師繼續...</div>`;
       }
       coBox.innerHTML = html;
@@ -1325,10 +1334,6 @@ function renderPieces() {
 
 function renderTeacher() {
   const gs = gameState;
-  const chipEl = document.getElementById('turn-chip');
-  const ct0 = TEAMS.find(t => t.id === gs.currentTurn);
-  if (ct0 && chipEl) chipEl.textContent = `${ct0.icon} ${ct0.name} 的回合`;
-  
   const sc = document.getElementById('t-scores'); sc.innerHTML = '';
   const orderArray = gs.playOrder && gs.playOrder.length > 0 ? gs.playOrder : TEAMS.map(t=>t.id);
   
@@ -1365,28 +1370,6 @@ function setHud(cardHtml) {
   if (card) card.innerHTML = cardHtml;
 }
 
-function setHudRoll(extraDice) {
-  const hud = document.getElementById('s-hud');
-  if (!hud) return;
-  const existing = hud.querySelector('.s-hud-roll-panel');
-  if (existing) existing.remove();
-  const panel = document.createElement('div');
-  panel.className = 's-hud-roll-panel';
-  panel.innerHTML = `
-    <div class="s-hud-dice-area">
-      <div class="s-hud-die">🎲</div>
-      ${extraDice ? '<div class="s-hud-die">🎲</div>' : ''}
-    </div>
-    <button class="s-hud-go-btn" onclick="rollDice()">GO</button>
-  `;
-  hud.appendChild(panel);
-}
-
-function removeHudRoll() {
-  const hud = document.getElementById('s-hud');
-  if (hud) hud.querySelector('.s-hud-roll-panel')?.remove();
-}
-
 function renderStudent() {
   const gs = gameState;
   const myT = TEAMS.find(t => t.id == myTeamId);
@@ -1418,24 +1401,16 @@ function renderStudent() {
   const hud = document.getElementById('s-hud');
   if (hud) hud.style.zIndex = '1000';
 
-  removeHudRoll();
-
   if (!isMyTurn) {
-    setHud(`<div style="font-size:0.82rem;color:rgba(255,255,255,0.7);">👀 ${ct?.icon||''} ${ct?.name||''}<br>的回合</div>`);
-  } else if (gs.phase === 'waiting_roll') {
-    if (myTD?.skipTurn) {
-      setHud(`<div style="color:var(--red);font-weight:900;font-size:1rem;">⏸ 這回合<br>停止行動！</div>`);
-    } else {
-      setHud(`<div style="color:var(--yellow);font-weight:900;font-size:0.9rem;">✨ 輪到你們了！</div>`);
-      setHudRoll(myTD?.extraDice);
-    }
+    setHud(`<div style="font-size:0.82rem;color:rgba(255,255,255,0.7);">👀 觀看 ${ct?.icon||''} ${ct?.name||''}</div>`);
   } else {
-    // 進入中間遮罩的環節，隱藏右下角的提示，保持版面乾淨
     const card = document.getElementById('s-hud-card');
-    if (card) card.style.display = 'none'; 
+    if (card) card.innerHTML = '';
+    if (card) card.style.display = 'none'; // 對於遊玩組，完全依賴中間遮罩，隱藏右下角提示
   }
 
-  if (gs.phase === 'waiting_roll' || !isMyTurn) {
+  // 等待組或是還沒開場，顯示右下提示
+  if (!isMyTurn || gs.phase === 'intro') {
     const card = document.getElementById('s-hud-card');
     if (card) card.style.display = 'block';
   }
@@ -1713,7 +1688,6 @@ function rollDice() {
   if (!team || team.skipTurn) return;
   
   gameState.phase = 'rolled'; // 防止重複點擊
-  removeHudRoll();
   
   const d1 = Math.ceil(Math.random() * 6);
   const d2 = team.extraDice ? Math.ceil(Math.random() * 6) : null;
@@ -1759,7 +1733,7 @@ function movePiece() {
     if (_t) { _t.position = curPos; gameState.teams[tidStr] = _t; gameState.teams[tid] = _t; }
     
     updateCameraTarget(curPos); // 鏡頭鎖定跳動的棋子
-    _panOffsetX = 0; _panOffsetY = 0;
+    _panOffsetX = 0; _panOffsetY = 0; // 重置拖曳，強迫回歸中心
     applyTransform();
 
     broadcast();
@@ -1895,6 +1869,19 @@ function nextTurn() {
 }
 
 function showResult() {
+  // 將最新分數推送到平台供排行顯示
+  try {
+      const rooms = window.parent?.getRooms?.();
+      const rc = window.parent?.state?.roomCode;
+      if (rooms && rc && rooms[rc]) {
+          if (!rooms[rc].scores) rooms[rc].scores = {};
+          Object.values(gameState.teams).forEach(t => {
+              rooms[rc].scores[`第${t.id}組`] = t.score;
+          });
+          window.parent.saveRooms(rooms);
+      }
+  } catch(e) {}
+
   const rs = document.getElementById('result-screen'); rs.style.display = 'flex';
   const sorted = Object.values(gameState.teams).sort((a, b) => b.score - a.score);
   const rl = document.getElementById('r-list'); rl.innerHTML = '';
@@ -1903,7 +1890,7 @@ function showResult() {
     const t = TEAMS.find(x => x.id === team.id);
     const item = document.createElement('div'); item.className = 'r-item';
     item.style.animationDelay = (i * 0.12) + 's';
-    item.innerHTML = `<span class="r-rank">${medals[i]}</span><span class="r-icon">${t.icon}</span>
+    item.innerHTML = `<span class="r-rank">${medals[i]||''}</span><span class="r-icon">${t.icon}</span>
       <span class="r-name">${t.name}</span><span class="r-score">${team.score}分</span>`;
     rl.appendChild(item);
   });
