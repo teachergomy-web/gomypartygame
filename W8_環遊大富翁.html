@@ -177,36 +177,39 @@ body {
   position: fixed; inset: 0;
   z-index: 10; overflow: hidden;
 }
-/* 分數條：緊貼頂部，含組別標識 */
+/* 分數條：只顯示自己組 */
 .s-scores { 
   position: absolute; top: 0; left: 0; right: 0; z-index: 300;
-  display: flex; gap: 5px; flex-wrap: nowrap; align-items: center;
-  padding: env(safe-area-inset-top, 6px) 10px 5px;
+  display: flex; gap: 8px; align-items: center;
+  padding: max(6px, env(safe-area-inset-top, 6px)) 14px 6px;
   background: rgba(5,5,8,0.88); 
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255,255,255,0.08); overflow-x: auto;
-  height: calc(40px + env(safe-area-inset-top, 0px)); flex-shrink: 0;
-  padding-top: max(6px, env(safe-area-inset-top, 6px));
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  height: calc(40px + env(safe-area-inset-top, 0px));
 }
 .my-badge {
-  background: rgba(0, 229, 255, 0.2); color: var(--blue); font-weight: 900; font-size: 0.8rem;
-  padding: 3px 10px; border-radius: 50px; display: flex; align-items: center; gap: 4px;
-  border: 1px solid rgba(0,229,255,0.4); white-space: nowrap; flex-shrink: 0; margin-right: 4px;
+  background: rgba(0, 229, 255, 0.2); color: var(--blue); font-weight: 900; font-size: 0.85rem;
+  padding: 4px 12px; border-radius: 50px; display: flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(0,229,255,0.4); white-space: nowrap;
 }
-.score-chip {
-  display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1); padding: 3px 9px; border-radius: 50px;
-  font-weight: 900; font-size: 0.75rem; color: rgba(255,255,255,0.7); white-space: nowrap; flex-shrink: 0;
+.my-score {
+  font-weight: 900; font-size: 0.9rem; color: var(--yellow);
+  padding: 4px 12px; border-radius: 50px;
+  background: rgba(255,214,0,0.12); border: 1px solid rgba(255,214,0,0.3);
+  white-space: nowrap;
 }
-.score-chip.mine { background: rgba(0, 229, 255, 0.15); border-color: var(--blue); color: var(--blue); }
+.turn-indicator {
+  margin-left: auto;
+  font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+}
 
 /* 地圖容器：頂部留分數條，底部到底 */
 .s-map {
   position: absolute; 
   top: calc(40px + env(safe-area-inset-top, 0px)); 
-  left: 0; right: 0; 
-  bottom: 0;
+  left: 0; right: 0; bottom: 0;
   overflow: hidden; touch-action: none; background: transparent;
   pointer-events: none;
 }
@@ -218,19 +221,15 @@ body {
   position: absolute; perspective: 2000px; overflow: visible;
 }
 
-/* 全螢幕等待遮罩 */
-.wait-overlay {
-  position: fixed; inset: 0; z-index: 500;
-  background: rgba(8, 8, 12, 0.95); 
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-  pointer-events: auto;
-}
-.wait-overlay-icon { font-size: 4rem; animation: bounce 2s ease-in-out infinite; }
-.wait-overlay-text {
-  color: rgba(255,255,255,0.95); font-weight: 900; font-size: 1.4rem;
-  text-align: center; line-height: 1.5; letter-spacing: 1px;
+/* 等待時：透明阻擋層（棋盤仍可見，但無法操作） */
+.wait-blocker {
+  position: fixed;
+  top: calc(40px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0; bottom: 0;
+  z-index: 400;
+  pointer-events: auto; /* 吸收所有點擊 */
+  background: transparent;
+  cursor: not-allowed;
 }
 
 /* ══════════════════════════════
@@ -762,26 +761,23 @@ body {
 
 <!-- STUDENT VIEW -->
 <div id="student-view">
-  <!-- 頂部分數條 -->
+  <!-- 頂部分數條：只顯示自己組別 + 分數 -->
   <div class="s-scores" id="s-scores">
     <div class="my-badge" id="my-badge">🐻 第1組</div>
+    <div class="my-score" id="my-score">0 分</div>
+    <div class="turn-indicator" id="turn-indicator"></div>
   </div>
-  <!-- 全螢幕地圖（填滿除頂部分數條外的所有空間） -->
+  <!-- 全螢幕地圖 -->
   <div class="s-map" id="s-map">
     <div class="s-map-inner" id="s-map-inner">
       <div class="iso-scene" id="s-iso-scene"><div id="s-board" class="iso-board"></div></div>
     </div>
   </div>
-
-  <!-- 右下角 HUD 懸浮視窗（狀態卡片 + 操作按鈕） -->
+  <!-- 等待時透明阻擋層（不可見但攔截點擊） -->
+  <div class="wait-blocker" id="s-wait-blocker" style="display:none;"></div>
+  <!-- 右下角 HUD 懸浮視窗 -->
   <div class="s-hud" id="s-hud">
-    <div class="s-hud-card" id="s-hud-card">等待遊戲狀態同步...</div>
-  </div>
-  
-  <!-- 全螢幕等待遮罩 -->
-  <div class="wait-overlay" id="s-wait-overlay" style="display:none;">
-    <div class="wait-overlay-icon" id="s-wait-icon">👀</div>
-    <div class="wait-overlay-text" id="s-wait-text">請觀看大螢幕</div>
+    <div class="s-hud-card" id="s-hud-card">⏳ 等待遊戲狀態同步...</div>
   </div>
 </div>
 
@@ -1250,7 +1246,11 @@ function updateState(patch) {
 }
 function updateTeam(tid, patch) {
   const t = { ...gameState.teams };
-  t[tid] = { ...t[tid], ...patch };
+  const tidStr = String(tid);
+  const base = t[tidStr] || t[tid] || {};
+  const updated = { ...base, ...patch };
+  t[tidStr] = updated;
+  t[tid] = updated; // 同時寫數字key確保相容
   updateState({ teams: t });
 }
 
@@ -1282,8 +1282,8 @@ function renderPieces() {
     
     const cellIndices = {};
     Object.values(gameState.teams || {}).forEach(team => {
-      const t = TEAMS.find(x => x.id == team.id);
-      if (!t) return;
+      const icons0 = ['🐻','🐼','🦊','🐸','🐧','🦁','🐯','🐨'];
+      const t = TEAMS.find(x => x.id == team.id) || { icon: icons0[(Number(team.id)-1)%8]||'🎮', name: `第${team.id}組` };
       const pos = Number(team.position || 0) % TOTAL;
       const bp = boardPos[pos]; if (!bp) return;
       
@@ -1613,50 +1613,44 @@ function removeHudRoll() {
 function renderStudent() {
   const gs = gameState;
 
-  // badge
+  // 頂部：自己組別 + 分數
   const myT = TEAMS.find(t => t.id == myTeamId);
   const badge = document.getElementById('my-badge');
   if (badge) badge.innerHTML = myT ? `${myT.icon} ${myT.name}` : `🐻 第${myTeamId}組`;
 
-  // 分數條
-  const sr = document.getElementById('s-scores');
-  Array.from(sr.querySelectorAll('.score-chip')).forEach(c => c.remove());
+  const myTD = gs?.teams?.[myTeamId] || gs?.teams?.[String(myTeamId)];
+  const scoreEl = document.getElementById('my-score');
+  if (scoreEl) scoreEl.textContent = `${myTD?.score ?? 0} 分`;
+
   if (!gs || !gs.teams) {
     setHud('⏳ 等待遊戲狀態同步...');
     return;
   }
-  const orderArray = gs.playOrder?.length > 0 ? gs.playOrder : TEAMS.map(t => t.id);
-  orderArray.forEach((tid, idx) => {
-    const team = gs.teams[tid]; if (!team) return;
-    const t = TEAMS.find(x => x.id == team.id); if (!t) return;
-    const chip = document.createElement('div');
-    chip.className = 'score-chip' + (team.id == myTeamId ? ' mine' : '');
-    const orderStr = gs.playOrder?.length > 0 ? `<span style="opacity:0.6;margin-right:2px">${idx+1}.</span>` : '';
-    chip.innerHTML = `${orderStr}${t.icon} ${team.score}分`;
-    sr.appendChild(chip);
-  });
 
   const curTurn = gs.currentTurn;
   const isMyTurn = Number(curTurn) === Number(myTeamId) || String(curTurn) === String(myTeamId) || curTurn == myTeamId;
   const ct = TEAMS.find(t => t.id == gs.currentTurn);
-  const myTD = gs.teams[myTeamId] || gs.teams[String(myTeamId)];
 
-  // 等待遮罩
-  const overlay = document.getElementById('s-wait-overlay');
-  const showOverlay = !isMyTurn;
-  if (overlay) {
-    overlay.style.display = showOverlay ? 'flex' : 'none';
-    if (showOverlay) {
-      const wText = document.getElementById('s-wait-text');
-      if (wText) wText.innerHTML = `請觀看大螢幕<br><span style="font-size:0.95rem;opacity:0.8;margin-top:8px;display:block;font-weight:normal;">現在是 <strong style="color:var(--yellow)">${ct?.icon||''} ${ct?.name||''}</strong> 的回合</span>`;
-    }
+  // 右上角顯示當前回合是誰
+  const turnEl = document.getElementById('turn-indicator');
+  if (turnEl) {
+    turnEl.textContent = isMyTurn ? '⭐ 你的回合' : `${ct?.icon||''} ${ct?.name||''} 的回合`;
+    turnEl.style.color = isMyTurn ? 'var(--yellow)' : 'rgba(255,255,255,0.45)';
   }
 
+  // 等待時：透明阻擋層（棋盤仍可見）
+  const blocker = document.getElementById('s-wait-blocker');
+  if (blocker) blocker.style.display = !isMyTurn ? 'block' : 'none';
+
+  // HUD z-index 在 blocker 之上（讓 HUD 仍可見）
+  const hud = document.getElementById('s-hud');
+  if (hud) hud.style.zIndex = '1000';
+
   // ── HUD 內容依 phase 決定 ──
-  removeHudRoll(); // 先清除骰子面板
+  removeHudRoll();
 
   if (!isMyTurn) {
-    setHud(`<div style="font-size:0.82rem;color:rgba(255,255,255,0.7);">👀 ${ct?.icon||''} ${ct?.name||''}<br>的回合，請稍候...</div>`);
+    setHud(`<div style="font-size:0.82rem;color:rgba(255,255,255,0.7);">👀 ${ct?.icon||''} ${ct?.name||''}<br>的回合</div>`);
 
   } else if (gs.phase === 'waiting_roll') {
     if (myTD?.skipTurn) {
@@ -1820,7 +1814,8 @@ function movePiece() {
   const gs = gameState;
   const tid = gs.currentTurn;
   const tidStr = String(tid);
-  const team = gs.teams[tid] || gs.teams[tidStr];
+  // teams key 在 JSON 序列化後全是字串，優先用字串 key
+  const team = gs.teams[tidStr] || gs.teams[tid];
   if (!team) return;
   const steps = gs.diceResult?.total || 1;
   const startPos = team.position;
@@ -1830,8 +1825,9 @@ function movePiece() {
   function moveStep() {
     step++;
     const curPos = (startPos + step) % TOTAL;
-    if (gameState.teams[tid] !== undefined) gameState.teams[tid].position = curPos;
-    if (gameState.teams[tidStr] !== undefined) gameState.teams[tidStr].position = curPos;
+    // 同時更新數字key和字串key（確保找得到）
+    const _t = gameState.teams[tidStr] || gameState.teams[tid];
+    if (_t) { _t.position = curPos; gameState.teams[tidStr] = _t; gameState.teams[tid] = _t; }
     renderPieces();
     
     if (myRole === 'student') centerOnMyPiece();
@@ -1855,9 +1851,11 @@ function movePiece() {
 
 function triggerEvent(type) {
   const tid = gameState.currentTurn;
+  const tidStr = String(tid);
+  const _curTeam = gameState.teams[tidStr] || gameState.teams[tid] || {};
   if (type === 'start') {
     showToast('🏁 經過起點！+1分');
-    updateTeam(tid, { score: (gameState.teams[tid].score || 0) + 1 });
+    updateTeam(tid, { score: (_curTeam.score || 0) + 1 });
     updateState({ phase: 'done', event: null });
   }
   else if (type === 'q') { updateState({ phase: 'answering', event: null }); fetchQ(false); }
