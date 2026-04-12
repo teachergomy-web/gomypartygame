@@ -323,153 +323,68 @@ body {
    骰子拋落動畫系統
    ══════════════════════════════ */
 
-/* 全螢幕骰子拋落遮罩（半透明，顯示在棋盤上） */
+/* ═══ 骰子動畫 ═══ */
+/* 骰子容器：固定置中顯示 */
 .dice-throw-overlay {
-  position: fixed; inset: 0; z-index: 800;
-  pointer-events: none;
-  display: flex; align-items: center; justify-content: center;
-  gap: 40px;
+  position: fixed; inset: 0; z-index: 800; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; gap: 24px;
+  background: rgba(0,0,0,0.55);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  animation: diceOverlayIn 0.2s ease both;
 }
+@keyframes diceOverlayIn { from { opacity:0 } to { opacity:1 } }
 
-/* 單顆骰子的外層容器：控制拋物線飛行 */
-.dt-wrap {
+/* 單顆骰子：飛入+彈跳 */
+.dw {
   position: relative;
-  width: 90px; height: 90px;
-  animation: dtFly var(--fly-dur, 1.6s) var(--fly-delay, 0s) cubic-bezier(0.22,1,0.36,1) both;
+  animation: dwBounce 0.9s cubic-bezier(0.22,1,0.36,1) both;
 }
-@keyframes dtFly {
-  0%   { transform: translateY(-480px) translateX(var(--sx, 0px)) scale(0.3); opacity: 0; }
-  15%  { opacity: 1; }
-  55%  { transform: translateY(0px)    translateX(0) scale(1);   animation-timing-function: cubic-bezier(0.55,0,1,0.45); }
-  70%  { transform: translateY(-48px)  translateX(0) scale(1.04); animation-timing-function: cubic-bezier(0,0,0.4,1); }
-  82%  { transform: translateY(0px)    translateX(0) scale(1);   animation-timing-function: cubic-bezier(0.55,0,1,0.45); }
-  91%  { transform: translateY(-14px)  translateX(0) scale(1.01); animation-timing-function: cubic-bezier(0,0,0.4,1); }
-  97%  { transform: translateY(0px)    translateX(0) scale(1); }
-  100% { transform: translateY(0px)    translateX(0) scale(1);   opacity: 1; }
+.dw:nth-child(2) { animation-delay: 0.1s; }
+@keyframes dwBounce {
+  0%   { transform: translateY(-600px) rotate(-720deg) scale(0.2); opacity: 0; }
+  60%  { transform: translateY(0)      rotate(0deg)    scale(1.12); opacity: 1; animation-timing-function: cubic-bezier(0.5,0,1,0.4); }
+  75%  { transform: translateY(-32px)  rotate(6deg)    scale(1);    animation-timing-function: cubic-bezier(0,0,0.4,1); }
+  88%  { transform: translateY(0)      rotate(-3deg)   scale(1.04); animation-timing-function: cubic-bezier(0.5,0,1,0.4); }
+  95%  { transform: translateY(-8px)   rotate(0)       scale(1);    animation-timing-function: cubic-bezier(0,0,0.4,1); }
+  100% { transform: translateY(0)      rotate(0)       scale(1); }
 }
 
-/* 骰子陰影 */
-.dt-shadow {
-  position: absolute; bottom: -10px; left: 10%; width: 80%; height: 14px;
-  background: rgba(0,0,0,0.5); border-radius: 50%; filter: blur(5px);
-  animation: dtShadow var(--fly-dur, 1.6s) var(--fly-delay, 0s) both;
-}
-@keyframes dtShadow {
-  0%   { transform: scaleX(0.2); opacity: 0; }
-  55%  { transform: scaleX(1);   opacity: 0.7; animation-timing-function: cubic-bezier(0.55,0,1,0.45); }
-  70%  { transform: scaleX(0.7); opacity: 0.4; animation-timing-function: cubic-bezier(0,0,0.4,1); }
-  82%  { transform: scaleX(1);   opacity: 0.7; animation-timing-function: cubic-bezier(0.55,0,1,0.45); }
-  91%  { transform: scaleX(0.85);opacity: 0.5; animation-timing-function: cubic-bezier(0,0,0.4,1); }
-  100% { transform: scaleX(1);   opacity: 0.7; }
+/* 骰子本體 */
+.dw-face {
+  width: 100px; height: 100px;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+  border-radius: 18px;
+  border: 3px solid #ccc;
+  box-shadow: 0 8px 0 #aaa, 0 14px 20px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.9);
+  display: grid; place-items: center; padding: 10px;
+  font-size: 4rem;
 }
 
-/* 3D 骰子本體：旋轉 */
-.dt-scene {
-  width: 90px; height: 90px;
-  perspective: 400px;
-  position: absolute; inset: 0;
-}
-.dt-cube {
-  width: 90px; height: 90px;
-  position: relative;
-  transform-style: preserve-3d;
-  animation: dtSpin var(--fly-dur, 1.6s) var(--fly-delay, 0s) cubic-bezier(0.15,0,0.2,1) both;
-}
-@keyframes dtSpin {
-  0%   { transform: rotateX(0deg)   rotateY(0deg)   rotateZ(0deg); }
-  55%  { transform: rotateX(var(--rx1,540deg)) rotateY(var(--ry1,360deg)) rotateZ(var(--rz1,180deg)); }
-  70%  { transform: rotateX(var(--rx2,600deg)) rotateY(var(--ry2,400deg)) rotateZ(var(--rz2,200deg)); }
-  82%  { transform: rotateX(var(--ex,720deg))  rotateY(var(--ey,480deg))  rotateZ(0deg); }
-  100% { transform: rotateX(var(--ex,720deg))  rotateY(var(--ey,480deg))  rotateZ(0deg); }
-}
-
-/* 六個面 */
-.dt-face {
-  position: absolute;
-  width: 90px; height: 90px;
-  background: linear-gradient(145deg, #fff 60%, #e8e8e8);
-  border: 2px solid #ccc;
-  border-radius: 14px;
-  display: grid;
-  box-shadow: inset 2px 2px 4px rgba(255,255,255,0.8), inset -2px -2px 4px rgba(0,0,0,0.1);
-}
-/* 各面定位 */
-.dt-face.f  { transform: translateZ(45px); }
-.dt-face.ba { transform: rotateY(180deg) translateZ(45px); }
-.dt-face.r  { transform: rotateY( 90deg) translateZ(45px); }
-.dt-face.l  { transform: rotateY(-90deg) translateZ(45px); }
-.dt-face.t  { transform: rotateX( 90deg) translateZ(45px); }
-.dt-face.bo { transform: rotateX(-90deg) translateZ(45px); }
-
-/* 骰點 */
-.dt-dot {
-  width: 14px; height: 14px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #444, #111);
-  box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-  align-self: center; justify-self: center;
-}
-
-/* 面1 */
-.dt-face[data-v="1"] { place-items: center; }
-/* 面2 */
-.dt-face[data-v="2"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 10px; gap: 0; }
-.dt-face[data-v="2"] .dt-dot:nth-child(1) { align-self: start; justify-self: start; }
-.dt-face[data-v="2"] .dt-dot:nth-child(2) { align-self: end;   justify-self: end; grid-column: 2; grid-row: 2; }
-/* 面3 */
-.dt-face[data-v="3"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; padding: 10px; }
-.dt-face[data-v="3"] .dt-dot:nth-child(1) { grid-column:1; grid-row:1; align-self:start; justify-self:start; }
-.dt-face[data-v="3"] .dt-dot:nth-child(2) { grid-column:2; grid-row:2; }
-.dt-face[data-v="3"] .dt-dot:nth-child(3) { grid-column:3; grid-row:3; align-self:end;   justify-self:end; }
-/* 面4 */
-.dt-face[data-v="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 10px; }
-/* 面5 */
-.dt-face[data-v="5"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; padding: 10px; }
-.dt-face[data-v="5"] .dt-dot:nth-child(1) { grid-column:1; grid-row:1; align-self:start; justify-self:start; }
-.dt-face[data-v="5"] .dt-dot:nth-child(2) { grid-column:3; grid-row:1; align-self:start; justify-self:end; }
-.dt-face[data-v="5"] .dt-dot:nth-child(3) { grid-column:2; grid-row:2; }
-.dt-face[data-v="5"] .dt-dot:nth-child(4) { grid-column:1; grid-row:3; align-self:end;   justify-self:start; }
-.dt-face[data-v="5"] .dt-dot:nth-child(5) { grid-column:3; grid-row:3; align-self:end;   justify-self:end; }
-/* 面6 */
-.dt-face[data-v="6"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; padding: 10px; }
-
-/* 結果顯示：骰子靜止後大字顯示點數和步數 */
+/* 結果顯示 */
 .dt-result {
   position: fixed; inset: 0; z-index: 801;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px;
   pointer-events: none;
-  animation: dtResultIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  animation: dtResultIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
 }
 @keyframes dtResultIn {
-  from { transform: scale(0.5) translateY(20px); opacity: 0; }
-  to   { transform: scale(1)   translateY(0);    opacity: 1; }
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
 }
-.dt-result-dice-row {
-  display: flex; gap: 16px; align-items: center;
-}
+.dt-result-dice-row { display: flex; gap: 16px; align-items: center; }
 .dt-result-face {
-  width: 64px; height: 64px;
-  background: linear-gradient(145deg, #fff 60%, #e8e8e8);
-  border: 2px solid #bbb; border-radius: 12px;
-  display: grid; place-items: center;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.5), inset 2px 2px 4px rgba(255,255,255,0.9);
-}
-.dt-result-dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #444, #111);
+  width: 80px; height: 80px;
+  background: linear-gradient(135deg, #fff, #f0f0f0);
+  border: 3px solid #bbb; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3.2rem;
+  box-shadow: 0 5px 0 #999, 0 10px 20px rgba(0,0,0,0.5);
 }
 .dt-total-badge {
-  background: rgba(0,0,0,0.75);
-  border: 2px solid var(--yellow);
-  border-radius: 50px;
-  padding: 8px 28px;
-  color: var(--yellow);
-  font-weight: 900;
-  font-size: 1.3rem;
-  letter-spacing: 2px;
-  box-shadow: 0 4px 20px rgba(255,214,0,0.3);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  background: rgba(0,0,0,0.82); border: 2px solid var(--yellow);
+  border-radius: 50px; padding: 10px 32px;
+  color: var(--yellow); font-weight: 900; font-size: 1.4rem; letter-spacing: 2px;
+  box-shadow: 0 4px 20px rgba(255,214,0,0.35);
 }
 
 .wait-msg { color: rgba(255,255,255,0.6); font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; width: 100%; text-align: center; }
@@ -951,18 +866,19 @@ function processAction(action) {
   _lastActionTs = action.ts;
 
   if (action.type === 'W8_MOVE_ROLL') {
-    if (Number(action.teamId) !== Number(gameState.currentTurn)) return;
+    // 寬鬆比較 teamId vs currentTurn
+    if (Number(action.teamId) !== Number(gameState.currentTurn) &&
+        String(action.teamId) !== String(gameState.currentTurn)) return;
     const d = action.diceResult;
-    showDiceAnim(d.d1, d.d2, d.total, 't');
+    showDiceAnim(d.d1, d.d2, d.total);
     updateState({ phase: 'rolled', diceResult: d });
     const team = TEAMS.find(t => t.id == action.teamId);
     showToast(`🎲 ${team?.icon || ''} 擲出 ${d.total} 步！`);
-    
-    // 【自動流程化】: 骰完 3 秒後自動幫老師按「移動棋子」
+    // 骰子動畫約 2 秒，動畫結束後移動棋子
     if (myRole === 'teacher') {
       setTimeout(() => {
         if (gameState.phase === 'rolled') movePiece();
-      }, 3000); 
+      }, 2200);
     }
   }
 }
@@ -1028,7 +944,7 @@ window.addEventListener('message', e => {
     syncTeamsFromParent(); syncTeamsFromState();
     render(); centerOnMyPiece();
   }
-  if (e.data.type === 'W8_ROLL' && myRole === 'teacher') {
+  if ((e.data.type === 'W8_ROLL' || e.data.type === 'W8_MOVE_ROLL') && myRole === 'teacher') {
     processAction(e.data);
   }
 });
@@ -1695,87 +1611,38 @@ function renderStudent() {
   centerOnMyPiece();
 }
 
-const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-const DICE_RX = [0, -90,  0,   0,  90,   0];
-const DICE_RY = [0,   0, 90, -90,   0, 180];
+const DICE_EMOJI = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 
-// 產生骰點 HTML（真實圓點，非 emoji）
-function makeDotFace(val) {
-  const n = Math.max(1, Math.min(6, val || 1));
-  const dots = '<div class="dt-dot"></div>'.repeat(n);
-  return `<div class="dt-face" data-v="${n}">${dots}</div>`;
+// 建立單顆骰子動畫 HTML（飛入+彈跳，顯示亂轉中的emoji）
+function makeDiceEl(val, index) {
+  const e = DICE_EMOJI[(val||1)-1];
+  return `<div class="dw" style="animation-delay:${index*0.1}s"><div class="dw-face">${e}</div></div>`;
 }
 
-// 產生對立面值（骰子對面相加=7）
-function oppVal(v) { return 7 - v; }
-
-// 建立單顆 3D 骰子 HTML
-function makeDiceCube(val, index) {
-  const delay = index * 0.18;
-  const sx = index === 0 ? '-60px' : '60px'; // 從略左/右飛入
-  // 各面 val 分配：front=val, back=oppVal, top,bottom,left,right 其他
-  const fv = val;
-  const bv = oppVal(val);
-  // 隨機其餘面（視覺用，不影響結果）
-  const others = [1,2,3,4,5,6].filter(v => v !== fv && v !== bv);
-  const [tv, bov, rv, lv] = others.sort(() => Math.random()-0.5);
-  // 最終旋轉角度：讓 front 面朝向觀看者
-  const rx = DICE_RX[(fv-1)] + 1080;
-  const ry = DICE_RY[(fv-1)] + 1080;
-  // 中間旋轉變化（讓骰子飛行中看起來亂轉）
-  const rx1 = 360 + Math.floor(Math.random()*3)*90;
-  const ry1 = 270 + Math.floor(Math.random()*3)*90;
-  const rz1 = Math.floor(Math.random()*4)*90;
-  const rx2 = rx1+90; const ry2 = ry1+90; const rz2 = rz1+45;
-  
-  return `<div class="dt-wrap" style="--fly-dur:1.6s;--fly-delay:${delay}s;--sx:${sx}">
-    <div class="dt-shadow"></div>
-    <div class="dt-scene">
-      <div class="dt-cube" style="--rx1:${rx1}deg;--ry1:${ry1}deg;--rz1:${rz1}deg;--rx2:${rx2}deg;--ry2:${ry2}deg;--rz2:${rz2}deg;--ex:${rx}deg;--ey:${ry}deg">
-        ${makeDotFace(fv)}
-        <div class="dt-face ba" data-v="${bv}">${'<div class="dt-dot"></div>'.repeat(bv)}</div>
-        <div class="dt-face t"  data-v="${tv||1}">${'<div class="dt-dot"></div>'.repeat(tv||1)}</div>
-        <div class="dt-face bo" data-v="${bov||2}">${'<div class="dt-dot"></div>'.repeat(bov||2)}</div>
-        <div class="dt-face r"  data-v="${rv||3}">${'<div class="dt-dot"></div>'.repeat(rv||3)}</div>
-        <div class="dt-face l"  data-v="${lv||4}">${'<div class="dt-dot"></div>'.repeat(lv||4)}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-// 建立結果面（靜止後顯示）
-function makeResultFace(val) {
-  const n = Math.max(1, Math.min(6, val||1));
-  return `<div class="dt-result-face" data-v="${n}">${'<div class="dt-result-dot"></div>'.repeat(n)}</div>`;
-}
-
-// 主動畫函式
-function showDiceAnim(d1, d2, total, target) {
-  // 清除舊的動畫
+// 骰子動畫：飛入彈跳 → 靜止顯示結果
+function showDiceAnim(d1, d2, total) {
   document.querySelectorAll('.dice-throw-overlay, .dt-result').forEach(el => el.remove());
 
-  // 拋落動畫：骰子飛入
+  // 飛入動畫（0.9s）
   const throwEl = document.createElement('div');
   throwEl.className = 'dice-throw-overlay';
-  throwEl.innerHTML = makeDiceCube(d1, 0) + (d2 ? makeDiceCube(d2, 1) : '');
+  throwEl.innerHTML = makeDiceEl(d1, 0) + (d2 ? makeDiceEl(d2, 1) : '');
   document.body.appendChild(throwEl);
 
-  // 動畫結束時間（1.6s飛行 + 第二顆延遲0.18s + 0.3s緩衝）
-  const animDur = (d2 ? 1.6 + 0.18 : 1.6) * 1000 + 300;
+  const animDur = (d2 ? 900 + 100 : 900) + 200;
 
-  // 靜止後：移除飛行骰子，顯示結果
+  // 動畫結束後：移除飛行骰子，顯示靜態結果
   setTimeout(() => {
     throwEl.remove();
     const resultEl = document.createElement('div');
     resultEl.className = 'dt-result';
     resultEl.innerHTML = `
       <div class="dt-result-dice-row">
-        ${makeResultFace(d1)}
-        ${d2 ? `<div style="color:#fff;font-size:1.4rem;font-weight:900;">+</div>${makeResultFace(d2)}` : ''}
+        <div class="dt-result-face">${DICE_EMOJI[(d1||1)-1]}</div>
+        ${d2 ? `<div style="color:#fff;font-size:1.6rem;font-weight:900;padding:0 4px;">+</div><div class="dt-result-face">${DICE_EMOJI[(d2||1)-1]}</div>` : ''}
       </div>
       <div class="dt-total-badge">🎲 ${total} 步</div>`;
     document.body.appendChild(resultEl);
-    // 1.5秒後淡出
     setTimeout(() => {
       resultEl.style.transition = 'opacity 0.4s';
       resultEl.style.opacity = '0';
