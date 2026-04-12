@@ -77,16 +77,18 @@ body {
   overflow: hidden; 
 }
 
+/* 極簡化頂部面板 */
 .t-header {
   position: absolute; top: 12px; left: 12px; right: 12px; z-index: 40;
   background: rgba(20, 20, 25, 0.85); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 16px; display: flex; align-items: center; gap: 16px; padding: 12px 20px; 
+  border-radius: 16px; display: flex; align-items: center; justify-content: center; 
+  padding: 10px 16px; 
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5); flex-wrap: wrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5); 
 }
 
 .t-horizontal-scores {
-  display: flex; flex: 1; justify-content: center; gap: 10px; align-items: center; flex-wrap: wrap;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; width: 100%;
 }
 .score-row {
   display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.5);
@@ -99,14 +101,6 @@ body {
 .sc-icon { font-size: 1.2rem; }
 .sc-name { color: #fff; font-weight: 700; font-size: 0.9rem; }
 .sc-pts { font-weight: 900; font-size: 1.1rem; color: var(--green); margin-left: 4px; }
-
-.btn-settle-small {
-  background: linear-gradient(135deg, #FF8C00, #E65100); color: #fff;
-  border: none; border-radius: 50px; font-family: var(--font); font-weight: 900;
-  padding: 8px 20px; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(255,140,0,0.3);
-  white-space: nowrap;
-}
-.btn-settle-small:active { transform: scale(0.95); }
 
 .board-container {
   position: absolute; inset: 0; z-index: 10;
@@ -269,8 +263,6 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   box-shadow: inset 0 0 50px rgba(0,0,0,0.8); border-radius: 16px;
 }
-.center-logo { font-size: 4.5rem; font-weight: 900; color: var(--yellow); text-shadow: 0 5px 15px rgba(0,0,0,0.5); margin-bottom: 10px; }
-.center-sub { font-size: 1.6rem; color: var(--blue); font-weight: 900; letter-spacing: 0.6em; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
 /* 基本格子顏色主題 */
 .cell.type-q { --c-color: var(--p-yellow); }
@@ -346,32 +338,6 @@ body {
   border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
 }
 
-/* RESULT SCREEN */
-#result-screen {
-  display: none; position: fixed; inset: 0; background: rgba(5,5,5,0.95);
-  z-index: 8000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(20px);
-}
-.r-title { font-size: 2.8rem; font-weight: 900; color: var(--yellow); text-shadow: 0 0 30px rgba(255,214,0,0.6); margin-bottom: 2rem; animation: tp 0.6s cubic-bezier(0.34,1.56,0.64,1); }
-@keyframes tp { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.r-list { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 420px; }
-.r-item {
-  display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05);
-  border-radius: 16px; padding: 14px 20px; backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.1); animation: rs 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
-}
-@keyframes rs { from { transform: translateX(-50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-.r-rank { font-size: 1.8rem; width: 40px; } .r-icon { font-size: 2rem; }
-.r-name { flex: 1; color: #fff; font-weight: 900; font-size: 1.1rem; } .r-score { font-size: 1.6rem; font-weight: 900; color: var(--green); }
-.confetti-wrap { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-.confetti-bit { position: absolute; border-radius: 4px; animation: cf linear forwards; }
-@keyframes cf { 0% { transform: translateY(-20px) rotate(0); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
-.btn-restart {
-  margin-top: 2rem; padding: 14px 40px; background: var(--blue); color: #000; border: none;
-  border-radius: 50px; font-family: var(--font); font-weight: 900; font-size: 1.1rem;
-  cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 20px rgba(0,229,255,0.4);
-}
-.btn-restart:hover { transform: scale(1.05); }
-
 .wait-msg { color: rgba(255,255,255,0.6); font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; width: 100%; text-align: center; }
 .pulse { width: 10px; height: 10px; background: var(--blue); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; box-shadow: 0 0 8px var(--blue); flex-shrink: 0; }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.6); } }
@@ -406,7 +372,6 @@ body {
 <div id="teacher-view">
   <div class="t-header" id="t-header">
     <div class="t-horizontal-scores" id="t-scores"></div>
-    <button class="btn-settle-small" onclick="showResult()">🏆 結算</button>
   </div>
   
   <div class="board-container" id="t-map-container">
@@ -436,14 +401,6 @@ body {
   </div>
 </div>
 
-<!-- RESULT SCREEN -->
-<div id="result-screen">
-  <div class="confetti-wrap" id="confetti-wrap"></div>
-  <div class="r-title">🏆 遊戲結算！</div>
-  <div class="r-list" id="r-list"></div>
-  <button class="btn-restart" onclick="location.reload()">🔄 再玩一次</button>
-</div>
-
 <!-- 3D 骰子 canvas 遮罩 -->
 <div id="dice3d-overlay">
   <div id="dice3d-canvas-wrap"></div>
@@ -460,6 +417,8 @@ body {
 <script>
 let _gameStartTime = Date.now();
 window._isMoving = false; // 動畫防干擾鎖定
+let _lastCamPos = -1;
+let _lastCamTurn = -1;
 
 // 動態組別系統
 let TEAMS = [
@@ -543,15 +502,12 @@ const CTYPES = [
 const CICONS = { q:'❓', lucky:'💰', bad:'💸', special:'⭐' };
 
 const LUCKY_DATA = [
-  ['考卷滿分獎勵', 100], ['幫助學弟妹解答題目', 150], ['擔任一週糾察隊津貼', 200], ['打掃區域被評為最乾淨', 250],
-  ['回答出老師的加分題', 300], ['校外比賽代表學校得獎', 350], ['在操場撿到校長的金幣', 400], ['作業書寫極其工整獲獎', 450],
-  ['全勤獎勵金', 500], ['冬令營期間表現最優異', 550], ['星際挖礦發現高純度金礦', 600], ['校園路跑獲得第一名', 700],
-  ['拾金不昧交給教務處獎勵', 800], ['科學實驗大成功獲得專利', 900], ['贏得「大富翁」年度爭霸賽', 1000],
-  ['製作環保作品獲得環保獎項', 120], ['期末同樂會抽中頭獎', 220], ['協助老師整理辦公室', 320], ['獲選為校園禮貌之星', 420],
-  ['分享個人讀書筆記大受好評', 520], ['修復教室損壞的教具', 620], ['外籍老師稱讚 Good Job 獎勵', 720],
-  ['班級佈置競賽獲得冠金', 820], ['段考進入全校前十名', 1000], ['獲得神祕的星際勳章補給', 500],
-  ['成功破解老師留下的邏輯難題', 480], ['擔任課堂小組長帶領奪冠', 380], ['寫作作品被刊登在校刊上', 280],
-  ['發現隱藏在走廊的寶箱', 580], ['獲得家長會贊助的圓夢基金', 680]
+  ['考卷滿分獎勵', 100], ['幫助學弟妹解答題目', 100], ['擔任一週糾察隊津貼', 200], ['打掃區域被評為最乾淨', 200],
+  ['回答出老師的加分題', 200], ['校外比賽代表學校得獎', 300], ['在操場撿到校長的金幣', 300], ['作業書寫極其工整獲獎', 300],
+  ['全勤獎勵金', 500], ['夏令營期間表現最優異', 500], ['校園路跑獲得第一名', 500],
+  ['拾金不昧交給教務處獎勵', 500], ['製作環保作品獲得環保獎項', 200], ['同樂會抽中頭獎', 300], ['獲選為校園禮貌之星', 300],
+  ['分享個人讀書筆記大受好評', 500], ['修復教室損壞的教具', 300], ['外籍老師稱讚 Good Job 獎勵', 200],
+  ['班級佈置競賽獲得冠軍', 300], ['段考進入全校前十名', 500], ['成功破解老師留下的數學難題', 300], ['擔任課堂小組長帶領奪冠', 300], 
 ];
 
 const LUCKY = LUCKY_DATA.map(([title, amt]) => ({
@@ -559,16 +515,13 @@ const LUCKY = LUCKY_DATA.map(([title, amt]) => ({
 }));
 
 const BAD_DATA = [
-  ['上課遲到 5 分鐘罰款', 100], ['忘記帶當天要用的課本', 120], ['在走廊奔跑不慎撞到人醫藥費', 150],
-  ['作業沒寫完被要求留下來補寫', 200], ['弄丟班級公共區域的鑰匙', 250], ['上課愛講話被老師扣點', 300],
-  ['教室電燈沒關被總務處罰款', 350], ['考卷忘記寫名字處理費', 400], ['午休時間太吵鬧影響他人', 450],
-  ['不慎弄壞高米教室的飲水機', 500], ['桌遊競賽失敗支付賭注', 550], ['違反營隊生活守則罰金', 600],
-  ['不慎掉進旗津的海水浴場洗衣服', 700], ['實驗器材操作不當損壞賠償', 750], ['被沒收課堂禁止攜帶的玩具', 800],
-  ['追趕跑跳碰受傷的診療費', 850], ['模擬股市大崩盤資產縮水', 900], ['遺失了珍貴的星際挖礦機具', 950],
-  ['繳納校園建設與維護稅', 1000], ['忘記關水龍頭造成水費暴漲', 130], ['圖書館借書逾期未還罰款', 230],
-  ['浪費午餐食材被要求勞動服務', 330], ['服裝儀容不整被糾察隊登記', 530], ['筆電沒充電導致無法上課檢修', 630],
-  ['弄丟老師最心愛的原子筆', 730], ['錯過班級接送的交通專車', 830], ['忘記關窗戶導致雨水潑入教室', 930],
-  ['遇到教務主任稽查不合格罰款', 1000], ['電腦中病毒需要支付重灌費', 480], ['午餐剩下太多廚餘扣點', 180]
+  ['在走廊奔跑不慎撞到人醫藥費', 300], ['弄丟班級公共區域的鑰匙', 250], ['教室電燈沒關被總務處罰款', 350],
+  ['故意弄壞高米教室的桌椅', 500], ['投飲料被販賣機吃錢', 200],  ['不慎掉進海水浴場', 700],
+  ['實驗器材操作不當損壞賠償', 750], ['被沒收課堂禁止攜帶的玩具', 800], ['追趕跑跳碰受傷的診療費', 850],
+  ['股市大崩盤資產縮水', 900], ['繳納校園建設與維護稅', 1000], ['忘記關水龍頭造成水費暴漲', 800], 
+  ['圖書館借書逾期未還罰款', 200], ['筆電沒充電導致無法上課檢修', 800], ['弄丟老師最心愛的原子筆', 730], 
+  ['錯過接送的交通專車', 830], ['忘記關窗戶導致雨水潑入教室', 930], ['遇到教務主任稽查不合格罰款', 700], 
+  ['電腦中病毒需要支付重灌費', 1000]
 ];
 
 const BAD = BAD_DATA.map(([title, amt]) => ({
@@ -688,16 +641,8 @@ try {
 // ══════════════════════════════
 // 強力跨裝置自動同步機制 & 攝影機系統
 // ══════════════════════════════
-let _lastStateStr = '';
-let _lastActionTs = 0;
-
-let _cameraOffsetX = 0;
-let _cameraOffsetY = 0;
-let _panOffsetX = 0;
-let _panOffsetY = 0;
-
 function updateCameraTarget(posIndex) {
-  if (myRole === 'teacher') return; // 老師端不自動跟隨
+  if (myRole === 'teacher') return; 
   if (!boardPos || boardPos.length === 0) return;
   const bp = boardPos[posIndex];
   if (!bp) return;
@@ -726,11 +671,9 @@ function applyTransform() {
   const vh = window.innerHeight;
   
   if (myRole === 'teacher') {
-    // 老師端全覽模式，固定視角，確保整個棋盤納入視窗中
     const VW_TARGET = BOARD_SIZE * 1.414 + 120;
     const VH_TARGET = BOARD_SIZE * 1.22 + 120;
     const scale = Math.min(vw / VW_TARGET, vh / VH_TARGET); 
-    
     const tx = _panOffsetX * scale;
     const ty = _panOffsetY * scale;
     
@@ -739,7 +682,7 @@ function applyTransform() {
     const tBoard = document.getElementById('board');
     if (tBoard) tBoard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   } else {
-    // 學生端高倍率模式，利用 translate 移動鏡頭來跟蹤棋子 (調降為 800 以顯示更多範圍)
+    // 學生端稍微拉遠到 800 倍率，視野更舒適，且能跟隨棋子移動
     const scale = Math.max(vw, vh) / 800; 
     const tx = (_cameraOffsetX + _panOffsetX) * scale;
     const ty = (_cameraOffsetY + _panOffsetY) * scale;
@@ -765,12 +708,7 @@ function setupDrag(elementId) {
   });
   window.addEventListener('mousemove', e => {
       if (!isDragging) return;
-      let scale = 1;
-      if (myRole === 'teacher') {
-          scale = Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120));
-      } else {
-          scale = Math.max(window.innerWidth, window.innerHeight) / 800;
-      }
+      let scale = myRole === 'teacher' ? Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120)) : Math.max(window.innerWidth, window.innerHeight) / 800;
       _panOffsetX += (e.clientX - startX) / scale;
       _panOffsetY += (e.clientY - startY) / scale;
       startX = e.clientX; startY = e.clientY;
@@ -786,12 +724,7 @@ function setupDrag(elementId) {
   }, {passive:true});
   window.addEventListener('touchmove', e => {
       if(!isDragging || e.touches.length !== 1) return;
-      let scale = 1;
-      if (myRole === 'teacher') {
-          scale = Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120));
-      } else {
-          scale = Math.max(window.innerWidth, window.innerHeight) / 800;
-      }
+      let scale = myRole === 'teacher' ? Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120)) : Math.max(window.innerWidth, window.innerHeight) / 800;
       _panOffsetX += (e.touches[0].clientX - startX) / scale;
       _panOffsetY += (e.touches[0].clientY - startY) / scale;
       startX = e.touches[0].clientX; startY = e.touches[0].clientY;
@@ -808,7 +741,6 @@ function setTransition(enabled) {
   if (sRig) sRig.style.transition = val;
 }
 
-// 傳送訊號到平台備援儲存機制
 function sendActionToPlatform(action) {
   try { window.parent.postMessage(action, '*'); } catch (e) {}
   try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
@@ -837,7 +769,7 @@ function attachSync() {
   }
 
   const applyState = (raw) => {
-    if (window._isMoving) return; // 鎖定防干擾
+    if (window._isMoving) return; 
     if (!raw || raw === _lastStateStr) return;
     try {
       const parsed = JSON.parse(raw);
@@ -854,7 +786,6 @@ function attachSync() {
     } catch(e) {}
   };
 
-  // Firebase Realtime Listener
   try {
     const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
     if (parentDb && roomId) {
@@ -907,7 +838,6 @@ function attachSync() {
           }
       } catch(e) {}
       
-      // 處理暫停偵測
       try {
         if (window.parent && window.parent.state && window.parent.getRooms) {
           const rooms = window.parent.getRooms();
@@ -925,10 +855,8 @@ function attachSync() {
   setInterval(pollNow, 400);
 }
 
-// 統一接收訊號處理骰子動畫並移動 
 function processAction(action) {
   if (!gameState) return;
-  // 保護機制：無視不同場次（GameId不符）或啟動前殘留的動作
   if (action.gameId && gameState.gameId && action.gameId !== gameState.gameId) return;
   if (action.ts < _gameStartTime) return;
   if (action.ts === _lastActionTs) return;
@@ -944,7 +872,7 @@ function processAction(action) {
   }
 
   if (action.type === 'W8_ROLL' || action.type === 'W8_MOVE_ROLL') {
-    if (action.actionType === 'W8_ANSWER') return; // 防呆
+    if (action.actionType === 'W8_ANSWER') return; 
 
     if (Number(action.teamId) !== Number(gameState.currentTurn) &&
         String(action.teamId) !== String(gameState.currentTurn)) {
@@ -956,7 +884,6 @@ function processAction(action) {
     
     if (myRole === 'teacher') {
       const savedDice = { ...d };
-      // 等待 3 秒鐘讓 3D 骰子動畫與結果完全播完，再開始跑棋子
       setTimeout(() => {
         if (gameState) {
           gameState.phase = 'rolled';
@@ -1051,11 +978,6 @@ window.addEventListener('storage', e => {
 });
 
 window.addEventListener('load', () => {
-  if (window.parent !== window) {
-    const btnSettle = document.getElementById('btn-settle');
-    if (btnSettle) btnSettle.style.display = 'none';
-  }
-  
   setTimeout(() => {
     const p = new URLSearchParams(location.search);
     if (p.get('role')) {
@@ -1128,7 +1050,6 @@ function launch() {
       }
     }
     
-    // 初始化時強制鎖定開始位置
     setTimeout(() => {
       updateCameraTarget(0);
       _panOffsetX = 0; _panOffsetY = 0;
@@ -1269,6 +1190,30 @@ function broadcast() {
   } catch(e) {}
 }
 
+function syncPlatformScore() {
+  try {
+      if (window.parent && window.parent.state && window.parent.state.players) {
+          let updated = false;
+          window.parent.state.players.forEach(p => {
+              const groupId = parseInt(String(p.group).replace(/\D/g, '')) || 0;
+              const t = Object.values(gameState.teams).find(team => 
+                  parseInt(team.id) === groupId || (TEAMS.find(x=>x.id==team.id)?.name === p.name)
+              );
+              if (t) {
+                  p.score = Number(t.score) || 0;
+                  updated = true;
+              }
+          });
+          if (updated) {
+              if (typeof window.parent.tcRenderScores === 'function') window.parent.tcRenderScores();
+              if (window.parent.saveRooms && window.parent.getRooms) {
+                  window.parent.saveRooms(window.parent.getRooms());
+              }
+          }
+      }
+  } catch(e) {}
+}
+
 function updateState(patch) {
   gameState = { ...gameState, ...patch };
   render(); broadcast();
@@ -1283,7 +1228,7 @@ function updateTeam(tid, patch) {
   updateState({ teams: t });
   
   if (patch.score !== undefined && myRole === 'teacher') {
-      try { window.parent.postMessage({ type: 'W8_SCORE', group: TEAMS.find(x=>x.id==tid)?.name, score: Number(patch.score) }, '*'); } catch(e) {}
+      syncPlatformScore();
   }
 }
 
@@ -1299,12 +1244,16 @@ function render() {
       updateCameraTarget(0);
       _panOffsetX = 0; _panOffsetY = 0;
       applyTransform();
-  } else if (!isT && gameState.currentTurn && gameState.phase !== 'rolled') {
+  } else if (!isT) {
       const curTeam = gameState.teams[gameState.currentTurn] || gameState.teams[String(gameState.currentTurn)];
       if (curTeam) {
-          updateCameraTarget(curTeam.position % TOTAL);
-          _panOffsetX = 0; _panOffsetY = 0;
-          applyTransform();
+          if (curTeam.position !== _lastCamPos || gameState.currentTurn !== _lastCamTurn) {
+              updateCameraTarget(curTeam.position % TOTAL);
+              _panOffsetX = 0; _panOffsetY = 0;
+              applyTransform();
+              _lastCamPos = curTeam.position;
+              _lastCamTurn = gameState.currentTurn;
+          }
       }
   }
 
@@ -1386,7 +1335,7 @@ function render() {
       else if (gameState.phase === 'answering') {
           const q = gameState.question;
           if (!q) {
-              html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> 讀取題庫中...</div>`;
+              html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> AI 出題中...</div>`;
           } else {
               const sa = gameState.selectedAnswer;
               if (isT) {
@@ -1423,6 +1372,7 @@ function render() {
               html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
               html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
           } else {
+              // 學生端在結果揭曉時不顯示解析，強制看大螢幕
               html += `<div class="co-icon" style="animation:none;">👀</div>
                        <div class="co-title">請看老師畫面</div>
                        <div class="co-desc">結果揭曉中...</div>`;
@@ -1588,19 +1538,6 @@ function renderStudent() {
     if (card) card.style.display = 'block';
   }
 }
-
-window.studentSelectAnswer = function(ans) {
-  if (!gameState || gameState.phase !== 'answering') return;
-  if (gameState.selectedAnswer) return; 
-  
-  const action = { type: 'W8_ROLL', actionType: 'W8_ANSWER', gameId: gameState.gameId, teamId: myTeamId, answer: ans, ts: Date.now() };
-  if (myRole === 'student') {
-    sendActionToPlatform(action);
-    processAction(action);
-  } else {
-    processAction(action);
-  }
-};
 
 // ══════════════════════════════
 // Three.js 3D 骰子系統
@@ -1894,6 +1831,28 @@ function movePiece() {
     broadcast();
     renderPieces();
     
+    if (curPos === 0) {
+        showToast('🏁 經過起點！+$500');
+        showPop('+$500', 'var(--green)');
+        if (_t) _t.score = (Number(_t.score) || 0) + 500;
+        
+        if (myRole === 'teacher') {
+            updateTeam(tid, { score: _t.score });
+        } else {
+            render(); 
+        }
+        
+        if (step < steps) {
+            setTimeout(moveStep, 800); 
+        } else {
+            setTimeout(() => {
+                window._isMoving = false;
+                if (myRole === 'teacher') triggerEvent(CTYPES[finalPos], finalPos);
+            }, 800);
+        }
+        return;
+    }
+
     if (step < steps) {
       setTimeout(moveStep, 400); 
     } else {
@@ -1921,9 +1880,6 @@ function triggerEvent(type, finalPos) {
       const _curTeam = gameState.teams[tidStr] || gameState.teams[tid] || {};
       
       if (type === 'start') {
-        showToast('🏁 經過起點！+$500');
-        showPop('+$500', 'var(--green)');
-        updateTeam(tid, { score: (Number(_curTeam.score) || 0) + 500 });
         updateState({ phase: 'done', event: null });
       }
       else if (type === 'q') { updateState({ phase: 'answering', event: null, selectedAnswer: null }); fetchQ(false); }
@@ -1935,27 +1891,31 @@ function triggerEvent(type, finalPos) {
   }
 }
 
-function doSpecial(tid) {
-  const ev = SPECIAL[Math.floor(Math.random() * SPECIAL.length)];
-  ev.fx(tid, gameState);
-  updateState({ phase: 'event', event: { type: 'special', title: ev.title, desc: ev.desc } });
-  showToast(`⭐ ${ev.title}`); 
-}
+const LUCKY = [
+  { title: '幸運之星！', desc: '+3 分！', fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + 3 }) },
+  { title: '順風！', desc: '前進 2 格！', fx: (tid, gs) => { updateTeam(tid, { position: (Number(gs.teams[tid].position) + 2) % TOTAL }); } },
+  { title: '全組加分！', desc: '所有組各 +1 分！', fx: (tid, gs) => {
+    const t2 = { ...gs.teams }; Object.values(t2).forEach(t => { t2[t.id] = { ...t2[t.id], score: (Number(t2[t.id].score) || 0) + 1 }; }); updateState({ teams: t2 }); } },
+  { title: '🎲 獲得第二顆骰子！', desc: '之後每回合擲兩顆！', fx: (tid) => updateTeam(tid, { extraDice: true }) },
+  { title: '神秘禮物！', desc: '+2 分！', fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + 2 }) },
+];
+const BAD = [
+  { title: '倒楣！', desc: '-1 分', fx: (tid, gs) => updateTeam(tid, { score: Math.max(0, (Number(gs.teams[tid].score) || 0) - 1) }) },
+  { title: '滑倒！', desc: '退後 2 格', fx: (tid, gs) => { updateTeam(tid, { position: ((Number(gs.teams[tid].position) - 2) + TOTAL) % TOTAL }); } },
+  { title: '⏸ 停一回合！', desc: '下回合跳過', fx: (tid) => updateTeam(tid, { skipTurn: true }) },
+];
 
 function doLucky(tid) {
   const ev = LUCKY[Math.floor(Math.random() * LUCKY.length)];
   ev.fx(tid, gameState);
   updateState({ phase: 'event', event: { type: 'lucky', title: ev.title, desc: ev.desc } });
-  showToast(`💰 ${ev.title}`); 
-  showPop(ev.desc, 'var(--green)');
+  showToast(`🍀 ${ev.title}`); showPop('+', 'var(--green)');
 }
-
 function doBad(tid) {
   const ev = BAD[Math.floor(Math.random() * BAD.length)];
   ev.fx(tid, gameState);
   updateState({ phase: 'event', event: { type: 'bad', title: ev.title, desc: ev.desc } });
-  showToast(`💸 ${ev.title}`); 
-  showPop(ev.desc, 'var(--red)');
+  showToast(`💀 ${ev.title}`); showPop('-1', 'var(--red)');
 }
 
 let cachedQuestions = null;
@@ -1972,7 +1932,6 @@ async function fetchQ(isSpecial) {
       
       cachedQuestions = [];
       data.table.rows.forEach(row => {
-        // 第一欄為題號，第二欄為題目
         if (row.c && row.c.length > 1 && row.c[1] && row.c[1].v) {
           const qText = String(row.c[1].v).trim();
           if (qText !== '題目' && qText !== 'Question') {
@@ -2043,46 +2002,6 @@ function nextTurn() {
   }
   const finalNextId = orderArray[nextIdx];
   updateState({ currentTurn: finalNextId, phase: 'waiting_roll', diceResult: null, event: null, question: null, selectedAnswer: null });
-}
-
-function showResult() {
-  try {
-      const rooms = window.parent?.getRooms?.();
-      const rc = window.parent?.state?.roomCode;
-      if (rooms && rc && rooms[rc]) {
-          if (!rooms[rc].scores) rooms[rc].scores = {};
-          Object.values(gameState.teams).forEach(t => {
-              rooms[rc].scores[`第${t.id}組`] = Number(t.score) || 0;
-          });
-          window.parent.saveRooms(rooms);
-      }
-  } catch(e) {}
-
-  const rs = document.getElementById('result-screen'); rs.style.display = 'flex';
-  
-  const uniqueTeams = Object.values(gameState.teams).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-  const sorted = uniqueTeams.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
-  
-  const rl = document.getElementById('r-list'); rl.innerHTML = '';
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
-  sorted.forEach((team, i) => {
-    const t = TEAMS.find(x => x.id === team.id);
-    const item = document.createElement('div'); item.className = 'r-item';
-    item.style.animationDelay = (i * 0.12) + 's';
-    item.innerHTML = `<span class="r-rank">${medals[i]||''}</span><span class="r-icon">${t?.icon||'🐻'}</span>
-      <span class="r-name">${t?.name||`第${team.id}組`}</span><span class="r-score">$${Number(team.score)||0}</span>`;
-    rl.appendChild(item);
-  });
-  
-  const wrap = document.getElementById('confetti-wrap');
-  const cols = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#CE93D8'];
-  for (let i = 0; i < 70; i++) {
-    const p = document.createElement('div'); p.className = 'confetti-bit';
-    p.style.cssText = `left:${Math.random() * 100}vw; background:${cols[Math.floor(Math.random() * cols.length)]};
-      animation-duration:${2 + Math.random() * 3}s; animation-delay:${Math.random() * 2}s;
-      width:${6 + Math.random() * 10}px; height:${6 + Math.random() * 10}px`;
-    wrap.appendChild(p);
-  }
 }
 
 function showToast(msg) {
