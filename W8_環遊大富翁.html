@@ -68,7 +68,7 @@ body {
 }
 
 /* ══════════════════════════════
-   TEACHER VIEW (全螢幕棋盤 + 摺疊側邊欄)
+   TEACHER VIEW (全螢幕棋盤 + 頂部分數板)
    ══════════════════════════════ */
 #teacher-view { 
   display: none; 
@@ -78,74 +78,42 @@ body {
 }
 
 .t-header {
-  position: absolute; top: 12px; left: 12px; z-index: 40;
-  background: rgba(20, 20, 25, 0.8); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px; display: flex; align-items: center; gap: 12px; padding: 10px 16px; 
-  backdrop-filter: blur(10px);
+  position: absolute; top: 12px; left: 12px; right: 12px; z-index: 40;
+  background: rgba(20, 20, 25, 0.85); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px; display: flex; align-items: center; gap: 16px; padding: 12px 20px; 
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5); flex-wrap: wrap;
 }
-.t-title { font-size: 1.2rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px var(--blue); }
-.turn-chip {
-  background: rgba(255, 214, 0, 0.2); color: var(--yellow); font-weight: 900; font-size: 0.95rem;
-  padding: 6px 16px; border-radius: 50px; margin-left: auto; display: flex; align-items: center; gap: 6px;
-  border: 1px solid rgba(255, 214, 0, 0.5); box-shadow: 0 0 10px rgba(255, 214, 0, 0.2);
+.t-title { font-size: 1.3rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px var(--blue); white-space: nowrap; }
+
+.t-horizontal-scores {
+  display: flex; flex: 1; justify-content: center; gap: 10px; align-items: center; flex-wrap: wrap;
 }
+.score-col {
+  display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.5);
+  padding: 6px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.3s;
+}
+.score-col.active {
+  background: rgba(255,214,0,0.15); border-color: var(--yellow); box-shadow: 0 0 12px rgba(255,214,0,0.4);
+}
+.sc-icon { font-size: 1.2rem; }
+.sc-name { color: #fff; font-weight: 700; font-size: 0.9rem; }
+.sc-pts { font-weight: 900; font-size: 1.1rem; color: var(--yellow); margin-left: 4px; }
+
+.btn-settle-small {
+  background: linear-gradient(135deg, #FF8C00, #E65100); color: #fff;
+  border: none; border-radius: 50px; font-family: var(--font); font-weight: 900;
+  padding: 8px 20px; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(255,140,0,0.3);
+  white-space: nowrap;
+}
+.btn-settle-small:active { transform: scale(0.95); }
 
 .board-container {
   position: absolute; inset: 0; z-index: 10;
   display: flex; align-items: center; justify-content: center;
   touch-action: none; 
 }
-
-/* 摺疊側邊欄 */
-.sidebar {
-  position: absolute; right: 0; top: 12px; bottom: 12px; 
-  width: clamp(200px, 22vw, 260px);
-  background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.1);
-  border-right: none; border-radius: 16px 0 0 16px;
-  transform: translateX(0); transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  z-index: 500; display: flex; flex-direction: column;
-  -webkit-backdrop-filter: blur(15px);
-  backdrop-filter: blur(15px); box-shadow: -5px 0 30px rgba(0,0,0,0.8);
-}
-.sidebar.collapsed { transform: translateX(100%); }
-
-.toggle-btn {
-  position: absolute; left: -42px; top: 20px; width: 42px; height: 90px;
-  background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.1);
-  border-right: none; border-radius: 12px 0 0 12px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  cursor: pointer; color: white; font-weight: 900; font-size: 0.9rem; gap: 5px;
-  backdrop-filter: blur(15px); box-shadow: -5px 0 10px rgba(0,0,0,0.5);
-  writing-mode: vertical-lr; letter-spacing: 2px;
-}
-.toggle-icon { transform: rotate(90deg); font-size: 1.2rem; }
-
-.sidebar-content { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
-.sidebar-content::-webkit-scrollbar { width: 4px; }
-.sidebar-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
-
-.panel {
-  background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px; padding: 12px;
-}
-.panel-title {
-  font-size: 0.75rem; font-weight: 900; color: rgba(255,255,255,0.5);
-  letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px;
-}
-
-.score-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; margin-bottom: 4px; transition: background 0.2s; }
-.score-row.active { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); }
-.sr-order { opacity: 0.5; font-size: 0.75rem; font-weight: 900; min-width: 14px; }
-.sr-icon { font-size: 1.4rem; } .sr-name { flex: 1; color: #fff; font-weight: 700; font-size: 0.85rem; }
-.sr-pts { font-weight: 900; font-size: 1.1rem; color: var(--yellow); }
-.sr-tag { font-size: 0.65rem; font-weight: 700; color: var(--orange); background: rgba(255,140,0,0.2); padding: 2px 6px; border-radius: 6px; }
-
-.btn-settle {
-  width: 100%; padding: 12px; border: none; border-radius: 12px;
-  font-family: var(--font); font-weight: 900; font-size: 0.95rem; cursor: pointer;
-  transition: all 0.2s; background: linear-gradient(135deg, #FF8C00, #E65100); color: #fff; box-shadow: 0 4px 15px rgba(255,140,0,0.3);
-}
-.btn-settle:active { transform: scale(0.96); }
 
 /* ══════════════════════════════
    STUDENT VIEW - 全螢幕地圖模式
@@ -217,8 +185,8 @@ body {
    ══════════════════════════════ */
 .center-overlay {
   position: fixed; inset: 0; z-index: 9000; 
-  pointer-events: none; /* 改為 none，讓背景不會被阻擋或變暗 */
-  background: transparent; /* 完全透明，取消黑色半透明遮罩 */
+  pointer-events: none; 
+  background: transparent; 
   display: none; flex-direction: column; align-items: center; justify-content: center;
 }
 .co-box {
@@ -302,8 +270,6 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   box-shadow: inset 0 0 50px rgba(0,0,0,0.8); border-radius: 16px;
 }
-.center-logo { font-size: 4.5rem; font-weight: 900; color: var(--yellow); text-shadow: 0 5px 15px rgba(0,0,0,0.5); margin-bottom: 10px; }
-.center-sub { font-size: 1.6rem; color: var(--blue); font-weight: 900; letter-spacing: 0.6em; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
 /* 基本格子顏色主題 */
 .cell.type-q { --c-color: var(--p-yellow); }
@@ -437,29 +403,14 @@ body {
 
 <!-- TEACHER VIEW -->
 <div id="teacher-view">
-  <div class="t-header">
+  <div class="t-header" id="t-header">
     <div class="t-title">✈️ 環遊大富翁</div>
+    <div class="t-horizontal-scores" id="t-scores"></div>
+    <button class="btn-settle-small" onclick="showResult()">🏆 結算</button>
   </div>
   
   <div class="board-container" id="t-map-container">
-    <div id="t-camera-rig" style="position: absolute; transition: transform 0.4s ease-out;">
-        <div class="iso-scene"><div id="board" class="iso-board"></div></div>
-    </div>
-  </div>
-  
-  <!-- 摺疊側邊欄 -->
-  <div class="sidebar" id="t-sidebar">
-    <div class="toggle-btn" onclick="toggleSidebar()">
-      <span class="toggle-icon" id="toggle-icon">▼</span>
-      分數板
-    </div>
-    <div class="sidebar-content">
-      <div class="panel">
-        <div class="panel-title">🏆 各組分數與順序</div>
-        <div id="t-scores"></div>
-        <button class="btn-settle" id="btn-settle" onclick="showResult()" style="margin-top:10px;">🏆 內部結算</button>
-      </div>
-    </div>
+    <div class="iso-scene"><div id="board" class="iso-board"></div></div>
   </div>
 </div>
 
@@ -473,9 +424,7 @@ body {
   </div>
   <!-- 全螢幕地圖 -->
   <div class="s-map" id="s-map">
-    <div id="s-camera-rig" style="position: absolute; transition: transform 0.4s ease-out;">
-        <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
-    </div>
+    <div class="iso-scene"><div id="s-board" class="iso-board"></div></div>
   </div>
   <!-- 右下角 HUD 懸浮視窗 -->
   <div class="s-hud" id="s-hud">
@@ -505,6 +454,8 @@ body {
 <div class="toast" id="toast"></div>
 
 <script>
+let _gameStartTime = Date.now();
+
 // 動態組別系統
 let TEAMS = [
   {id: 1, name: '第1組', icon: '🐻', color: '#FF8A65'},
@@ -620,6 +571,7 @@ let _panOffsetX = 0;
 let _panOffsetY = 0;
 
 function updateCameraTarget(posIndex) {
+  if (myRole === 'teacher') return; // 老師端不自動跟隨
   if (!boardPos || boardPos.length === 0) return;
   const bp = boardPos[posIndex];
   if (!bp) return;
@@ -653,21 +605,19 @@ function applyTransform() {
     const VH_TARGET = BOARD_SIZE * 1.22 + 120;
     const scale = Math.min(vw / VW_TARGET, vh / VH_TARGET); 
     
-    // 老師固定視角，不再受 _cameraOffset 跟隨影響，只接受手動 panOffset
     const tx = _panOffsetX * scale;
     const ty = _panOffsetY * scale;
     
-    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
     const tBoard = document.getElementById('board');
-    if (tBoard) tBoard.style.transform = transformStr;
+    if (tBoard) tBoard.style.transform = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   } else {
-    // 學生端高倍率模式，跟蹤棋子
+    // 學生端高倍率模式，利用 translate 移動鏡頭來跟蹤棋子
     const scale = Math.max(vw, vh) / 500; 
     const tx = (_cameraOffsetX + _panOffsetX) * scale;
     const ty = (_cameraOffsetY + _panOffsetY) * scale;
-    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    
     const sBoard = document.getElementById('s-board');
-    if (sBoard) sBoard.style.transform = transformStr;
+    if (sBoard) sBoard.style.transform = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
   }
 }
 
@@ -723,10 +673,8 @@ function setupDrag(elementId) {
 function setTransition(enabled) {
   const val = enabled ? 'transform 0.4s ease-out' : 'none';
   const tBoard = document.getElementById('board');
-  const sRig = document.getElementById('s-camera-rig');
   const sBoard = document.getElementById('s-board');
   if (tBoard) tBoard.style.transition = val;
-  if (sRig) sRig.style.transition = val;
   if (sBoard) sBoard.style.transition = val;
 }
 
@@ -765,6 +713,9 @@ function attachSync() {
       if (!parsed?.teams) return;
       _lastStateStr = raw;
       gameState = parsed;
+      if (gameState.gameId) {
+        _gameStartTime = 0; 
+      }
       if (!boardPos?.length) boardPos = getBoardLayout();
       if (!document.getElementById('sc-0')) buildBoard();
       syncTeamsFromParent(); syncTeamsFromState();
@@ -786,7 +737,7 @@ function attachSync() {
           }
       });
     }
-  } catch(e) { console.log('Firebase 監聽失敗', e); }
+  } catch(e) {}
 
   const pollNow = () => {
     if (myRole === 'student') {
@@ -846,13 +797,14 @@ function attachSync() {
 // 統一接收訊號處理骰子動畫並移動 
 function processAction(action) {
   if (!gameState) return;
+  // 保護機制：無視不同場次（GameId不符）或啟動前殘留的動作
+  if (action.gameId && gameState.gameId && action.gameId !== gameState.gameId) return;
+  if (action.ts < _gameStartTime) return;
   if (action.ts === _lastActionTs) return;
   _lastActionTs = action.ts;
 
-  // 為了偽裝過主平台的檢查，學生端回答問題也使用 type='W8_ROLL'，但帶有 actionType='W8_ANSWER'
   if (action.type === 'W8_ANSWER' || action.actionType === 'W8_ANSWER') {
     if (gameState && gameState.phase === 'answering') {
-      // 收到作答訊號，即時更新選取狀態
       updateState({ selectedAnswer: action.answer });
       const team = TEAMS.find(t => t.id == action.teamId);
       showToast(`✅ ${team?.name || '學生'} 已選擇答案！`);
@@ -1041,7 +993,7 @@ function launch() {
       }
     }
     
-    // 初始化時強制鎖定開始位置，確保第一組擲骰前看的到所有棋子
+    // 初始化時強制鎖定開始位置
     setTimeout(() => {
       updateCameraTarget(0);
       _panOffsetX = 0; _panOffsetY = 0;
@@ -1063,12 +1015,7 @@ function buildBoard() {
 
     const center = document.createElement('div');
     center.className = 'board-center';
-    center.innerHTML = `
-      <div style="transform: rotateZ(45deg); display: flex; flex-direction: column; align-items: center;">
-        <div class="center-logo">✈️ 環遊大富翁</div>
-        <div class="center-sub">WORLD TOUR</div>
-      </div>
-    `;
+    center.innerHTML = ''; // 移除中間多餘的標題，保持畫面乾淨
     el.appendChild(center);
 
     boardPos.forEach((bp, i) => {
@@ -1137,8 +1084,10 @@ function makeInit() {
 
   const playOrder = [...TEAMS].sort((a, b) => a.id - b.id).map(t => t.id);
   
-  // 新增 intro 階段
+  _gameStartTime = Date.now();
+
   return { 
+    gameId: Date.now().toString(36) + Math.random().toString(36).substring(2),
     teams, 
     playOrder,
     currentTurn: playOrder[0], 
@@ -1151,7 +1100,6 @@ function makeInit() {
   };
 }
 
-// 老師端點擊開始遊戲
 window.startGame = function() {
     if (myRole !== 'teacher') return;
     updateState({ phase: 'waiting_roll' });
@@ -1194,7 +1142,6 @@ function updateTeam(tid, patch) {
   t[tid] = updated;
   updateState({ teams: t });
   
-  // 順便廣播分數更新給平台 (W8_SCORE)
   if (patch.score !== undefined && myRole === 'teacher') {
       try { window.parent.postMessage({ type: 'W8_SCORE', group: TEAMS.find(x=>x.id==tid)?.name, score: patch.score }, '*'); } catch(e) {}
   }
@@ -1208,13 +1155,11 @@ function render() {
   syncTeamsFromState();
   renderPieces();
 
-  // 攝影機鎖定當前回合隊伍（如果是開場，鎖定 0 格；如果是學生其他狀態鎖定當前隊伍）
   if (gameState.phase === 'intro') {
       updateCameraTarget(0);
       _panOffsetX = 0; _panOffsetY = 0;
       applyTransform();
   } else if (!isT && gameState.currentTurn && gameState.phase !== 'rolled') {
-      // 學生端才會在棋子靜止時也強制回中，老師端完全放手給自己拖曳
       const curTeam = gameState.teams[gameState.currentTurn] || gameState.teams[String(gameState.currentTurn)];
       if (curTeam) {
           updateCameraTarget(curTeam.position % TOTAL);
@@ -1223,13 +1168,11 @@ function render() {
       }
   }
 
-  // 中心事件大遮罩統合渲染
   const overlay = document.getElementById('center-event-overlay');
   const coBox = document.getElementById('co-box');
   
   const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || String(gameState.currentTurn) === String(myTeamId) || gameState.currentTurn == myTeamId;
   
-  // 老師端不需要顯示 "等待擲骰" 或 "棋子移動中" 的中心遮罩，讓他看乾淨的地圖
   const showCenterPhaseTeacher = ['intro', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
   const showCenterPhaseStudent = ['intro', 'waiting_roll', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
   
@@ -1242,7 +1185,6 @@ function render() {
       } else if (isMyTurn) {
           showCenter = showCenterPhaseStudent;
       } else {
-          // 等待組不需要看任何事件提示，全部隱藏，專心看老師畫面
           showCenter = false;
       }
   }
@@ -1270,7 +1212,6 @@ function render() {
           else html += `<div class="wait-msg"><div class="pulse"></div> 等待老師開始遊戲...</div>`;
       }
       else if (gameState.phase === 'waiting_roll') {
-          // 只有學生端會進來這個判斷
           const myTD = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
           if (myTD?.skipTurn) {
               html = `<div class="co-title" style="color:var(--red);">⏸ 這回合停止行動！</div>`;
@@ -1302,7 +1243,7 @@ function render() {
       else if (gameState.phase === 'answering') {
           const q = gameState.question;
           if (!q) {
-              html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> 讀取題庫中...</div>`;
+              html = `<div class="wait-msg" style="padding:20px;"><div class="pulse"></div> AI 出題中...</div>`;
           } else {
               const sa = gameState.selectedAnswer;
               if (isT) {
@@ -1331,12 +1272,19 @@ function render() {
           const sa = gameState.selectedAnswer;
           const correct = sa === q.answer;
           
-          html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
-          html += `<button class="co-opt-btn ${sa==='A'?(correct?'correct':'wrong'):(q.answer==='A'?'correct':'')}" disabled style="opacity:1;">A．${q.optionA}${q.answer==='A'?' ✅':''}</button>
-                   <button class="co-opt-btn ${sa==='B'?(correct?'correct':'wrong'):(q.answer==='B'?'correct':'')}" disabled style="opacity:1;">B．${q.optionB}${q.answer==='B'?' ✅':''}</button>`;
-          html += `<div style="font-size:2rem; font-weight:900; color:${correct?'var(--green)':'var(--red)'}; margin:15px 0;">${correct ? '🎉 答對了！' : '😢 答錯了...'}</div>`;
-          html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
-          if (isT) html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
+          if (isT) {
+              html = `<div class="co-title" style="font-size:1.3rem; margin-bottom:20px; text-align:left; line-height:1.4;">${q.question}</div>`;
+              html += `<button class="co-opt-btn ${sa==='A'?(correct?'correct':'wrong'):(q.answer==='A'?'correct':'')}" disabled style="opacity:1;">A．${q.optionA}${q.answer==='A'?' ✅':''}</button>
+                       <button class="co-opt-btn ${sa==='B'?(correct?'correct':'wrong'):(q.answer==='B'?'correct':'')}" disabled style="opacity:1;">B．${q.optionB}${q.answer==='B'?' ✅':''}</button>`;
+              html += `<div style="font-size:2rem; font-weight:900; color:${correct?'var(--green)':'var(--red)'}; margin:15px 0;">${correct ? '🎉 答對了！' : '😢 答錯了...'}</div>`;
+              html += `<div style="font-size:0.95rem; color:rgba(255,255,255,0.7); margin-bottom:20px; line-height:1.5;">💡 ${q.explanation}</div>`;
+              html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
+          } else {
+              // 學生端在結果揭曉時不顯示解析，強制看大螢幕
+              html += `<div class="co-icon" style="animation:none;">👀</div>
+                       <div class="co-title">請看老師畫面</div>
+                       <div class="co-desc">結果揭曉中...</div>`;
+          }
       }
       else if (gameState.phase === 'done') {
           html = `<div class="co-title" style="font-size:1.8rem; margin:20px 0;">回合結束</div>`;
@@ -1413,7 +1361,7 @@ function renderPieces() {
     });
 
     el.querySelectorAll('.cell').forEach(c => c.classList.remove('active'));
-    if (gameState.currentTurn) {
+    if (gameState.currentTurn && gameState.phase !== 'intro') {
       const cur = uniqueTeams.find(t => t.id == gameState.currentTurn);
       if (cur) {
         const cel = document.getElementById((id === 'board' ? 'cell-' : 'sc-') + (Number(cur.position||0) % TOTAL));
@@ -1434,26 +1382,19 @@ function renderTeacher() {
     const t = TEAMS.find(x => x.id === team.id);
     if (!t) return;
     const row = document.createElement('div');
-    row.className = 'score-row' + (team.id === gs.currentTurn ? ' active' : '');
+    row.className = 'score-row' + ((team.id === gs.currentTurn && gs.phase !== 'intro') ? ' active' : '');
     
     const orderBadge = gs.playOrder && gs.playOrder.length > 0 ? `<span class="sr-order">${idx + 1}.</span>` : `<span class="sr-order">-</span>`;
 
     row.innerHTML = `
       ${orderBadge}
-      <span class="sr-icon">${t.icon}</span>
-      <span class="sr-name" style="color:${t.color}">${t.name}</span>
+      <span class="sc-icon">${t.icon}</span>
+      <span class="sc-name" style="color:${t.color}">${t.name}</span>
       ${team.extraDice ? '<span class="sr-tag">🎲🎲</span>' : ''}
-      ${team.skipTurn ? '<span class="sr-tag" style="color:var(--red)">⏸</span>' : ''}
-      <span class="sr-pts">${team.score}分</span>`;
+      ${team.skipTurn ? '<span style="font-size:0.7rem; background:var(--red); padding:2px 4px; border-radius:4px;">⏸</span>' : ''}
+      <span class="sc-pts">${team.score || 0}</span>`;
     sc.appendChild(row);
   });
-}
-
-function toggleSidebar() {
-  const sb = document.getElementById('t-sidebar');
-  const icon = document.getElementById('toggle-icon');
-  sb.classList.toggle('collapsed');
-  icon.style.transform = sb.classList.contains('collapsed') ? 'rotate(-90deg)' : 'rotate(90deg)';
 }
 
 function setHud(cardHtml) {
@@ -1469,7 +1410,7 @@ function renderStudent() {
 
   const myTD = gs?.teams?.[myTeamId] || gs?.teams?.[String(myTeamId)];
   const scoreEl = document.getElementById('my-score');
-  if (scoreEl) scoreEl.textContent = `${myTD?.score ?? 0} 分`;
+  if (scoreEl) scoreEl.textContent = `${Number(myTD?.score) || 0} 分`;
 
   if (!gs || !gs.teams) {
     setHud('⏳ 等待遊戲狀態同步...');
@@ -1482,8 +1423,13 @@ function renderStudent() {
 
   const turnEl = document.getElementById('turn-indicator');
   if (turnEl) {
-    turnEl.textContent = isMyTurn ? '⭐ 你的回合' : `${ct?.icon||''} ${ct?.name||''} 的回合`;
-    turnEl.style.color = isMyTurn ? 'var(--yellow)' : 'rgba(255,255,255,0.45)';
+    if (gs.phase === 'intro') {
+       turnEl.textContent = '👀 等待開始';
+       turnEl.style.color = 'rgba(255,255,255,0.45)';
+    } else {
+       turnEl.textContent = isMyTurn ? '⭐ 你的回合' : `${ct?.icon||''} ${ct?.name||''} 的回合`;
+       turnEl.style.color = isMyTurn ? 'var(--yellow)' : 'rgba(255,255,255,0.45)';
+    }
   }
 
   const blocker = document.getElementById('s-wait-blocker');
@@ -1497,10 +1443,9 @@ function renderStudent() {
   } else {
     const card = document.getElementById('s-hud-card');
     if (card) card.innerHTML = '';
-    if (card) card.style.display = 'none'; // 對於遊玩組，完全依賴中間遮罩，隱藏右下角提示
+    if (card) card.style.display = 'none'; 
   }
 
-  // 等待組或是還沒開場，顯示右下提示
   if (!isMyTurn && gs.phase !== 'intro') {
     const card = document.getElementById('s-hud-card');
     if (card) card.style.display = 'block';
@@ -1511,8 +1456,7 @@ window.studentSelectAnswer = function(ans) {
   if (!gameState || gameState.phase !== 'answering') return;
   if (gameState.selectedAnswer) return; 
   
-  // 使用 W8_ROLL 並帶上 actionType 以通過主平台的安全過濾，主平台只會幫忙廣播，W8負責解析
-  const action = { type: 'W8_ROLL', actionType: 'W8_ANSWER', teamId: myTeamId, answer: ans, ts: Date.now() };
+  const action = { type: 'W8_ROLL', actionType: 'W8_ANSWER', gameId: gameState.gameId, teamId: myTeamId, answer: ans, ts: Date.now() };
   if (myRole === 'student') {
     sendActionToPlatform(action);
     processAction(action);
@@ -1596,12 +1540,12 @@ function createDiceScene(canvas, finalVal) {
   sideVals.sort(() => Math.random() - 0.5);
 
   const faceMats = [
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[0] || 3) }), // +x
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[1] || 4) }), // -x
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(finalVal) }),         // +y (朝上為最終點數)
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(bottomVal) }),        // -y
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[2] || 2) }), // +z
-    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[3] || 5) }), // -z
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[0] || 3) }), 
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[1] || 4) }), 
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(finalVal) }),         
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(bottomVal) }),        
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[2] || 2) }), 
+    new THREE.MeshPhongMaterial({ map: makeFaceTex(sideVals[3] || 5) }), 
   ];
   faceMats.forEach(m => { m.shininess = 80; });
 
@@ -1666,7 +1610,7 @@ function animateDice(state, elapsed) {
     state.t += dt * 4; 
     const p = Math.min(state.t, 1);
     const ease = 1 - Math.pow(1 - p, 3); 
-    const TX = 0, TY = 0, TZ = 0; // 朝向 (0,0,0) 就是 +y 朝上
+    const TX = 0, TY = 0, TZ = 0; 
 
     if (!state.rotStart) {
       const norm = (a) => {
@@ -1739,7 +1683,6 @@ function showDiceAnim(d1, d2, total) {
     if (!allDone) {
       rafId = requestAnimationFrame(loop);
     } else {
-      // 動畫播完後，直接保留實體骰子，顯示步數徽章
       const badge = document.createElement('div');
       badge.className = 'dt-total-badge';
       badge.textContent = `共 ${total} 步`;
@@ -1769,13 +1712,13 @@ function rollDice() {
   const team = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
   if (!team || team.skipTurn) return;
   
-  gameState.phase = 'rolled'; // 防止重複點擊
+  gameState.phase = 'rolled'; 
   
   const d1 = Math.ceil(Math.random() * 6);
   const d2 = team.extraDice ? Math.ceil(Math.random() * 6) : null;
   const total = d1 + (d2 || 0);
   
-  const action = { type: 'W8_ROLL', teamId: myTeamId, diceResult: { d1, d2, total }, ts: Date.now() };
+  const action = { type: 'W8_ROLL', teamId: myTeamId, gameId: gameState.gameId, diceResult: { d1, d2, total }, ts: Date.now() };
 
   if (myRole === 'student') {
     sendActionToPlatform(action);
@@ -1804,8 +1747,8 @@ function movePiece() {
     if (_t) { _t.position = curPos; gameState.teams[tidStr] = _t; gameState.teams[tid] = _t; }
     
     if (myRole !== 'teacher') {
-        updateCameraTarget(curPos); // 只有學生端鏡頭跟隨
-        _panOffsetX = 0; _panOffsetY = 0; // 重置拖曳，強迫回歸中心
+        updateCameraTarget(curPos);
+        _panOffsetX = 0; _panOffsetY = 0; 
         applyTransform();
     }
 
@@ -1850,16 +1793,16 @@ function triggerEvent(type, finalPos) {
 }
 
 const LUCKY = [
-  { title: '幸運之星！', desc: '+3 分！', fx: (tid, gs) => updateTeam(tid, { score: (gs.teams[tid].score || 0) + 3 }) },
-  { title: '順風！', desc: '前進 2 格！', fx: (tid, gs) => { updateTeam(tid, { position: (gs.teams[tid].position + 2) % TOTAL }); } },
+  { title: '幸運之星！', desc: '+3 分！', fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + 3 }) },
+  { title: '順風！', desc: '前進 2 格！', fx: (tid, gs) => { updateTeam(tid, { position: (Number(gs.teams[tid].position) + 2) % TOTAL }); } },
   { title: '全組加分！', desc: '所有組各 +1 分！', fx: (tid, gs) => {
-    const t2 = { ...gs.teams }; Object.values(t2).forEach(t => { t2[t.id] = { ...t2[t.id], score: (t2[t.id].score || 0) + 1 }; }); updateState({ teams: t2 }); } },
+    const t2 = { ...gs.teams }; Object.values(t2).forEach(t => { t2[t.id] = { ...t2[t.id], score: (Number(t2[t.id].score) || 0) + 1 }; }); updateState({ teams: t2 }); } },
   { title: '🎲 獲得第二顆骰子！', desc: '之後每回合擲兩顆！', fx: (tid) => updateTeam(tid, { extraDice: true }) },
-  { title: '神秘禮物！', desc: '+2 分！', fx: (tid, gs) => updateTeam(tid, { score: (gs.teams[tid].score || 0) + 2 }) },
+  { title: '神秘禮物！', desc: '+2 分！', fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + 2 }) },
 ];
 const BAD = [
-  { title: '倒楣！', desc: '-1 分', fx: (tid, gs) => updateTeam(tid, { score: Math.max(0, (gs.teams[tid].score || 0) - 1) }) },
-  { title: '滑倒！', desc: '退後 2 格', fx: (tid, gs) => { updateTeam(tid, { position: ((gs.teams[tid].position - 2) + TOTAL) % TOTAL }); } },
+  { title: '倒楣！', desc: '-1 分', fx: (tid, gs) => updateTeam(tid, { score: Math.max(0, (Number(gs.teams[tid].score) || 0) - 1) }) },
+  { title: '滑倒！', desc: '退後 2 格', fx: (tid, gs) => { updateTeam(tid, { position: ((Number(gs.teams[tid].position) - 2) + TOTAL) % TOTAL }); } },
   { title: '⏸ 停一回合！', desc: '下回合跳過', fx: (tid) => updateTeam(tid, { skipTurn: true }) },
 ];
 
@@ -1885,13 +1828,11 @@ async function fetchQ(isSpecial) {
       const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
       const res = await fetch(url);
       const text = await res.text();
-      // 移除 google visualization 前後綴以取得標準 JSON
       const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
       const data = JSON.parse(jsonStr);
       
       cachedQuestions = [];
       data.table.rows.forEach(row => {
-        // 第一欄為題號，第二欄為題目
         if (row.c && row.c.length > 1 && row.c[1] && row.c[1].v) {
           const qText = String(row.c[1].v).trim();
           if (qText !== '題目' && qText !== 'Question') {
@@ -1916,7 +1857,6 @@ async function fetchQ(isSpecial) {
     console.error("讀取 Google 試算表失敗，使用備用題庫", e);
   }
   
-  // 備用題庫
   const pool = [
     { question: '「一石二鳥」的意思是？', optionA: '做一件事達成兩個目的', optionB: '用石頭打兩隻鳥', answer: 'A', explanation: '一石二鳥比喻做一件事情，同時達到兩個目的。' },
     { question: '地球上面積最大的海洋是？', optionA: '大西洋', optionB: '太平洋', answer: 'B', explanation: '太平洋是地球上最大的海洋，約佔地球表面積三分之一。' },
@@ -1933,7 +1873,8 @@ function publishAnswer() {
   const correct = gs.selectedAnswer === gs.question.answer;
   const bonus = gs.event?.specialQ ? 4 : 2;
   if (correct) {
-    updateTeam(gs.currentTurn, { score: (gs.teams[gs.currentTurn].score || 0) + bonus });
+    const curTeam = gs.teams[gs.currentTurn];
+    updateTeam(gs.currentTurn, { score: (Number(curTeam.score) || 0) + bonus });
     showPop('+' + bonus, 'var(--green)');
   }
   updateState({ phase: 'revealing' });
@@ -1971,24 +1912,28 @@ function showResult() {
       if (rooms && rc && rooms[rc]) {
           if (!rooms[rc].scores) rooms[rc].scores = {};
           Object.values(gameState.teams).forEach(t => {
-              rooms[rc].scores[`第${t.id}組`] = t.score;
+              rooms[rc].scores[`第${t.id}組`] = Number(t.score) || 0;
           });
           window.parent.saveRooms(rooms);
       }
   } catch(e) {}
 
   const rs = document.getElementById('result-screen'); rs.style.display = 'flex';
-  const sorted = Object.values(gameState.teams).sort((a, b) => b.score - a.score);
+  
+  const uniqueTeams = Object.values(gameState.teams).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+  const sorted = uniqueTeams.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+  
   const rl = document.getElementById('r-list'); rl.innerHTML = '';
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
   sorted.forEach((team, i) => {
     const t = TEAMS.find(x => x.id === team.id);
     const item = document.createElement('div'); item.className = 'r-item';
     item.style.animationDelay = (i * 0.12) + 's';
-    item.innerHTML = `<span class="r-rank">${medals[i]||''}</span><span class="r-icon">${t.icon}</span>
-      <span class="r-name">${t.name}</span><span class="r-score">${team.score}分</span>`;
+    item.innerHTML = `<span class="r-rank">${medals[i]||''}</span><span class="r-icon">${t?.icon||'🐻'}</span>
+      <span class="r-name">${t?.name||`第${team.id}組`}</span><span class="r-score">${Number(team.score)||0}分</span>`;
     rl.appendChild(item);
   });
+  
   const wrap = document.getElementById('confetti-wrap');
   const cols = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#CE93D8'];
   for (let i = 0; i < 70; i++) {
