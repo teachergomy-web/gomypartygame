@@ -801,6 +801,13 @@ let _lastActionTs = 0;
 
 function attachSync() {
   syncMyTeamId();
+  // 老師端：把 _lastActionTs 設為現在，避免讀到殘留的舊 W8_ROLL
+  if (myRole === 'teacher') {
+    try {
+      const raw = localStorage.getItem('W8_ROLL');
+      if (raw) { const a = JSON.parse(raw); if (a.ts) _lastActionTs = a.ts; }
+    } catch(e) {}
+  }
 
   // localStorage 輪詢（同電腦/同瀏覽器備援）
   const applyState = (raw) => {
@@ -854,13 +861,20 @@ function processAction(action) {
     updateState({ phase: 'rolled', diceResult: d });
     const team = TEAMS.find(t => t.id == action.teamId);
     showToast(`🎲 ${team?.icon || ''} 擲出 ${d.total} 步！`);
-    console.log('[W8] processAction: scheduling movePiece in 2200ms, myRole=', myRole);
-    // 骰子動畫結束後移動棋子（老師端執行）
+    console.log('[W8] processAction: scheduling movePiece in 2500ms, myRole=', myRole);
     if (myRole === 'teacher') {
+      // 傳入 diceResult 直接使用，不依賴 gameState.phase
+      const savedDice = { ...d };
+      const savedTid = action.teamId;
       setTimeout(() => {
-        console.log('[W8] movePiece trigger, phase=', gameState?.phase);
-        if (gameState.phase === 'rolled') movePiece();
-      }, 2200);
+        console.log('[W8] movePiece trigger, phase=', gameState?.phase, 'diceResult=', gameState?.diceResult);
+        // 強制設定 phase 和 diceResult 再移動
+        if (gameState) {
+          gameState.phase = 'rolled';
+          gameState.diceResult = savedDice;
+          movePiece();
+        }
+      }, 2500);
     }
   }
 }
@@ -987,6 +1001,8 @@ function launch() {
     if (myRole === 'teacher') {
       document.getElementById('teacher-view').style.display = 'block';
       document.getElementById('student-view').style.display = 'none';
+      // 清除舊的 W8_ROLL（防止進入遊戲就觸發舊 action）
+      try { localStorage.removeItem('W8_ROLL'); localStorage.removeItem('W8_STATE'); } catch(e) {}
       gameState = makeInit();
       render(); broadcast();
     } else {
@@ -1641,9 +1657,9 @@ function createDiceScene(canvas, finalVal) {
   renderer.shadowMap.enabled = true;
 
   const scene = new THREE.Scene();
-  // 相機：強俯視角（從上方45度斜看）
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-  camera.position.set(0, 5, 3.5);
+  // 相機：等距三點視角（能看到上、右、前三個面）
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(4, 4, 4);
   camera.lookAt(0, 0, 0);
 
   // 燈光
@@ -1740,13 +1756,13 @@ function createDiceScene(canvas, finalVal) {
 
   // 動畫狀態
   const state = {
-    phase: 'fall',   // fall → bounce1 → bounce2 → settle
+    phase: 'fall',
     t: 0,
-    vy: 8,           // 初速度（向下）
-    y: 6,            // 起始高度
-    spinX: (Math.random()-0.5) * 20,
-    spinY: (Math.random()-0.5) * 20,
-    spinZ: (Math.random()-0.5) * 15,
+    vy: 6,
+    y: 5,
+    spinX: (Math.random()-0.5) * 8,
+    spinY: (Math.random()-0.5) * 10,
+    spinZ: (Math.random()-0.5) * 6,
     done: false,
     renderer, scene, camera, dice
   };
@@ -1759,60 +1775,55 @@ function animateDice(state, elapsed) {
   const { dice } = state;
 
   if (state.phase === 'fall') {
-    state.vy += dt * 18;
+    state.vy += dt * 16;
+    state.y -= state.vy * dt;
+    dice.position.y = state.y;
+    // 自然旋轉：速度適中
+    dice.rotation.x += state.spinX * dt;
+    dice.rotation.y += state.spinY * dt;
+    dice.rotation.z += state.spinZ * dt;
+    if (state.y <= -0.5) {
+      state.phase = 'bounce1';
+      state.y = -0.5;
+      state.vy = -state.vy * 0.42;
+      state.spinX *= 0.25; state.spinY *= 0.25; state.spinZ *= 0.15;
+    }
+  } else if (state.phase === 'bounce1') {
+    state.vy += dt * 16;
     state.y -= state.vy * dt;
     dice.position.y = state.y;
     dice.rotation.x += state.spinX * dt;
     dice.rotation.y += state.spinY * dt;
     dice.rotation.z += state.spinZ * dt;
-    if (state.y <= -0.8) {
-      state.phase = 'bounce1';
-      state.y = -0.8;
-      state.vy = -state.vy * 0.45;
-      state.spinX *= 0.3; state.spinY *= 0.3; state.spinZ *= 0.2;
-    }
-  } else if (state.phase === 'bounce1') {
-    state.vy += dt * 18;
-    state.y -= state.vy * dt;
-    dice.position.y = state.y;
-    dice.rotation.x += state.spinX * dt;
-    dice.rotation.y += state.spinY * dt;
-    if (state.y <= -0.8) {
+    if (state.y <= -0.5) {
       state.phase = 'bounce2';
-      state.y = -0.8;
-      state.vy = -state.vy * 0.3;
-      state.spinX *= 0.15; state.spinY *= 0.15;
+      state.y = -0.5;
+      state.vy = -state.vy * 0.28;
+      state.spinX *= 0.1; state.spinY *= 0.1; state.spinZ *= 0.05;
     }
   } else if (state.phase === 'bounce2') {
-    state.vy += dt * 18;
+    state.vy += dt * 16;
     state.y -= state.vy * dt;
     dice.position.y = state.y;
     dice.rotation.x += state.spinX * dt;
     dice.rotation.y += state.spinY * dt;
-    if (state.y <= -0.8) {
+    if (state.y <= -0.5) {
       state.phase = 'settle';
-      state.y = -0.8;
+      state.y = -0.5;
       state.t = 0;
     }
   } else if (state.phase === 'settle') {
-    state.t += dt * 4;
-    // 讓旋轉速度衰減到0，骰子自然停下
-    // 上面那面已經是 finalVal，不需要額外旋轉
-    state.spinX *= Math.max(0, 1 - dt * 8);
-    state.spinY *= Math.max(0, 1 - dt * 8);
-    state.spinZ *= Math.max(0, 1 - dt * 8);
-    dice.rotation.x += state.spinX * dt;
-    dice.rotation.y += state.spinY * dt;
-    dice.rotation.z += state.spinZ * dt;
-    // 確保最終 X/Z 旋轉回到讓上面朝上的角度（整數倍 PI/2）
-    const snapX = Math.round(dice.rotation.x / (Math.PI/2)) * (Math.PI/2);
-    const snapZ = Math.round(dice.rotation.z / (Math.PI/2)) * (Math.PI/2);
-    dice.rotation.x += (snapX - dice.rotation.x) * dt * 5;
-    dice.rotation.z += (snapZ - dice.rotation.z) * dt * 5;
-    dice.position.y = -0.8;
-    if (state.t > 1.0) {
-      dice.rotation.x = snapX;
-      dice.rotation.z = snapZ;
+    state.t += dt * 2.5;
+    const p = Math.min(state.t, 1);
+    const ease = 1 - Math.pow(1 - p, 4); // 更平滑
+    // 目標：等距三點視角 x=0, y=PI/4, z=0（讓上、右、前三面可見）
+    const TX = 0, TY = Math.PI / 4, TZ = 0;
+    dice.rotation.x += (TX - dice.rotation.x) * ease * 0.1;
+    dice.rotation.y += (TY - dice.rotation.y) * ease * 0.08;
+    dice.rotation.z += (TZ - dice.rotation.z) * ease * 0.1;
+    dice.position.y = -0.5;
+    if (p >= 1) {
+      dice.rotation.x = TX; dice.rotation.y = TY; dice.rotation.z = TZ;
       state.done = true;
     }
   }

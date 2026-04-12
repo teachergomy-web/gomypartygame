@@ -971,9 +971,7 @@ function startSyncListener() {
                 if (data.w5state && pData.screen === 'screen-student-game' && (window.state.selectedGame === 4 || data.selectedGame === 4)) {
                     const sgIframe = document.getElementById('sg-iframe');
                     if (sgIframe && sgIframe.contentWindow) {
-                        // 一般狀態更新
                         sgIframe.contentWindow.postMessage({ type: 'W5_STATE', data: data.w5state }, '*');
-                        // 偵測到 forceCollectAt 有變化 → 觸發強制收卷
                         const newFCAt = data.w5state.forceCollectAt || 0;
                         const lastFCAt = pData._lastForceCollectAt || 0;
                         if (newFCAt > lastFCAt) {
@@ -982,7 +980,7 @@ function startSyncListener() {
                         }
                     }
                 }
-                // W8：收到遊戲狀態更新，推給學生 sg-iframe
+                // W8：收到棋盤狀態更新，推給學生 sg-iframe
                 if (data.w8State && pData.screen === 'screen-student-game' && (window.state.selectedGame === 7 || data.selectedGame === 7)) {
                     const sgIframe = document.getElementById('sg-iframe');
                     if (sgIframe && sgIframe.contentWindow) {
@@ -998,17 +996,17 @@ function startSyncListener() {
                 try { tcW3.contentWindow.postMessage({ type: 'W3_STATE', data: data.w3state }, '*'); } catch(e2) {}
             }
         }
-        // 老師端：W5 狀態更新推給 tc-w5-iframe（Firebase snapshot 收到學生 imgData 後即時推送）
+        // 老師端：W5 狀態更新推給 tc-w5-iframe
         if (p === 'teacher' && data.w5state) {
             const tcW5 = document.getElementById('tc-w5-iframe');
             if (tcW5 && tcW5.contentWindow) {
                 try { tcW5.contentWindow.postMessage({ type: 'W5_STATE', data: data.w5state }, '*'); } catch(e2) {}
             }
         }
-        // 老師端：W8 Roll（學生擲骰）推給 tc-w8-iframe
+        // 老師端：W8 學生擲骰 action 推給 tc-w8-iframe（只推比上次新的）
         if (p === 'teacher' && data.w8Action) {
-            const lastTs = window._lastW8ActionTs || 0;
-            if (data.w8Action.ts && data.w8Action.ts !== lastTs) {
+            const lastW8Ts = window._lastW8ActionTs || 0;
+            if (data.w8Action.ts && data.w8Action.ts > lastW8Ts) {
                 window._lastW8ActionTs = data.w8Action.ts;
                 const tcW8 = document.getElementById('tc-w8-iframe');
                 if (tcW8 && tcW8.contentWindow) {
@@ -1419,14 +1417,17 @@ window.addEventListener('message', (e3) => {
     }
 });
 
-// ── W8_ROLL 接收：學生擲骰後通知老師，老師 iframe 更新狀態再廣播 ──
+// ── W8_ROLL：學生擲骰 → 寫入 Firebase w8Action，同時轉發給老師 iframe（同電腦）──
 window.addEventListener('message', (e9) => {
     if (!e9.data || e9.data.type !== 'W8_ROLL') return;
-    // 學生裝置 postMessage 過來，存入 Firebase 讓老師端的 startSyncListener 收到
-    const rc = window.state.roomCode;
+    // 只處理比上次新的 action
+    const lastTs = window._lastW8ActionTs || 0;
+    if (e9.data.ts && e9.data.ts <= lastTs) return;
+    // 寫入 Firebase（讓老師端的 startSyncListener 收到）
+    const rc9 = window.state.roomCode;
     const rooms9 = window.getRooms();
-    if (rc && rooms9[rc]) {
-        rooms9[rc].w8Action = e9.data;
+    if (rc9 && rooms9[rc9]) {
+        rooms9[rc9].w8Action = e9.data;
         window.saveRooms(rooms9);
     }
     // 同電腦：直接轉發給老師 tc-w8-iframe
@@ -1438,24 +1439,25 @@ window.addEventListener('message', (e9) => {
     }
 });
 
-// ── W8_STATE 轉發：老師端 tc-w8-iframe 廣播給學生 sg-iframe + 寫入 Firebase ──
+// ── W8_STATE：老師 tc-w8-iframe 廣播 → 轉給學生 sg-iframe + 寫 Firebase ──
 window.addEventListener('message', (e8) => {
     if (!e8.data || e8.data.type !== 'W8_STATE') return;
     if (window.state.perspective !== 'teacher') return;
+    // 同頁面學生 iframe
     const sgIframe = document.getElementById('sg-iframe');
     if (sgIframe && sgIframe.contentWindow) {
         try { sgIframe.contentWindow.postMessage({ type: 'W8_STATE', state: e8.data.state }, '*'); } catch(e) {}
     }
-    // 存 w8State 到 Firebase rooms（讓不同裝置的學生透過 startSyncListener 收到）
+    // 寫入 Firebase（供跨裝置學生取得）
     if (e8.data.state) {
         const rooms8 = window.getRooms();
-        const rc = window.state.roomCode;
-        if (rc && rooms8[rc]) {
-            rooms8[rc].w8State = e8.data.state;
+        const rc8 = window.state.roomCode;
+        if (rc8 && rooms8[rc8]) {
+            rooms8[rc8].w8State = e8.data.state;
             if (e8.data.state.teams) {
-                if (!rooms8[rc].scores) rooms8[rc].scores = {};
+                if (!rooms8[rc8].scores) rooms8[rc8].scores = {};
                 Object.values(e8.data.state.teams).forEach(t => {
-                    rooms8[rc].scores[`第${t.id}組`] = t.score || 0;
+                    rooms8[rc8].scores[`第${t.id}組`] = t.score || 0;
                 });
             }
             window.saveRooms(rooms8);
@@ -2824,7 +2826,19 @@ function syncJoinDOM() {
     }
 }
 
-function goToJoin() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; stopJoinListener(); window.syncJoinDOM(); window.renderRoomList(); window.goTo('screen-join'); }
+function goToJoin() { 
+  if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; 
+  stopJoinListener(); 
+  window.syncJoinDOM(); 
+  window.renderRoomList(); 
+  window.goTo('screen-join');
+  // 重設按鈕（防止「確認中...」殘留）
+  setTimeout(() => {
+    const btn = document.querySelector('#screen-join .btn-green');
+    if (btn) { btn.disabled = false; btn.textContent = '準備完成！→'; }
+    window._joinRetry = 0;
+  }, 50);
+}
 
 function renderRoomList() {
   const rooms = window.getRooms();
@@ -3026,6 +3040,10 @@ function joinRoom() {
 
 function _finishJoin(groupName, symbol, roomCode) {
   stopJoinListener(); // 加入成功，停止選組監聽
+  // 重設加入按鈕（防止再次進入時卡住）
+  window._joinRetry = 0;
+  const joinBtnEl = document.querySelector('#screen-join .btn-green');
+  if (joinBtnEl) { joinBtnEl.disabled = false; joinBtnEl.textContent = '準備完成！→'; }
   const pData = window.pStates[window.state.perspective];
   if (pData) {
     pData.joined = true;
