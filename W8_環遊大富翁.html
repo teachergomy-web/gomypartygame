@@ -832,7 +832,10 @@ function attachSync() {
         const raw = localStorage.getItem('W8_ROLL');
         if (raw) {
           const action = JSON.parse(raw);
-          if (action.ts && action.ts !== _lastActionTs) processAction(action);
+          if (action.ts && action.ts !== _lastActionTs) {
+            console.log('[W8] pollNow teacher: W8_ROLL found, ts=', action.ts, 'type=', action.type);
+            processAction(action);
+          }
         }
       } catch(e) {}
     }
@@ -842,22 +845,28 @@ function attachSync() {
 }
 
 function processAction(action) {
-  if (!gameState) return;
-  if (action.ts === _lastActionTs) return;
+  if (!gameState) { console.warn('[W8] processAction: no gameState'); return; }
+  if (action.ts === _lastActionTs) { console.log('[W8] processAction: duplicate ts, skip'); return; }
   _lastActionTs = action.ts;
 
+  console.log('[W8] processAction:', action.type, 'myRole=', myRole, 'currentTurn=', gameState.currentTurn, 'teamId=', action.teamId);
+
   if (action.type === 'W8_MOVE_ROLL') {
-    // 寬鬆比較 teamId vs currentTurn
     if (Number(action.teamId) !== Number(gameState.currentTurn) &&
-        String(action.teamId) !== String(gameState.currentTurn)) return;
+        String(action.teamId) !== String(gameState.currentTurn)) {
+      console.warn('[W8] processAction: teamId mismatch', action.teamId, '!=', gameState.currentTurn);
+      return;
+    }
     const d = action.diceResult;
     showDiceAnim(d.d1, d.d2, d.total);
     updateState({ phase: 'rolled', diceResult: d });
     const team = TEAMS.find(t => t.id == action.teamId);
     showToast(`🎲 ${team?.icon || ''} 擲出 ${d.total} 步！`);
-    // 骰子動畫約 2 秒，動畫結束後移動棋子
+    console.log('[W8] processAction: scheduling movePiece in 2200ms, myRole=', myRole);
+    // 骰子動畫結束後移動棋子（老師端執行）
     if (myRole === 'teacher') {
       setTimeout(() => {
+        console.log('[W8] movePiece trigger, phase=', gameState?.phase);
         if (gameState.phase === 'rolled') movePiece();
       }, 2200);
     }
@@ -1880,22 +1889,26 @@ function showDiceAnim(d1, d2, total) {
 function rollDice() {
   if (!gameState) return;
   const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || gameState.currentTurn == myTeamId;
-  if (!isMyTurn || gameState.phase !== 'waiting_roll') return;
+  if (!isMyTurn || gameState.phase !== 'waiting_roll') {
+    console.warn('[W8] rollDice blocked: isMyTurn=', isMyTurn, 'phase=', gameState?.phase);
+    return;
+  }
   const team = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
   if (!team || team.skipTurn) return;
   const d1 = Math.ceil(Math.random() * 6);
   const d2 = team.extraDice ? Math.ceil(Math.random() * 6) : null;
   const total = d1 + (d2 || 0);
   const action = { type: 'W8_MOVE_ROLL', teamId: myTeamId, diceResult: { d1, d2, total }, ts: Date.now() };
-  showDiceAnim(d1, d2, total, 's');
-  // HUD 更新
+  console.log('[W8] rollDice: myRole=', myRole, 'action=', action);
+  showDiceAnim(d1, d2, total);
   setHud(`<div style="font-size:0.78rem;color:rgba(255,255,255,0.6);">骰子已擲出</div>
     <div style="color:var(--yellow);font-weight:900;font-size:1rem;">請看老師畫面...</div>`);
   if (myRole === 'student') {
     try { window.parent.postMessage({ type: 'W8_ROLL', ...action }, '*'); } catch(e) {}
-    try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
+    try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); console.log('[W8] W8_ROLL written to localStorage'); } catch(e) {}
     try { const roomId = window.parent?.state?.roomId; if (parentDb && roomId) parentDb.collection('rooms').doc(roomId).update({ w8Action: action }); } catch(e) {}
   } else {
+    // 老師端直接處理（單機測試）
     processAction(action);
   }
 }
