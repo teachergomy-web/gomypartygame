@@ -918,45 +918,89 @@ let _lastActionTs = 0;
 function attachSync() {
   syncMyTeamId();
 
-  // Firebase 監聽（如果可用）
+  // 從 URL 取得 roomCode
+  const urlP = new URLSearchParams(location.search);
+  const roomCode = urlP.get('room') || (window.parent?.state?.roomCode) || null;
+
+  // ── Firebase 監聽（跨裝置同步主要機制）──
+  let firebaseActive = false;
   try {
-    const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
-    if (parentDb && roomId) {
-      parentDb.collection('rooms').doc(roomId).onSnapshot(doc => {
-        const data = doc.data();
-        if (data && data.w8State && myRole === 'student') {
-          const stateStr = JSON.stringify(data.w8State);
-          if (stateStr !== _lastStateStr) {
-            _lastStateStr = stateStr;
-            gameState = data.w8State;
-            if (!boardPos || boardPos.length === 0) boardPos = getBoardLayout();
-            if (!document.getElementById('sc-0')) buildBoard();
-            syncTeamsFromParent(); syncTeamsFromState();
-            render(); centerOnMyPiece();
+    // 取得 Firebase db（從父頁面或直接）
+    const fbDb = parentDb?._db || parentDb ||
+      (window.parent?.db) ||
+      (window.parent?.firebase?.firestore?.()) || null;
+
+    if (fbDb && roomCode) {
+      // 嘗試用 Firebase v9 SDK
+      const tryV9 = () => {
+        try {
+          const { doc, onSnapshot } = window.parent?._fsModule || {};
+          if (doc && onSnapshot) {
+            onSnapshot(doc(fbDb, 'rooms', roomCode), (snap) => {
+              const data = snap.data();
+              if (data?.w8State && myRole === 'student') {
+                const str = JSON.stringify(data.w8State);
+                if (str !== _lastStateStr) {
+                  _lastStateStr = str;
+                  gameState = data.w8State;
+                  if (!boardPos?.length) boardPos = getBoardLayout();
+                  if (!document.getElementById('sc-0')) buildBoard();
+                  syncTeamsFromParent(); syncTeamsFromState();
+                  render(); centerOnMyPiece();
+                }
+              }
+            });
+            firebaseActive = true;
           }
-        }
-        if (data && data.w8Action && myRole === 'teacher') {
-          processAction(data.w8Action);
-        }
-      });
-      // Firebase 有了也繼續跑 localStorage，確保萬無一失
+        } catch(e) {}
+      };
+
+      // 嘗試用 Firebase v8 SDK（Firestore collection API）
+      const tryV8 = () => {
+        try {
+          if (fbDb.collection) {
+            fbDb.collection('rooms').doc(roomCode).onSnapshot(snap => {
+              const data = snap.data();
+              if (data?.w8State && myRole === 'student') {
+                const str = JSON.stringify(data.w8State);
+                if (str !== _lastStateStr) {
+                  _lastStateStr = str;
+                  gameState = data.w8State;
+                  if (!boardPos?.length) boardPos = getBoardLayout();
+                  if (!document.getElementById('sc-0')) buildBoard();
+                  syncTeamsFromParent(); syncTeamsFromState();
+                  render(); centerOnMyPiece();
+                }
+              }
+            });
+            firebaseActive = true;
+          }
+        } catch(e) {}
+      };
+
+      tryV9();
+      if (!firebaseActive) tryV8();
     }
   } catch(e) {}
 
-  // localStorage 輪詢（主要機制，Firebase 是加分）
+  // ── localStorage + postMessage 備援（同電腦測試用）──
+  const applyState = (raw) => {
+    if (!raw || raw === _lastStateStr) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed?.teams) return;
+      _lastStateStr = raw;
+      gameState = parsed;
+      if (!boardPos?.length) boardPos = getBoardLayout();
+      if (!document.getElementById('sc-0')) buildBoard();
+      syncTeamsFromParent(); syncTeamsFromState();
+      render(); centerOnMyPiece();
+    } catch(e) {}
+  };
+
   const pollNow = () => {
     try {
-      if (myRole === 'student') {
-        const raw = localStorage.getItem('W8_STATE');
-        if (raw && raw !== _lastStateStr) {
-          _lastStateStr = raw;
-          gameState = JSON.parse(raw);
-          if (!boardPos || boardPos.length === 0) boardPos = getBoardLayout();
-          if (!document.getElementById('sc-0')) buildBoard();
-          syncTeamsFromParent(); syncTeamsFromState();
-          render(); centerOnMyPiece();
-        }
-      }
+      if (myRole === 'student') applyState(localStorage.getItem('W8_STATE'));
       if (myRole === 'teacher') {
         const raw = localStorage.getItem('W8_ROLL');
         if (raw) {
@@ -1247,19 +1291,30 @@ function makeInit() {
 function broadcast() {
   if (myRole !== 'teacher') return;
   const stateStr = JSON.stringify(gameState);
+  // postMessage 給同頁面的學生 sg-iframe（同電腦）
   try { window.parent.postMessage({ type: 'W8_STATE', state: gameState }, '*'); } catch (e) {}
+  // localStorage（同電腦備援）
   try {
     localStorage.setItem('W8_STATE', stateStr);
-    // 手動觸發 storage event（同視窗的 storage 事件不會自動觸發）
     window.dispatchEvent(new StorageEvent('storage', { key: 'W8_STATE', newValue: stateStr }));
   } catch (e) {}
+  // Firebase（跨裝置主要機制）：透過 parent 的 saveRooms 寫入 rooms.w8State
   try {
-    const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
-    if (parentDb && roomId) {
-      parentDb.collection('rooms').doc(roomId).update({ w8State: gameState });
-    } else if (window.parent && window.parent.state && typeof window.parent.saveRooms === 'function') {
-      window.parent.state.w8State = gameState;
-      window.parent.saveRooms();
+    const roomCode = new URLSearchParams(location.search).get('room') ||
+                     window.parent?.state?.roomCode;
+    if (roomCode && window.parent && typeof window.parent.getRooms === 'function') {
+      const rooms = window.parent.getRooms();
+      if (rooms[roomCode]) {
+        rooms[roomCode].w8State = gameState;
+        // 同步分數
+        if (gameState.teams) {
+          if (!rooms[roomCode].scores) rooms[roomCode].scores = {};
+          Object.values(gameState.teams).forEach(t => {
+            rooms[roomCode].scores[`第${t.id}組`] = t.score || 0;
+          });
+        }
+        window.parent.saveRooms(rooms);
+      }
     }
   } catch(e) {}
 }

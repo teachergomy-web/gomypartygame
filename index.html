@@ -1416,20 +1416,24 @@ window.addEventListener('message', (e9) => {
 window.addEventListener('message', (e8) => {
     if (!e8.data || e8.data.type !== 'W8_STATE') return;
     if (window.state.perspective !== 'teacher') return;
-    // 老師控制台收到 W8 狀態更新，廣播給所有學生（透過 sg-iframe）
     const sgIframe = document.getElementById('sg-iframe');
     if (sgIframe && sgIframe.contentWindow) {
         try { sgIframe.contentWindow.postMessage({ type: 'W8_STATE', state: e8.data.state }, '*'); } catch(e) {}
     }
-    // 同步儲存到 rooms（供結算用分數）
-    if (e8.data.state && e8.data.state.teams) {
+    // 同步儲存到 rooms（供結算用分數 + 跨裝置同步 w8State）
+    if (e8.data.state) {
         const rooms8 = window.getRooms();
         if (rooms8[window.state.roomCode]) {
-            if (!rooms8[window.state.roomCode].scores) rooms8[window.state.roomCode].scores = {};
-            Object.values(e8.data.state.teams).forEach(t => {
-                const teamName = `第${t.id}組`;
-                rooms8[window.state.roomCode].scores[teamName] = t.score || 0;
-            });
+            // 存分數
+            if (e8.data.state.teams) {
+                if (!rooms8[window.state.roomCode].scores) rooms8[window.state.roomCode].scores = {};
+                Object.values(e8.data.state.teams).forEach(t => {
+                    const teamName = `第${t.id}組`;
+                    rooms8[window.state.roomCode].scores[teamName] = t.score || 0;
+                });
+            }
+            // 存完整 w8State（供學生端跨裝置同步）
+            rooms8[window.state.roomCode].w8State = e8.data.state;
             window.saveRooms(rooms8);
         }
     }
@@ -2796,19 +2800,7 @@ function syncJoinDOM() {
     }
 }
 
-function goToJoin() { 
-  if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; 
-  stopJoinListener(); 
-  window.syncJoinDOM(); 
-  window.renderRoomList(); 
-  window.goTo('screen-join'); 
-  // 重設按鈕狀態（防止上次「確認中...」殘留）
-  setTimeout(() => {
-    const btn = document.querySelector('#screen-join .btn-green');
-    if (btn) { btn.disabled = false; btn.textContent = '準備完成！→'; }
-    window._joinRetry = 0;
-  }, 50);
-}
+function goToJoin() { if (window.pStates[window.state.perspective]) window.pStates[window.state.perspective].joinStep = 1; stopJoinListener(); window.syncJoinDOM(); window.renderRoomList(); window.goTo('screen-join'); }
 
 function renderRoomList() {
   const rooms = window.getRooms();
@@ -3010,10 +3002,6 @@ function joinRoom() {
 
 function _finishJoin(groupName, symbol, roomCode) {
   stopJoinListener(); // 加入成功，停止選組監聽
-  // 重設按鈕（以防下次回到加入頁面仍是 disabled）
-  window._joinRetry = 0;
-  const joinBtnEl = document.querySelector('#screen-join .btn-green');
-  if (joinBtnEl) { joinBtnEl.disabled = false; joinBtnEl.textContent = '準備完成！→'; }
   const pData = window.pStates[window.state.perspective];
   if (pData) {
     pData.joined = true;
