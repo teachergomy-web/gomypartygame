@@ -189,6 +189,13 @@ body {
   overflow: hidden; touch-action: none; background: transparent;
 }
 
+/* 等待時透明阻擋層 */
+.wait-blocker {
+  position: fixed; top: calc(40px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0; bottom: 0; z-index: 400;
+  pointer-events: auto; background: transparent; cursor: not-allowed;
+}
+
 /* ══════════════════════════════
    右下角懸浮 HUD 視窗 (僅供學生端顯示提示)
    ══════════════════════════════ */
@@ -209,18 +216,17 @@ body {
    統一全螢幕中央大遮罩 (Center Event Overlay)
    ══════════════════════════════ */
 .center-overlay {
-  position: fixed; inset: 0; z-index: 9000; pointer-events: auto; /* 阻擋下方操作 */
-  background: rgba(0,0,0,0.85); /* 移除 blur，改為純深色半透明 */
+  position: fixed; inset: 0; z-index: 9000; 
+  pointer-events: none; /* 改為 none，讓背景不會被阻擋或變暗 */
+  background: transparent; /* 完全透明，取消黑色半透明遮罩 */
   display: none; flex-direction: column; align-items: center; justify-content: center;
-  animation: coFadeIn 0.3s ease-out; transition: all 0.3s;
 }
-@keyframes coFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .co-box {
-  pointer-events: auto; /* 遮罩內容可以點擊 */
+  pointer-events: auto; /* 內容可以點擊 */
   background: rgba(20,20,30,0.95); border: 3px solid var(--yellow);
   border-radius: 24px; padding: 30px 40px; text-align: center;
   box-shadow: 0 10px 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,214,0,0.2);
-  transform: scale(0.8); animation: coPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform: scale(0.8); animation: coPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   width: 90%; max-width: 500px; display: flex; flex-direction: column; align-items: center;
   transition: all 0.3s ease;
 }
@@ -285,6 +291,7 @@ body {
 }
 .iso-board { 
   position: relative; transform-style: preserve-3d; 
+  transition: transform 0.4s ease-out; 
 }
 
 /* 中央區域底板 */
@@ -639,22 +646,28 @@ function updateCameraTarget(posIndex) {
 function applyTransform() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  // 縮放率：放大拉近到剛好顯示前後數格
-  const scale = Math.max(vw, vh) / 500; 
   
-  const tx = (_cameraOffsetX + _panOffsetX) * scale;
-  const ty = (_cameraOffsetY + _panOffsetY) * scale;
-
   if (myRole === 'teacher') {
-    const rig = document.getElementById('t-camera-rig');
-    if (rig) rig.style.transform = `translate(${tx}px, ${ty}px)`;
+    // 老師端全覽模式，固定視角，確保整個棋盤納入視窗中
+    const VW_TARGET = BOARD_SIZE * 1.414 + 120;
+    const VH_TARGET = BOARD_SIZE * 1.22 + 120;
+    const scale = Math.min(vw / VW_TARGET, vh / VH_TARGET); 
+    
+    // 老師固定視角，不再受 _cameraOffset 跟隨影響，只接受手動 panOffset
+    const tx = _panOffsetX * scale;
+    const ty = _panOffsetY * scale;
+    
+    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
     const tBoard = document.getElementById('board');
-    if (tBoard) tBoard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    if (tBoard) tBoard.style.transform = transformStr;
   } else {
-    const rig = document.getElementById('s-camera-rig');
-    if (rig) rig.style.transform = `translate(${tx}px, ${ty}px)`;
+    // 學生端高倍率模式，跟蹤棋子
+    const scale = Math.max(vw, vh) / 500; 
+    const tx = (_cameraOffsetX + _panOffsetX) * scale;
+    const ty = (_cameraOffsetY + _panOffsetY) * scale;
+    const transformStr = `translate(${tx}px, ${ty}px) scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
     const sBoard = document.getElementById('s-board');
-    if (sBoard) sBoard.style.transform = `scale(${scale}) rotateX(55deg) rotateZ(-45deg)`;
+    if (sBoard) sBoard.style.transform = transformStr;
   }
 }
 
@@ -672,7 +685,12 @@ function setupDrag(elementId) {
   });
   window.addEventListener('mousemove', e => {
       if (!isDragging) return;
-      const scale = Math.max(window.innerWidth, window.innerHeight) / 500;
+      let scale = 1;
+      if (myRole === 'teacher') {
+          scale = Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120));
+      } else {
+          scale = Math.max(window.innerWidth, window.innerHeight) / 500;
+      }
       _panOffsetX += (e.clientX - startX) / scale;
       _panOffsetY += (e.clientY - startY) / scale;
       startX = e.clientX; startY = e.clientY;
@@ -688,7 +706,12 @@ function setupDrag(elementId) {
   }, {passive:true});
   window.addEventListener('touchmove', e => {
       if(!isDragging || e.touches.length !== 1) return;
-      const scale = Math.max(window.innerWidth, window.innerHeight) / 500;
+      let scale = 1;
+      if (myRole === 'teacher') {
+          scale = Math.min(window.innerWidth / (BOARD_SIZE * 1.414 + 120), window.innerHeight / (BOARD_SIZE * 1.22 + 120));
+      } else {
+          scale = Math.max(window.innerWidth, window.innerHeight) / 500;
+      }
       _panOffsetX += (e.touches[0].clientX - startX) / scale;
       _panOffsetY += (e.touches[0].clientY - startY) / scale;
       startX = e.touches[0].clientX; startY = e.touches[0].clientY;
@@ -699,10 +722,31 @@ function setupDrag(elementId) {
 
 function setTransition(enabled) {
   const val = enabled ? 'transform 0.4s ease-out' : 'none';
-  const tRig = document.getElementById('t-camera-rig');
+  const tBoard = document.getElementById('board');
   const sRig = document.getElementById('s-camera-rig');
-  if (tRig) tRig.style.transition = val;
+  const sBoard = document.getElementById('s-board');
+  if (tBoard) tBoard.style.transition = val;
   if (sRig) sRig.style.transition = val;
+  if (sBoard) sBoard.style.transition = val;
+}
+
+// 傳送訊號到平台備援儲存機制
+function sendActionToPlatform(action) {
+  try { window.parent.postMessage(action, '*'); } catch (e) {}
+  try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
+  try {
+    const roomId = window.parent?.state?.roomId;
+    if (parentDb && roomId) {
+      parentDb.collection('rooms').doc(roomId).update({ w8Action: action });
+    } else if (window.parent && window.parent.getRooms && window.parent.saveRooms) {
+      const rooms = window.parent.getRooms();
+      const rc = window.parent.state.roomCode;
+      if (rooms && rc && rooms[rc]) {
+          rooms[rc].w8Action = action;
+          window.parent.saveRooms(rooms);
+      }
+    }
+  } catch(e) {}
 }
 
 function attachSync() {
@@ -728,8 +772,35 @@ function attachSync() {
     } catch(e) {}
   };
 
+  // Firebase Realtime Listener
+  try {
+    const roomId = window.parent && window.parent.state ? window.parent.state.roomId : null;
+    if (parentDb && roomId) {
+      parentDb.collection('rooms').doc(roomId).onSnapshot(doc => {
+          const data = doc.data();
+          if (data && data.w8State && myRole === 'student') {
+              applyState(JSON.stringify(data.w8State));
+          }
+          if (data && data.w8Action && myRole === 'teacher') {
+              processAction(data.w8Action);
+          }
+      });
+    }
+  } catch(e) { console.log('Firebase 監聽失敗', e); }
+
   const pollNow = () => {
-    if (myRole === 'student') applyState(localStorage.getItem('W8_STATE'));
+    if (myRole === 'student') {
+      applyState(localStorage.getItem('W8_STATE'));
+      try {
+          if (window.parent && window.parent.getRooms) {
+              const rooms = window.parent.getRooms();
+              const rc = window.parent.state?.roomCode;
+              if (rooms && rc && rooms[rc] && rooms[rc].w8State) {
+                  applyState(JSON.stringify(rooms[rc].w8State));
+              }
+          }
+      } catch(e) {}
+    }
     if (myRole === 'teacher') {
       try {
         const raw = localStorage.getItem('W8_ROLL');
@@ -739,6 +810,19 @@ function attachSync() {
             processAction(action);
           }
         }
+      } catch(e) {}
+      
+      try {
+          if (window.parent && window.parent.getRooms) {
+              const rooms = window.parent.getRooms();
+              const rc = window.parent.state?.roomCode;
+              if (rooms && rc && rooms[rc] && rooms[rc].w8Action) {
+                  const action = rooms[rc].w8Action;
+                  if (action.ts && action.ts !== _lastActionTs) {
+                      processAction(action);
+                  }
+              }
+          }
       } catch(e) {}
       
       // 處理暫停偵測
@@ -1083,9 +1167,13 @@ function broadcast() {
     const roomId = window.parent?.state?.roomId;
     if (parentDb && roomId) {
       parentDb.collection('rooms').doc(roomId).update({ w8State: gameState });
-    } else if (window.parent?.state && typeof window.parent.saveRooms === 'function') {
-      window.parent.state.w8State = gameState;
-      window.parent.saveRooms();
+    } else if (window.parent && window.parent.getRooms && window.parent.saveRooms) {
+      const rooms = window.parent.getRooms();
+      const rc = window.parent.state.roomCode;
+      if (rooms && rc && rooms[rc]) {
+          rooms[rc].w8State = gameState;
+          window.parent.saveRooms(rooms);
+      }
     }
   } catch(e) {}
 }
@@ -1117,12 +1205,13 @@ function render() {
   syncTeamsFromState();
   renderPieces();
 
-  // 攝影機鎖定當前回合隊伍（如果是開場，鎖定 0 格；如果是其他狀態鎖定當前隊伍）
+  // 攝影機鎖定當前回合隊伍（如果是開場，鎖定 0 格；如果是學生其他狀態鎖定當前隊伍）
   if (gameState.phase === 'intro') {
       updateCameraTarget(0);
       _panOffsetX = 0; _panOffsetY = 0;
       applyTransform();
-  } else if (gameState.currentTurn && gameState.phase !== 'rolled') {
+  } else if (!isT && gameState.currentTurn && gameState.phase !== 'rolled') {
+      // 學生端才會在棋子靜止時也強制回中，老師端完全放手給自己拖曳
       const curTeam = gameState.teams[gameState.currentTurn] || gameState.teams[String(gameState.currentTurn)];
       if (curTeam) {
           updateCameraTarget(curTeam.position % TOTAL);
@@ -1136,16 +1225,19 @@ function render() {
   const coBox = document.getElementById('co-box');
   
   const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || String(gameState.currentTurn) === String(myTeamId) || gameState.currentTurn == myTeamId;
-  const showCenterPhase = ['intro', 'waiting_roll', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  
+  // 老師端不需要顯示 "等待擲骰" 或 "棋子移動中" 的中心遮罩，讓他看乾淨的地圖
+  const showCenterPhaseTeacher = ['intro', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  const showCenterPhaseStudent = ['intro', 'waiting_roll', 'land_reveal', 'event', 'answering', 'revealing', 'done'].includes(gameState.phase);
   
   let showCenter = false;
   if (isT) {
-      showCenter = showCenterPhase;
+      showCenter = showCenterPhaseTeacher;
   } else {
       if (gameState.phase === 'intro') {
           showCenter = true;
       } else if (isMyTurn) {
-          showCenter = showCenterPhase;
+          showCenter = showCenterPhaseStudent;
       } else {
           // 等待組不需要看任何事件提示，全部隱藏，專心看老師畫面
           showCenter = false;
@@ -1175,17 +1267,13 @@ function render() {
           else html += `<div class="wait-msg"><div class="pulse"></div> 等待老師開始遊戲...</div>`;
       }
       else if (gameState.phase === 'waiting_roll') {
-          const ct = TEAMS.find(t => t.id === gameState.currentTurn);
-          if (isT) {
-              html = `<div class="co-title">等待 ${ct?.icon || ''} <span style="color:var(--yellow)">${ct?.name || ''}</span> 擲骰...</div>`;
+          // 只有學生端會進來這個判斷
+          const myTD = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
+          if (myTD?.skipTurn) {
+              html = `<div class="co-title" style="color:var(--red);">⏸ 這回合停止行動！</div>`;
           } else {
-              const myTD = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
-              if (myTD?.skipTurn) {
-                  html = `<div class="co-title" style="color:var(--red);">⏸ 這回合停止行動！</div>`;
-              } else {
-                  html = `<div class="co-title">✨ 輪到你們了！</div>
-                          <button class="btn-pub" style="display:block; font-size:1.5rem; padding:16px; margin-top:20px;" onclick="rollDice()">🎲 擲骰！</button>`;
-              }
+              html = `<div class="co-title">✨ 輪到你們了！</div>
+                      <button class="btn-pub" style="display:block; font-size:1.5rem; padding:16px; margin-top:20px;" onclick="rollDice()">🎲 擲骰！</button>`;
           }
       }
       else if (gameState.phase === 'land_reveal') {
@@ -1410,7 +1498,7 @@ function renderStudent() {
   }
 
   // 等待組或是還沒開場，顯示右下提示
-  if (!isMyTurn || gs.phase === 'intro') {
+  if (!isMyTurn && gs.phase !== 'intro') {
     const card = document.getElementById('s-hud-card');
     if (card) card.style.display = 'block';
   }
@@ -1422,17 +1510,7 @@ window.studentSelectAnswer = function(ans) {
   
   const action = { type: 'W8_ANSWER', teamId: myTeamId, answer: ans, ts: Date.now() };
   if (myRole === 'student') {
-    try { window.parent.postMessage(action, '*'); } catch (e) {}
-    try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
-    try {
-      const roomId = window.parent?.state?.roomId;
-      if (parentDb && roomId) {
-        parentDb.collection('rooms').doc(roomId).update({ w8Action: action });
-      } else if (window.parent?.state && typeof window.parent.saveRooms === 'function') {
-        window.parent.state.w8Action = action;
-        window.parent.saveRooms();
-      }
-    } catch(e) {}
+    sendActionToPlatform(action);
     processAction(action);
   } else {
     processAction(action);
@@ -1696,18 +1774,7 @@ function rollDice() {
   const action = { type: 'W8_ROLL', teamId: myTeamId, diceResult: { d1, d2, total }, ts: Date.now() };
 
   if (myRole === 'student') {
-    try { window.parent.postMessage(action, '*'); } catch (e) {}
-    try { localStorage.setItem('W8_ROLL', JSON.stringify(action)); } catch(e) {}
-    try {
-      const roomId = window.parent?.state?.roomId;
-      if (parentDb && roomId) {
-        parentDb.collection('rooms').doc(roomId).update({ w8Action: action });
-      } else if (window.parent?.state && typeof window.parent.saveRooms === 'function') {
-        window.parent.state.w8Action = action;
-        window.parent.saveRooms();
-      }
-    } catch(e) {}
-    
+    sendActionToPlatform(action);
     processAction(action);
   } else {
     processAction(action);
@@ -1732,9 +1799,11 @@ function movePiece() {
     const _t = gameState.teams[tidStr] || gameState.teams[tid];
     if (_t) { _t.position = curPos; gameState.teams[tidStr] = _t; gameState.teams[tid] = _t; }
     
-    updateCameraTarget(curPos); // 鏡頭鎖定跳動的棋子
-    _panOffsetX = 0; _panOffsetY = 0; // 重置拖曳，強迫回歸中心
-    applyTransform();
+    if (myRole !== 'teacher') {
+        updateCameraTarget(curPos); // 只有學生端鏡頭跟隨
+        _panOffsetX = 0; _panOffsetY = 0; // 重置拖曳，強迫回歸中心
+        applyTransform();
+    }
 
     broadcast();
     renderPieces();
@@ -1803,32 +1872,55 @@ function doBad(tid) {
   showToast(`💀 ${ev.title}`); showPop('-1', 'var(--red)');
 }
 
+let cachedQuestions = null;
+
 async function fetchQ(isSpecial) {
-  const subs = ['生活常識、自然科學', '國語（成語、字義、造句）'];
-  const sub = subs[Math.floor(Math.random() * subs.length)];
-  const diff = isSpecial ? '中難度，適合國小高年級' : '簡單到中等，適合國小混齡';
-  const prompt = `你是小學老師，出一題${sub}選擇題。難度：${diff}。JSON格式，不含其他文字：\n{"question":"題目","optionA":"A選項","optionB":"B選項","answer":"A或B","explanation":"解釋1~2句"}`;
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': '', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-3-5-sonnet-20241022', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!resp.ok) throw new Error('api');
-    const data = await resp.json();
-    const text = data.content?.[0]?.text || '';
-    const q = JSON.parse(text.replace(/```[\w]*|```/g, '').trim());
-    updateState({ question: q, phase: 'answering', selectedAnswer: null });
+    if (!cachedQuestions) {
+      const sheetId = '1omKsEFVvIBbBVcWxdr8H13TRJlgCmkAL_aM9VNmuMYM';
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+      const res = await fetch(url);
+      const text = await res.text();
+      // 移除 google visualization 前後綴以取得標準 JSON
+      const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const data = JSON.parse(jsonStr);
+      
+      cachedQuestions = [];
+      data.table.rows.forEach(row => {
+        if (row.c && row.c[0] && row.c[0].v) {
+          const qText = String(row.c[0].v).trim();
+          // 過濾掉標題列
+          if (qText !== '題目' && qText !== 'Question') {
+            cachedQuestions.push({
+              question: qText,
+              optionA: row.c[1] ? String(row.c[1].v) : '',
+              optionB: row.c[2] ? String(row.c[2].v) : '',
+              answer: row.c[3] ? String(row.c[3].v).trim().toUpperCase() : 'A',
+              explanation: row.c[4] ? String(row.c[4].v) : ''
+            });
+          }
+        }
+      });
+    }
+    
+    if (cachedQuestions && cachedQuestions.length > 0) {
+      const q = cachedQuestions[Math.floor(Math.random() * cachedQuestions.length)];
+      updateState({ question: q, phase: 'answering', selectedAnswer: null });
+      return;
+    }
   } catch (e) {
-    const pool = [
-      { question: '「一石二鳥」的意思是？', optionA: '做一件事達成兩個目的', optionB: '用石頭打兩隻鳥', answer: 'A', explanation: '一石二鳥比喻做一件事情，同時達到兩個目的。' },
-      { question: '地球上面積最大的海洋是？', optionA: '大西洋', optionB: '太平洋', answer: 'B', explanation: '太平洋是地球上最大的海洋，約佔地球表面積三分之一。' },
-      { question: '植物光合作用需要什麼？', optionA: '陽光和二氧化碳', optionB: '陽光和氧氣', answer: 'A', explanation: '植物利用陽光、水和二氧化碳進行光合作用，並釋放氧氣。' },
-      { question: '「半途而廢」的意思？', optionA: '做事到一半就放棄', optionB: '做事非常努力', answer: 'A', explanation: '半途而廢形容事情做到一半就放棄，沒有堅持到底。' },
-      { question: '台灣最高的山是？', optionA: '雪山', optionB: '玉山', answer: 'B', explanation: '玉山海拔3952公尺，是台灣第一高峰。' }
-    ];
-    updateState({ question: pool[Math.floor(Math.random() * pool.length)], phase: 'answering', selectedAnswer: null });
+    console.error("讀取 Google 試算表失敗，使用備用題庫", e);
   }
+  
+  // 備用題庫 (萬一網路或試算表有問題時使用)
+  const pool = [
+    { question: '「一石二鳥」的意思是？', optionA: '做一件事達成兩個目的', optionB: '用石頭打兩隻鳥', answer: 'A', explanation: '一石二鳥比喻做一件事情，同時達到兩個目的。' },
+    { question: '地球上面積最大的海洋是？', optionA: '大西洋', optionB: '太平洋', answer: 'B', explanation: '太平洋是地球上最大的海洋，約佔地球表面積三分之一。' },
+    { question: '植物光合作用需要什麼？', optionA: '陽光和二氧化碳', optionB: '陽光和氧氣', answer: 'A', explanation: '植物利用陽光、水和二氧化碳進行光合作用，並釋放氧氣。' },
+    { question: '「半途而廢」的意思？', optionA: '做事到一半就放棄', optionB: '做事非常努力', answer: 'A', explanation: '半途而廢形容事情做到一半就放棄，沒有堅持到底。' },
+    { question: '台灣最高的山是？', optionA: '雪山', optionB: '玉山', answer: 'B', explanation: '玉山海拔3952公尺，是台灣第一高峰。' }
+  ];
+  updateState({ question: pool[Math.floor(Math.random() * pool.length)], phase: 'answering', selectedAnswer: null });
 }
 
 function publishAnswer() {
