@@ -493,6 +493,10 @@
         // ==========================================
 
         let countdownTimeout = null;
+        // 平台模式旗標
+        window.IS_PLATFORM_W2 = false;
+        // 暫停時間記錄（用於 RESUME 後補回計時偏移）
+        let _pausedAt = 0;
         function startCountdown(cb) {
             clearTimeout(countdownTimeout);
             const statusEl = document.getElementById('status-txt');
@@ -576,6 +580,12 @@
                         cell.type = randomTypes[Math.floor(seededRandom() * randomTypes.length)];
                         cell.rotation = Math.floor(seededRandom() * 4);
                     } else {
+                        // 防衛：若字元不在 SYMBOL_MAP 中，視為空格
+                        if (!SYMBOL_MAP[char]) {
+                            cell.type = ' ';
+                            row.push(cell);
+                            continue;
+                        }
                         cell.type = SYMBOL_MAP[char].type;
                         let correctRot = SYMBOL_MAP[char].rot || 0;
 
@@ -922,8 +932,10 @@ requestWakeLock();
             switch(e.data.type) {
                 case 'PLATFORM_START':
                     if (e.data.group) window.GROUP_ID = e.data.group;
+                    window.IS_PLATFORM_W2 = true;
                     break;
                 case 'PLATFORM_PAUSE':
+                    _pausedAt = Date.now(); // 記錄暫停時刻
                     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
                     if (!document.getElementById('pause-overlay')) {
                         const ov = document.createElement('div');
@@ -936,10 +948,24 @@ requestWakeLock();
                 case 'PLATFORM_RESUME':
                     const ov = document.getElementById('pause-overlay');
                     if (ov) ov.remove();
+                    // 補回暫停期間的偏移，計時從暫停處繼續（不歸零）
+                    if (_pausedAt > 0 && startTime > 0) {
+                        startTime += (Date.now() - _pausedAt);
+                        _pausedAt = 0;
+                    }
                     if (gameStarted && !isLevelComplete) startTimer();
                     break;
                 case 'PLATFORM_RESET':
-                    backToMenu();
+                    // 平台模式下 RESET 只清遊戲狀態，不回主選單讓學生自選
+                    if (window.IS_PLATFORM_W2) {
+                        clearInterval(timerInterval);
+                        clearTimeout(levelTransitionTimeout1);
+                        clearTimeout(levelTransitionTimeout2);
+                        clearTimeout(countdownTimeout);
+                        gameStarted = false;
+                    } else {
+                        backToMenu();
+                    }
                     break;
             }
         });
@@ -952,6 +978,7 @@ requestWakeLock();
             const group = params.get('group');
             if (group) window.GROUP_ID = group;
             if (autoMode) {
+                window.IS_PLATFORM_W2 = true;
                 document.getElementById('main-menu').classList.add('hidden');
                 currentMode = (autoMode === 'DOUBLE') ? 'DOUBLE' : 'SINGLE';
                 maxLevels = currentMode === 'SINGLE' ? 30 : 10;

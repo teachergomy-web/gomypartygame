@@ -167,7 +167,9 @@
 //  取得參數
 // ══════════════════════════════════════════════════
 const params    = new URLSearchParams(location.search);
-let MY_GROUP    = params.get('group') ? `第 ${params.get('group')} 組` : '';
+// group 參數由 index.html 以 encodeURIComponent(myGroup) 傳入，myGroup 已是「第X組」完整格式
+// 直接使用，不再自行拼接，避免變成「第 第X組 組」
+let MY_GROUP    = params.get('group') ? decodeURIComponent(params.get('group')) : '';
 let START_LEVEL = parseInt(params.get('autostart') || '0') || 0;
 
 // ══════════════════════════════════════════════════
@@ -245,7 +247,7 @@ window.addEventListener('message', e => {
     const d = e.data;
     if (!d || !d.type) return;
     if (d.type === 'PLATFORM_START') {
-        if (d.group) MY_GROUP = d.group;
+        if (d.group) MY_GROUP = d.group; // group 已是完整格式（如「第1組」），直接使用
         startGame(d.level || 1);
     }
     if (d.type === 'PLATFORM_PAUSE') {

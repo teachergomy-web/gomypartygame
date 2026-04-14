@@ -418,6 +418,16 @@ window.addEventListener('message',ev=>{
       canvas.width=0; canvas.height=0;
     }
 
+    // 進入 GUESSING：強制清空輸入框，避免殘留上一輪答案
+    if(S.phase==='GUESSING'&&prevPhase!=='GUESSING'){
+      const inp=document.getElementById('s-guess-input');
+      if(inp){ inp.value=''; inp.disabled=false; }
+      const btn=document.getElementById('s-guess-btn');
+      if(btn) btn.style.display='';
+      const sub=document.getElementById('s-guess-submitted');
+      if(sub) sub.style.display='none';
+    }
+
     // phase 改變了，才重新 renderS
     renderS();
     return;

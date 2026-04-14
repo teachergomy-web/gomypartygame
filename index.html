@@ -1457,7 +1457,8 @@ window.addEventListener('message', (e8) => {
             if (e8.data.state.teams) {
                 if (!rooms8[rc8].scores) rooms8[rc8].scores = {};
                 Object.values(e8.data.state.teams).forEach(t => {
-                    const key = `第 ${t.id} 組`;
+                    // 使用「第X組」格式（無空格），與 W8 的 TEAMS.name 和 index.html 組名格式一致
+                    const key = t.name || `第${t.id}組`;
                     rooms8[rc8].scores[key] = t.score || 0;
                     TC.scores[key] = t.score || 0;
                 });

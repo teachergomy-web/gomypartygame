@@ -630,8 +630,19 @@ function applyState(newState){
             if (m.status === 'finished' && (!p || p.status !== 'finished')) {
                 clearInterval(clearTimers[mi]);
                 let timeLeft = 10;
+                let _clearPausedAt = 0; // 記錄暫停時刻，恢復後補回
                 clearTimers[mi] = setInterval(() => {
-                    if (state.paused) return; // 暫停時凍結清空倒數
+                    if (state.paused) {
+                        // 暫停中：記錄時刻（只記一次）
+                        if (!_clearPausedAt) _clearPausedAt = Date.now();
+                        return;
+                    }
+                    // 從暫停恢復：補回已暫停的秒數（避免恢復後立刻清空）
+                    if (_clearPausedAt) {
+                        const pausedSecs = Math.floor((Date.now() - _clearPausedAt) / 1000);
+                        timeLeft = Math.min(10, timeLeft + pausedSecs);
+                        _clearPausedAt = 0;
+                    }
                     timeLeft--;
                     // 即時更新倒數文字
                     const txtEl = document.getElementById(`auto-clear-text-${mi}`);
@@ -942,12 +953,13 @@ function renderGameView(){
         }
     }
 
-    // 棋盤
+    // 棋盤 — 老師端不可點擊，學生端才加 can-move
     resizeSoloBoard();
     const cells=document.querySelectorAll('#solo-board .cell');
     cells.forEach((cell,i)=>{
         const val=m.cells[i];
         const myTurn=(myGroup===m.black&&m.turn==='black')||(myGroup===m.white&&m.turn==='white');
+        // 老師視角：cell 永不加 can-move，避免誤觸視覺反饋
         const canMove=myRole==='player'&&m.status==='playing'&&!m.winner&&val===0&&myTurn;
         cell.className='cell'+(canMove?' can-move':'');
         cell.innerHTML=val===0?'':`<div class="piece ${val===1?'black':'white'}${m.lastMove===i?' last':''}"></div>`;

@@ -1123,7 +1123,10 @@
     let musicMuted = false;
 
     function getAudioCtx() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            window._w4AudioCtx = audioCtx; // 暴露給頂層 touchstart handler（iOS resume 用）
+        }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         return audioCtx;
     }
@@ -1714,6 +1717,21 @@ document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') requestWakeLock();
 });
 requestWakeLock();
+
+// iOS Safari AudioContext 需在使用者互動後 resume
+// 在第一個 touchstart 時嘗試 resume，確保音效正常播放
+(function() {
+    function _resumeAudioOnTouch() {
+        // audioCtx 是在遊戲內部建立的，透過嘗試 resume 解鎖
+        try {
+            if (window._w4AudioCtx && window._w4AudioCtx.state === 'suspended') {
+                window._w4AudioCtx.resume();
+            }
+        } catch(e) {}
+        document.removeEventListener('touchstart', _resumeAudioOnTouch, true);
+    }
+    document.addEventListener('touchstart', _resumeAudioOnTouch, true);
+})();
 
     // 平台模式初始化：隱藏主選單，顯示等待畫面或直接啟動
     if (isPlatform) {

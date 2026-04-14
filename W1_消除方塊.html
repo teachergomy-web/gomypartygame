@@ -451,10 +451,13 @@ const MINERAL_TYPES = [
     { color: '#CC44FF', pts: 50,  scale: 1.25, speedMod: 0.8 }
 ];
 
+// 平台模式旗標（由 autostart 或 PLATFORM_START 設定）
+window.IS_PLATFORM = false;
+
 // ===== LOBBY / BACK =====
 function backToLobby() {
-    // 平台模式下不回選關單
-    if(document.getElementById("level-select-menu")?.style.display === "none") return;
+    // 平台模式下禁止回選關單
+    if(window.IS_PLATFORM) return;
     state.active = false;
     document.getElementById('level-select-menu').classList.remove('hidden');
     document.getElementById('ui-header').classList.add('hidden');
@@ -808,6 +811,13 @@ function endGame(){
     else if(finalScore>=1500) stars='⭐⭐';
     document.getElementById('result-stars').innerText=stars;
     document.getElementById('game-over').classList.remove('hidden');
+    // 平台模式：重新套用隱藏回大廳按鈕（每次結算都確保正確）
+    if(window.IS_PLATFORM) {
+        const lobbyBtn = document.getElementById('w1-lobby-btn');
+        const platformMsg = document.getElementById('w1-platform-msg');
+        if(lobbyBtn) lobbyBtn.style.display = 'none';
+        if(platformMsg) platformMsg.style.display = 'block';
+    }
     spawnConfetti();
     const nb=document.getElementById('next-lvl-btn');
     if(state.level>=TOTAL_LEVELS){ nb.style.display='none'; } else { nb.style.display=''; }
@@ -863,6 +873,7 @@ window.addEventListener('message', (e) => {
     switch(e.data.type) {
         case 'PLATFORM_START':
             if (e.data.group) window.GROUP_ID = e.data.group;
+            window.IS_PLATFORM = true;
             startGame(e.data.level || 1);
             break;
         case 'PLATFORM_PAUSE':
@@ -905,13 +916,14 @@ window.parent.postMessage({ type: 'W1_READY' }, '*');
     const isPlatform = !!params.get('group') || !!params.get('autostart');
     const applyPlatformMode = () => {
         if(!isPlatform) return;
+        window.IS_PLATFORM = true;
         const lobbyBtn = document.getElementById('w1-lobby-btn');
         const platformMsg = document.getElementById('w1-platform-msg');
         if(lobbyBtn) lobbyBtn.style.display = 'none';
         if(platformMsg) platformMsg.style.display = 'block';
-        // 遊戲中 level-select-menu 不開放
+        // 平台模式：隱藏選關選單（改用 IS_PLATFORM 旗標控制，不再靠 style.display 判斷）
         const lsMenu = document.getElementById('level-select-menu');
-        if(lsMenu) lsMenu.style.display = 'none';
+        if(lsMenu) lsMenu.classList.add('hidden');
     };
     if (document.readyState !== 'loading') {
         setTimeout(() => { startGame(autoLevel); applyPlatformMode(); }, 300);

@@ -990,7 +990,10 @@ window.addEventListener('load', () => {
     const p = new URLSearchParams(location.search);
     if (p.get('role')) {
       myRole = p.get('role') || 'student';
-      myTeamId = parseInt(String(p.get('team')).replace(/\D/g, '')) || 1;
+      // team 可能是「第X組」完整格式或純數字，統一取出數字部分
+      const teamParam = decodeURIComponent(p.get('team') || '');
+      const parsedTeamId = parseInt(teamParam.replace(/\D/g, ''));
+      myTeamId = (!isNaN(parsedTeamId) && parsedTeamId > 0) ? parsedTeamId : 1;
       syncMyTeamId();
       launch();
     } else if (!window.parent || window.parent === window) {
