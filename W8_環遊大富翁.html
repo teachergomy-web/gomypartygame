@@ -543,33 +543,30 @@ const BAD = BAD_DATA.map(([title, amt]) => ({
 // ══════════════════════════════
 const CHALLENGE_REWARD  = 600;  // 成功獎勵
 const CHALLENGE_PENALTY = 300;  // 失敗罰款
+const DUEL_PRIZE        = 600;  // 對戰勝利：從對方手中奪走的金額
 
 const SPECIAL = [
-  // ── 猜拳 / 互動類 ──
+  // ── 對戰挑戰類（選擇挑戰對象，贏方從輸方拿 $600）──
   {
     icon: '✊',
     title: '【猜拳決勝負】',
-    desc: '跟老師猜拳，三局兩勝制。\n全組輪流各出一拳，贏老師超過半數即算成功！',
-    hint: '老師裁判：超過半數隊員贏老師 → ✅ 完成',
+    desc: '選擇一組對手，雙方各出三拳，三局兩勝制。\n贏的隊伍從對方手中拿走 $600！',
+    hint: '老師選對手，再判定誰贏',
+    duel: true,   // ← 標記為對戰類：需先選挑戰對象
   },
   {
     icon: '🤝',
-    title: '【黑白配挑戰】',
-    desc: '每位隊員依序和老師玩「黑白配」一局。\n全組需有 **三分之二以上** 的人猜中老師的手指數。',
-    hint: '老師裁判：2/3以上隊員猜中 → ✅ 完成',
-  },
-  {
-    icon: '👆',
-    title: '【心電感應】',
-    desc: '隊員甲在心裡想一個 1–10 的數字，\n隊員乙在 10 秒內猜出，三次機會。',
-    hint: '老師裁判：猜中任一次 → ✅ 完成',
+    title: '【黑白配決鬥】',
+    desc: '選擇一組對手，雙方各出一位代表互猜黑白配。\n三局兩勝，贏的隊伍從對方手中拿走 $600！',
+    hint: '老師選對手，再判定誰贏',
+    duel: true,   // ← 標記為對戰類
   },
   // ── 繞口令類 ──
   {
     icon: '👅',
     title: '【繞口令：四是四】',
-    desc: '全組一起齊聲念出：\n「四是四，十是十，十四是十四，四十是四十。」\n一口氣念完，不可唸錯！',
-    hint: '老師裁判：全組齊聲念完不出錯 → ✅ 完成',
+    desc: '指定一位隊員念出：\n「四是四，十是十，十四是十四，四十是四十。」\n一口氣念完，不可唸錯！(兩次機會)',
+    hint: '老師裁判：念完不出錯 → ✅ 完成',
   },
   {
     icon: '👅',
@@ -587,7 +584,13 @@ const SPECIAL = [
   {
     icon: '🔤',
     title: '【ㄇ開頭！2字語詞】',
-    desc: '每位隊員依序說出一個「ㄇ開頭的 2 字語詞」。\n不可重複、不可超過 5 秒思考！',
+    desc: '每位隊員依序說出一個「ㄇ開頭的 2 字語詞」。\n不可重複！',
+    hint: '老師裁判：全員成功說出不重複 → ✅ 完成',
+  },
+  {
+    icon: '🔤',
+    title: '【ㄨ開頭！2字語詞】',
+    desc: '每位隊員依序說出一個「ㄨ開頭的 2 字語詞」。\n不可重複！',
     hint: '老師裁判：全員成功說出不重複 → ✅ 完成',
   },
   {
@@ -597,15 +600,9 @@ const SPECIAL = [
     hint: '老師裁判：全員成功說出不重複 → ✅ 完成',
   },
   {
-    icon: '1️⃣',
-    title: '【含「一」的四字成語】',
-    desc: '每位隊員說出一個「有「一」字的四字成語」。\n例如：一石二鳥、萬眾一心、一馬當先。\n不可重複！',
-    hint: '老師裁判：全員成功說出不重複 → ✅ 完成',
-  },
-  {
     icon: '🍎',
-    title: '【水果開頭字接龍】',
-    desc: '以「香蕉」開頭，每位隊員接著說一種以上一個字結尾字開頭的水果。\n例如：香蕉→蕉糖→糖心蘋果…（廣義水果都算）\n接不下去或說錯即失敗！',
+    title: '【文字接龍】',
+    desc: '以「香蕉」開頭，每位隊員接著說一種以上一語詞。\n接不下去或說錯即失敗！\n',
     hint: '老師裁判：全員接龍成功 → ✅ 完成',
   },
   {
@@ -615,10 +612,10 @@ const SPECIAL = [
     hint: '老師裁判：全員成功說出不重複 → ✅ 完成',
   },
   {
-    icon: '🌍',
-    title: '【國家首都大考驗】',
-    desc: '老師說出一個國家名稱，\n全組 30 秒內一起討論並說出該國首都。\n答對加分，答錯扣分！',
-    hint: '老師裁判：說出正確首都 → ✅ 完成',
+    icon: '🏫',
+    title: '【成語考驗】',
+    desc: '每位隊員說出一個有「一」的四字成語。\n例如：一馬當先、一元復始。\n不可重複！',
+    hint: '老師裁判：全員成功說出不重複 → ✅ 完成',
   },
 ];
 
@@ -1178,6 +1175,9 @@ window.startGame = function() {
 // 讓 HTML onclick 可以直接呼叫這些函式
 window.challengePass = challengePass;
 window.challengeFail = challengeFail;
+window.duelPickTarget = duelPickTarget;
+window.duelWin        = duelWin;
+window.duelLose       = duelLose;
 window.nextTurn      = nextTurn;
 window.publishAnswer = publishAnswer;
 window.rollDice      = rollDice;
@@ -1278,8 +1278,8 @@ function render() {
   
   const isMyTurn = Number(gameState.currentTurn) === Number(myTeamId) || String(gameState.currentTurn) === String(myTeamId) || gameState.currentTurn == myTeamId;
   
-  const showCenterPhaseTeacher = ['intro', 'land_reveal', 'event', 'challenge', 'answering', 'revealing', 'done'].includes(gameState.phase);
-  const showCenterPhaseStudent = ['intro', 'waiting_roll', 'land_reveal', 'event', 'challenge', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  const showCenterPhaseTeacher = ['intro', 'land_reveal', 'event', 'duel_pick', 'duel', 'challenge', 'answering', 'revealing', 'done'].includes(gameState.phase);
+  const showCenterPhaseStudent = ['intro', 'waiting_roll', 'land_reveal', 'event', 'duel_pick', 'duel', 'challenge', 'answering', 'revealing', 'done'].includes(gameState.phase);
   
   let showCenter = false;
   if (isT) {
@@ -1289,6 +1289,9 @@ function render() {
           showCenter = true;
       } else if (gameState.phase === 'challenge') {
           // 任務挑戰：所有學生都要看到任務內容（不只是當前組別）
+          showCenter = true;
+      } else if (gameState.phase === 'duel_pick' || gameState.phase === 'duel') {
+          // 對戰選人/對戰：所有學生都能觀戰
           showCenter = true;
       } else if (isMyTurn) {
           showCenter = showCenterPhaseStudent;
@@ -1350,6 +1353,90 @@ function render() {
                   <div class="co-desc" style="margin-bottom:20px; color:#fff; font-size:1.1rem;">${ev.desc}</div>`;
           if (isT) html += `<button class="btn-next" style="display:block;" onclick="nextTurn()">➡️ 下一組</button>`;
           else html += `<div class="co-desc" style="font-size:0.9rem;">等待老師繼續...</div>`;
+      }
+      else if (gameState.phase === 'duel_pick') {
+          // 對戰：等老師選挑戰對象
+          const ch = gameState.challenge || {};
+          const chTeam = TEAMS.find(t => t.id == ch.teamId) || {};
+          const otherTeams = TEAMS.filter(t => t.id != ch.teamId);
+          html = `
+            <div class="co-icon" style="animation:none;font-size:2.8rem;">${ch.icon || '✊'}</div>
+            <div class="co-title" style="color:var(--p-yellow);font-size:1.2rem;">${ch.title}</div>
+            <div style="font-size:0.9rem;color:rgba(255,255,255,0.7);margin:8px 0 4px;">
+              ${chTeam.icon||''} <b>${chTeam.name||'發起組'}</b> 要向哪組挑戰？
+            </div>
+            <div style="font-size:0.82rem;color:rgba(255,255,255,0.4);margin-bottom:16px;">
+              ${ch.desc || ''}
+            </div>`;
+          if (isT) {
+            html += `<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:400px;">`;
+            otherTeams.forEach(ot => {
+              const otScore = Number(gameState.teams[String(ot.id)]?.score || 0);
+              html += `
+                <button onclick="duelPickTarget(${ot.id})"
+                  style="padding:14px 20px;border-radius:12px;border:2px solid rgba(255,220,0,.5);
+                  background:rgba(255,220,0,.1);color:#fff;font-family:var(--font);font-weight:900;
+                  font-size:1rem;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+                  ${ot.icon||''} ${ot.name}<br>
+                  <span style="font-size:0.72rem;color:var(--p-yellow);">$${otScore}</span>
+                </button>`;
+            });
+            html += `</div>`;
+          } else {
+            html += `<div class="co-desc" style="color:rgba(255,220,0,0.7);">⏳ 等待老師選擇挑戰對手...</div>`;
+          }
+      }
+      else if (gameState.phase === 'duel') {
+          // 對戰進行中：老師判定誰贏
+          const ch = gameState.challenge || {};
+          const chTeam  = TEAMS.find(t => t.id == ch.teamId)   || {};
+          const tgtTeam = TEAMS.find(t => t.id == ch.targetId)  || {};
+          const chScore  = Number(gameState.teams[String(ch.teamId)]?.score  || 0);
+          const tgtScore = Number(gameState.teams[String(ch.targetId)]?.score || 0);
+          const prize = Math.min(DUEL_PRIZE, Math.min(chScore, tgtScore) > 0 ? DUEL_PRIZE : Math.max(chScore, tgtScore));
+          html = `
+            <div style="font-size:2.5rem;margin-bottom:6px;">${ch.icon || '✊'}</div>
+            <div class="co-title" style="color:var(--p-yellow);font-size:1.15rem;margin-bottom:14px;">${ch.title}</div>
+            <!-- 對戰雙方 -->
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;">
+              <div style="text-align:center;background:rgba(0,229,255,.1);border:2px solid rgba(0,229,255,.4);
+                border-radius:14px;padding:14px 18px;min-width:110px;">
+                <div style="font-size:1.8rem;">${chTeam.icon||'⭐'}</div>
+                <div style="font-weight:900;font-size:.9rem;color:#fff;margin-top:4px;">${chTeam.name||'發起方'}</div>
+                <div style="font-size:.8rem;color:var(--p-green);margin-top:2px;">$${chScore}</div>
+              </div>
+              <div style="font-size:1.8rem;font-weight:900;color:var(--p-yellow);">VS</div>
+              <div style="text-align:center;background:rgba(255,64,255,.1);border:2px solid rgba(255,64,255,.4);
+                border-radius:14px;padding:14px 18px;min-width:110px;">
+                <div style="font-size:1.8rem;">${tgtTeam.icon||'⭐'}</div>
+                <div style="font-weight:900;font-size:.9rem;color:#fff;margin-top:4px;">${tgtTeam.name||'對手'}</div>
+                <div style="font-size:.8rem;color:var(--p-red);margin-top:2px;">$${tgtScore}</div>
+              </div>
+            </div>
+            <div style="font-size:0.82rem;color:rgba(255,255,255,0.4);margin-bottom:16px;">
+              贏方從對方手中奪走 <b style="color:var(--p-yellow);">$${DUEL_PRIZE}</b>
+            </div>`;
+          if (isT) {
+            html += `
+              <div style="display:flex;gap:14px;width:100%;max-width:380px;">
+                <button onclick="duelWin()"
+                  style="flex:1;padding:14px;border-radius:12px;border:2px solid rgba(0,229,255,.6);
+                  background:rgba(0,229,255,.15);color:#fff;font-family:var(--font);font-weight:900;
+                  font-size:.95rem;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent;">
+                  🏆 ${chTeam.icon||''} ${chTeam.name||'發起方'} 贏
+                  <div style="font-size:.72rem;opacity:.7;margin-top:3px;">奪走對方 $${DUEL_PRIZE}</div>
+                </button>
+                <button onclick="duelLose()"
+                  style="flex:1;padding:14px;border-radius:12px;border:2px solid rgba(255,64,255,.6);
+                  background:rgba(255,64,255,.15);color:#fff;font-family:var(--font);font-weight:900;
+                  font-size:.95rem;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent;">
+                  🏆 ${tgtTeam.icon||''} ${tgtTeam.name||'對手'} 贏
+                  <div style="font-size:.72rem;opacity:.7;margin-top:3px;">奪走對方 $${DUEL_PRIZE}</div>
+                </button>
+              </div>`;
+          } else {
+            html += `<div class="co-desc" style="color:rgba(255,220,0,0.7);">⚔️ 對戰進行中，等待老師判定結果...</div>`;
+          }
       }
       else if (gameState.phase === 'challenge') {
           // 特殊任務挑戰：老師裁判制
@@ -1959,20 +2046,95 @@ function triggerEvent(type, finalPos) {
 }
 
 function doSpecial(tid) {
-  // 隨機抽一張任務卡，進入 challenge 階段等待老師裁判
   const ch = SPECIAL[Math.floor(Math.random() * SPECIAL.length)];
+
+  if (ch.duel) {
+    // ★ 對戰類：先進入 duel_pick 階段，讓老師選挑戰對象
+    updateState({
+      phase: 'duel_pick',
+      event: null,
+      challenge: {
+        icon:     ch.icon,
+        title:    ch.title,
+        desc:     ch.desc,
+        hint:     ch.hint,
+        teamId:   tid,    // 發起方（踩到格子的組）
+        targetId: null,   // 被挑戰方（老師點選後填入）
+      }
+    });
+    showToast(`${ch.icon} ${ch.title} — 選擇對手！`);
+  } else {
+    // 一般任務類：直接進入 challenge 階段
+    updateState({
+      phase: 'challenge',
+      event: null,
+      challenge: {
+        icon:    ch.icon,
+        title:   ch.title,
+        desc:    ch.desc,
+        hint:    ch.hint,
+        teamId:  tid,
+      }
+    });
+    showToast(`⭐ ${ch.title}`);
+  }
+}
+
+// ── 對戰：老師選擇挑戰對象 ──
+function duelPickTarget(targetId) {
+  if (!gameState || gameState.phase !== 'duel_pick') return;
+  const ch = gameState.challenge || {};
+  // 更新 targetId，進入 duel 階段
   updateState({
-    phase: 'challenge',
-    event: null,
-    challenge: {
-      icon:    ch.icon,
-      title:   ch.title,
-      desc:    ch.desc,
-      hint:    ch.hint,
-      teamId:  tid,
-    }
+    phase: 'duel',
+    challenge: { ...ch, targetId }
   });
-  showToast(`⭐ ${ch.title}`);
+}
+
+// ── 對戰結果：發起方（踩格子的組）獲勝 ──
+function duelWin() {
+  if (!gameState || gameState.phase !== 'duel') return;
+  const ch = gameState.challenge || {};
+  const winnerId = ch.teamId;
+  const loserId  = ch.targetId;
+  if (!winnerId || !loserId) return;
+
+  const loserScore  = Number(gameState.teams[String(loserId)]?.score  || 0);
+  const winnerScore = Number(gameState.teams[String(winnerId)]?.score || 0);
+  const prize = Math.min(DUEL_PRIZE, loserScore); // 對方沒錢就全拿
+
+  // 扣輸方
+  updateTeam(loserId,  { score: loserScore  - prize });
+  // 加贏方
+  updateTeam(winnerId, { score: winnerScore + prize });
+
+  const winTeam  = TEAMS.find(t => t.id == winnerId) || {};
+  const loseTeam = TEAMS.find(t => t.id == loserId)  || {};
+  showToast(`🏆 ${winTeam.name||'發起方'} 贏！從 ${loseTeam.name||'對手'} 奪走 $${prize}`);
+  showPop(`+$${prize}`, 'var(--green)');
+  updateState({ phase: 'done', challenge: null });
+}
+
+// ── 對戰結果：被挑戰方（目標組）獲勝 ──
+function duelLose() {
+  if (!gameState || gameState.phase !== 'duel') return;
+  const ch = gameState.challenge || {};
+  const loserId  = ch.teamId;   // 發起方反輸
+  const winnerId = ch.targetId; // 被挑戰方反贏
+  if (!loserId || !winnerId) return;
+
+  const loserScore  = Number(gameState.teams[String(loserId)]?.score  || 0);
+  const winnerScore = Number(gameState.teams[String(winnerId)]?.score || 0);
+  const prize = Math.min(DUEL_PRIZE, loserScore);
+
+  updateTeam(loserId,  { score: loserScore  - prize });
+  updateTeam(winnerId, { score: winnerScore + prize });
+
+  const winTeam  = TEAMS.find(t => t.id == winnerId) || {};
+  const loseTeam = TEAMS.find(t => t.id == loserId)  || {};
+  showToast(`🏆 ${winTeam.name||'對手'} 贏！從 ${loseTeam.name||'發起方'} 奪走 $${prize}`);
+  showPop(`+$${prize}`, 'var(--green)');
+  updateState({ phase: 'done', challenge: null });
 }
 
 function challengePass() {
