@@ -1701,11 +1701,16 @@ function tcRenderScores() {
     const sorted = [...players].sort((a,b) => (TC.scores[b.group]||0) - (TC.scores[a.group]||0));
     const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
     area.innerHTML = sorted.map((p,i) => `
-        <div style="display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);border-radius:20px;padding:16px 24px;width:100%;max-width:600px">
-            <div style="font-size:2rem;width:40px;text-align:center">${medals[i]||''}</div>
-            <div style="font-size:2rem">${p.symbol}</div>
-            <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:white">${p.group}</div>
-            <div id="tc-score-${p.group.replace(/\s/g,'')}" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:2rem;color:#f5c800;min-width:80px;text-align:right;transition:transform .2s">${TC.scores[p.group]||0}</div>
+        <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);border-radius:20px;padding:14px 20px;width:100%;max-width:600px">
+            <div style="font-size:1.8rem;width:36px;text-align:center">${medals[i]||''}</div>
+            <div style="font-size:1.8rem">${p.symbol}</div>
+            <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:white">${p.group}</div>
+            <div id="tc-score-${p.group.replace(/\s/g,'')}" style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.8rem;color:#f5c800;min-width:72px;text-align:right;transition:transform .2s">${TC.scores[p.group]||0}</div>
+            <button onclick="tcKickPlayer('${p.group.replace(/'/g,"\\'")}','${(p.symbol||'').replace(/'/g,"\\'")}',this)"
+              title="踢除此組"
+              style="flex-shrink:0;background:rgba(232,32,32,.18);border:1px solid rgba(232,32,32,.5);border-radius:8px;color:#ff6b6b;font-family:'Nunito',sans-serif;font-weight:900;font-size:.7rem;padding:5px 9px;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1;">
+              ✕ 踢除
+            </button>
         </div>`).join('');
 }
 
@@ -1719,6 +1724,43 @@ function tcUpdateScore(group, score) {
     }
     // 重新排序
     tcRenderScores();
+}
+
+// ── 踢除玩家（老師端）──
+function tcKickPlayer(groupName, symbol, btnEl) {
+    if (!groupName) return;
+    // 按鈕防止重複點擊
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = '踢除中...'; }
+
+    const roomCode = window.state.roomCode;
+    const rooms = window.getRooms();
+    const r = rooms[roomCode];
+    if (!r) return;
+
+    // 1. 從 room.players 移除
+    r.players = (r.players || []).filter(p => p.group !== groupName);
+    r.playerCount = r.players.length;
+
+    // 2. 寫入 kicked 清單，讓學生端 snapshot 偵測到後自動離開
+    if (!r.kicked) r.kicked = {};
+    r.kicked[groupName] = { ts: Date.now(), symbol };
+
+    window.saveRooms(rooms);
+    window.state.players = r.players;
+    window.state.takenSymbols = r.players.map(p => p.symbol);
+
+    // 3. 清除本機的 pData（若此裝置有該組的 pState）
+    Object.keys(window.pStates).forEach(k => {
+        if (window.pStates[k].group === groupName) {
+            window.pStates[k].joined = false;
+            window.pStates[k].group  = '';
+        }
+    });
+
+    // 4. 重新渲染大廳和分數
+    window.renderLobby();
+    tcRenderScores();
+    showToast(`🚷 已踢除 ${groupName}`);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2324,6 +2366,12 @@ function tcLaunchStudentIfNeeded() {
     if (iframe) {
         const isW3 = selectedGame === 2;
         const isW5 = selectedGame === 4;
+
+        // ★ 讀取重連分數（若此組是重新進入遊戲中的房間）
+        const rejoinKey = '_rejoin_score_' + window.state.roomCode + '_' + encodeURIComponent(myGroup);
+        const rejoinScore = parseInt(localStorage.getItem(rejoinKey) || '0', 10);
+        // 讀取後立即清除，避免下次誤用
+        if (rejoinScore > 0) localStorage.removeItem(rejoinKey);
         let url;
         if (isW2) {
             url = gameFile + '?autostart=' + gameMode + '&level=' + level + '&group=' + encodeURIComponent(myGroup);
@@ -2371,7 +2419,8 @@ function tcLaunchStudentIfNeeded() {
                 // W7：傳入 level（= Part 編號）和 group
                 if (isW7) {
                     iframe.contentWindow.postMessage({
-                        type: 'PLATFORM_START', level, group: myGroup
+                        type: 'PLATFORM_START', level, group: myGroup,
+                        rejoinScore  // ★ 重連時帶入現有分數，讓 W7 繼續累計
                     }, '*');
                 } else if (isW8) {
                     iframe.contentWindow.postMessage({
@@ -2385,7 +2434,8 @@ function tcLaunchStudentIfNeeded() {
                         type: 'PLATFORM_START', level, group: myGroup,
                         isTeacher: isTeacher2,
                         state: isW5 ? w5state : w3state,
-                        players: r2.players || window.state.players || []
+                        players: r2.players || window.state.players || [],
+                        rejoinScore  // ★ 重連時帶入現有分數，讓遊戲繼續累計
                     }, '*');
                 }
             } catch(e) {}
@@ -2904,9 +2954,26 @@ setInterval(() => {
         pData.joined = false; pData.screen = 'screen-home';
         stopSyncListener();
         sessionStorage.removeItem('game_session');
+        localStorage.removeItem('game_session_persistent');
         window.goTo('screen-home');
         window.showToast('🚪 房間已關閉');
         return;
+    }
+
+    // 偵測老師踢除此組 → 強制離開並清除 session
+    if (r.kicked && pData.group && r.kicked[pData.group]) {
+        const kickedTs = r.kicked[pData.group].ts || 0;
+        // 只處理最近 30 秒內的踢除（避免舊資料誤觸）
+        if (Date.now() - kickedTs < 30000) {
+            pData.joined = false; pData.group = ''; pData.symbol = '';
+            pData.screen = 'screen-home';
+            stopSyncListener();
+            sessionStorage.removeItem('game_session');
+            localStorage.removeItem('game_session_persistent');
+            window.goTo('screen-home');
+            window.showToast('🚷 你已被老師踢出房間');
+            return;
+        }
     }
 
     // 偵測老師開啟規則頁 → 學生同步顯示規則
@@ -3445,10 +3512,18 @@ function renderLobby() {
       }
   }
   // 固定顯示5個座位格，有人就填，沒人就空位
+  // 老師端加踢人按鈕，學生端不顯示
+  const isTeacherView = window.state.perspective === 'teacher';
   const slots = Array.from({length:5}, (_,i) => {
     const p = window.state.players[i];
     if (p) {
-        return `<div class="kr-seat"><div class="kr-seat-emoji">${p.symbol}</div><div class="kr-seat-name">${p.group}</div></div>`;
+        const kickBtn = isTeacherView
+            ? `<button onclick="tcKickPlayer('${p.group.replace(/'/g,"\\'")}','${(p.symbol||'').replace(/'/g,"\\'")}',this)"
+                style="margin-top:4px;background:rgba(232,32,32,.2);border:1px solid rgba(232,32,32,.5);
+                border-radius:6px;color:#ff6b6b;font-size:.6rem;font-weight:900;padding:2px 6px;
+                cursor:pointer;font-family:'Nunito',sans-serif;-webkit-tap-highlight-color:transparent;">✕</button>`
+            : '';
+        return `<div class="kr-seat"><div class="kr-seat-emoji">${p.symbol}</div><div class="kr-seat-name">${p.group}</div>${kickBtn}</div>`;
     }
     return `<div class="kr-seat" style="opacity:.2;border-style:dashed"><div class="kr-seat-emoji">＋</div><div class="kr-seat-name">空位</div></div>`;
   });
@@ -3937,6 +4012,16 @@ function tryRestoreSession() {
         window.updateStudentWaitDisplay();
 
         if (room.status === 'playing') {
+            // ★ 重連時：把此組現有的累計分數存到 localStorage
+            //   tcLaunchStudentIfNeeded 啟動 iframe 時會讀取並傳入 PLATFORM_START
+            const myGroup = saved.group;
+            const existingScore = (room.scores && room.scores[myGroup]) || 0;
+            if (existingScore > 0) {
+                localStorage.setItem(
+                    '_rejoin_score_' + saved.roomCode + '_' + encodeURIComponent(myGroup),
+                    String(existingScore)
+                );
+            }
             tcLaunchStudentIfNeeded();
         } else if (room.status === 'settlement') {
             pData.screen = 'screen-settlement';
@@ -4070,6 +4155,7 @@ Object.assign(window, {
     doCloseRoom, selectGame, leaveRoomStudent, teacherLogin, _finishJoin,
     openTeacherConsole, changeLevel, jumpToPhase, updateLevelDisplay,
     tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, tcW4NextLevel, exitToLobby, studentLeaveGame, tryRestoreSession,
+    tcKickPlayer,
     showToast, setViewTeacher, setViewStudent,
     syncJoinDOM, renderLobby, renderSymbolPicker, renderGroupSelect, renderGroupPicker, renderGroupPicker, updateStudentWaitDisplay,
     getRooms, saveRooms,

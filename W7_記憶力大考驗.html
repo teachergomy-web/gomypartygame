@@ -643,7 +643,7 @@ window.addEventListener('message', e=>{
 
   // ── PLATFORM_START ──
   if(d.type!=='PLATFORM_START') return;
-  const {level, group} = d;
+  const {level, group, rejoinScore} = d;
   platformMode=true;
   platformGroup=group||'';
   const part=Math.max(1,Math.min(3,parseInt(level)||1));
@@ -653,6 +653,9 @@ window.addEventListener('message', e=>{
   document.getElementById('ui-header').classList.add('on');
   const leaveBtn=document.querySelector('#ui-header .btn-ghost');
   if(leaveBtn) leaveBtn.style.display='none';
+
+  // ★ 重連時從上次分數繼續（rejoinScore > 0 才覆蓋）
+  if (rejoinScore > 0 && score === 0) score = rejoinScore;
 
   // 先顯示該 Part 規則頁，學生確認後才開始
   w7ShowRules(part, () => {

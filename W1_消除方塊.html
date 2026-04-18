@@ -471,7 +471,8 @@ function startGame(lvl) {
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('ui-header').classList.remove('hidden');
     state.active = true;
-    state.score = 0;
+    // 平台模式重連時 score 已由 PLATFORM_START 設好，不在這裡歸零
+    if (!window.IS_PLATFORM || state.score === undefined) state.score = 0;
     state.spawnCount = 0;
     resize();
     setupLevel(lvl);
@@ -874,6 +875,8 @@ window.addEventListener('message', (e) => {
         case 'PLATFORM_START':
             if (e.data.group) window.GROUP_ID = e.data.group;
             window.IS_PLATFORM = true;
+            // ★ 重連時從上次分數繼續（而非歸零）
+            if (e.data.rejoinScore > 0) state.score = e.data.rejoinScore;
             startGame(e.data.level || 1);
             break;
         case 'PLATFORM_PAUSE':
