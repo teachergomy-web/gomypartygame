@@ -91,12 +91,30 @@ body::before {
 /* 深色全螢幕畫面：align-items stretch，不留邊距，不允許捲動 */
 #screen-lobby.active, #screen-student-wait.active,
 #screen-level-select.active, #screen-teacher-console.active,
-#screen-settlement.active, #screen-student-game.active {
+#screen-settlement.active, #screen-student-game.active,
+#screen-student-rules.active {
     align-items: stretch; padding: 0; overflow: hidden;
     top: 0 !important; left: 0 !important;
     width: 100% !important; height: 100% !important;
     height: 100dvh !important;
 }
+
+/* 規則覆蓋層：用 JS 直接操作 display（最可靠，避免 class/!important 在各平板 WebKit 的歧異）*/
+#rules-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%; height: 100%; height: 100dvh;
+    z-index: 800;
+    background: #080a14;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+/* .active 只作備援標記，實際 display 由 JS showRulesOverlay/hideRulesOverlay 直接設定 */
+#rules-overlay.active { display: flex; }
 
 /* 排行榜項目 */
 .tc-lb-item {
@@ -649,37 +667,42 @@ body::before {
      老師端規則覆蓋層：全屏 fixed，疊在 level-select 上
      老師按「全班開始！」時顯示，確認後才真正 tcStartGame
      ════════════════════════════════════════ -->
-<div id="rules-overlay" style="
-  display:none; position:fixed; inset:0; z-index:800;
-  background:#080a14;
-  flex-direction:column; align-items:center;
-  overflow-y:auto; -webkit-overflow-scrolling:touch;">
+<div id="rules-overlay">
 
-  <!-- 頂部 header -->
-  <div style="width:100%;max-width:680px;display:flex;align-items:center;justify-content:space-between;
-    padding:18px 22px 0;flex-shrink:0;position:sticky;top:0;background:#080a14;z-index:10;
-    border-bottom:1px solid rgba(245,200,0,.15);padding-bottom:14px;">
+  <!-- 頂部 header（固定在覆蓋層頂部，不用 sticky 避免 iOS fixed 容器問題）-->
+  <div id="rules-header" style="
+    width:100%;max-width:680px;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 22px 14px;
+    flex-shrink:0;
+    border-bottom:1px solid rgba(245,200,0,.15);
+    background:#080a14;">
     <div>
       <div style="color:rgba(245,200,0,.5);font-family:'Nunito',sans-serif;font-weight:900;font-size:.65rem;letter-spacing:.12em;margin-bottom:3px;">📖 GAME RULES</div>
       <div id="rules-game-title" style="color:#f5c800;font-family:'Nunito',sans-serif;font-weight:900;font-size:1.25rem;">遊戲規則</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <div id="rules-room-code" style="background:rgba(245,200,0,.12);border:2px solid rgba(245,200,0,.35);border-radius:8px;padding:4px 12px;color:#f5c800;font-family:'Fredoka One',sans-serif;font-size:1rem;letter-spacing:.12em;">0000</div>
-      <button onclick="hideRulesOverlay()" style="background:transparent;border:1px solid rgba(255,255,255,.2);border-radius:8px;color:rgba(255,255,255,.45);font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;padding:6px 12px;cursor:pointer;">← 返回</button>
+      <button onclick="hideRulesOverlay()" style="background:transparent;border:1px solid rgba(255,255,255,.2);border-radius:8px;color:rgba(255,255,255,.5);font-family:'Nunito',sans-serif;font-weight:900;font-size:.8rem;padding:6px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;">← 返回</button>
     </div>
   </div>
 
-  <!-- 規則內容 -->
-  <div id="rules-content" style="width:100%;max-width:680px;padding:20px 22px 12px;flex:1;"></div>
+  <!-- 規則內容（可捲動） -->
+  <div id="rules-content" style="width:100%;max-width:680px;padding:20px 22px 12px;flex:1;min-height:0;"></div>
 
-  <!-- 底部開始按鈕 -->
-  <div style="width:100%;max-width:680px;padding:12px 22px 36px;flex-shrink:0;
-    position:sticky;bottom:0;background:linear-gradient(transparent,#080a14 30%);padding-top:24px;">
+  <!-- 底部開始按鈕（固定，不用 sticky）-->
+  <div style="
+    width:100%;max-width:680px;
+    padding:16px 22px 40px;
+    flex-shrink:0;
+    background:#080a14;">
     <button onclick="closeRulesAndStart()" style="
-      width:100%;padding:18px;border-radius:16px;border:none;cursor:pointer;
+      display:block;width:100%;
+      padding:18px;border-radius:16px;border:none;cursor:pointer;
       background:linear-gradient(135deg,#22c040,#169030);color:#fff;
       font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;
-      box-shadow:0 5px 0 #0c4a1a,0 0 24px rgba(34,192,64,.3);">
+      box-shadow:0 5px 0 #0c4a1a;
+      -webkit-tap-highlight-color:transparent;">
       ▶ 關閉規則，全班開始！
     </button>
   </div>
@@ -1765,6 +1788,59 @@ const GAME_RULES = [
   ]},
 ];
 
+// W4 各模式細分規則（按 mode 1/2/3）
+const GAME_RULES_W4 = [
+  // Mode 1：縮圈點擊
+  { icon:'◎', name:'節奏合鳴 — 縮圈點擊', color:'#3498db', sections:[
+    { title:'🎯 目標', body:'圓圈從外往內縮，等縮到最小（最準確的時機）時點擊，越準確分越高！' },
+    { title:'🕹️ 操作', body:'看準圓圈的大小，等它縮到中心點後立刻點擊（或按住畫面）。' },
+    { title:'⭐ 評級', items:['PERFECT（誤差 < 50ms）：最高分', 'GREAT（誤差 < 120ms）：高分', 'OK（誤差 < 250ms）：基礎分', 'MISS / 太早太晚：0 分，Combo 中斷'] },
+    { title:'🔥 Combo', body:'連續命中累積 Combo，倍率可達 2x！Miss 一次就歸零。' },
+    { title:'📈 難度', body:'共 10 關，越往後圓圈越多、縮得越快，判定視窗越窄。' },
+  ]},
+  // Mode 2：鋼琴黑塊
+  { icon:'▬', name:'節奏合鳴 — 鋼琴黑塊', color:'#9b59b6', sections:[
+    { title:'🎯 目標', body:'從上方落下的黑色方塊，在滑到底線時點擊！不要碰到白色方塊，也不要錯過黑塊。' },
+    { title:'🕹️ 操作', body:'用手指點擊黑色方塊（可同時多指點擊）。黑塊滑到底線時點擊分數最高。' },
+    { title:'⚠️ 規則', items:['點到白色方塊 → 立刻失敗', '錯過黑色方塊 → 扣分、Combo 中斷', '在黑塊完整落入底線前點擊分數最佳'] },
+    { title:'🔥 Combo', body:'連續命中累積 Combo 倍率！失誤歸零。' },
+    { title:'📈 難度', body:'共 10 關，越往後速度越快、黑塊排列越複雜。' },
+  ]},
+  // Mode 3：底線軌道
+  { icon:'↓', name:'節奏合鳴 — 底線軌道', color:'#e67e22', sections:[
+    { title:'🎯 目標', body:'音符從上方滑入底線判定軌道，在音符進入時按住、音符離開時放開！' },
+    { title:'🕹️ 操作', body:'音符碰到底線時按住螢幕，音符滑過後放開。長音符需要一直按住直到結束。' },
+    { title:'⭐ 評級', items:['按住整個音符過程：PERFECT（最高分）', '太晚按 / 太早放：GOOD（部分分）', '完全錯過：MISS（Combo 中斷）'] },
+    { title:'🔥 Combo', body:'連續完美命中可累積 Combo 倍率。' },
+    { title:'📈 難度', body:'共 10 關，越往後軌道數量增加、長短音符混搭更複雜。' },
+  ]},
+];
+
+// W7 各 Part 細分規則（按 part 1/2/3）
+const GAME_RULES_W7 = [
+  // Part 1：記憶翻牌
+  { icon:'🃏', name:'記憶力大考驗 — 記憶翻牌', color:'#a78bfa', sections:[
+    { title:'🎯 目標', body:'記住所有牌的位置，翻開找出所有配對！' },
+    { title:'📋 流程', items:['牌面全部翻開，記住每張牌的圖案位置（倒數計時）','倒數結束後所有牌蓋起','翻開任一張牌，再翻一張看是否配對','配對成功：兩張牌留在翻開狀態','配對失敗：兩張牌翻回蓋起，繼續找'] },
+    { title:'✅ 過關條件', body:'找出所有配對即過關！速度越快，時間分越高。' },
+    { title:'📈 難度', body:'LV 1–10，牌數從 12 張到 30 張，Emoji 越來越相似！' },
+  ]},
+  // Part 2：動果大遊行
+  { icon:'🎪', name:'記憶力大考驗 — 動果大遊行', color:'#f59e0b', sections:[
+    { title:'🎯 目標', body:'記住一串動物/水果圖案出場的順序，結束後依序還原！' },
+    { title:'📋 流程', items:['觀看圖案一個個從右側跑進畫面（出場順序就是答案）','全部出場後進入作答模式','從選項格中依序點選每個圖案，還原出場順序','點錯可用「重填」清空重來','確認後送出'] },
+    { title:'✅ 過關條件', body:'完全還原正確順序即滿分過關！部分正確依比例給分。' },
+    { title:'📈 難度', body:'LV 1–10，物品從 4 個增加到 12 個。' },
+  ]},
+  // Part 3：金庫解碼
+  { icon:'🔐', name:'記憶力大考驗 — 金庫解碼', color:'#34d399', sections:[
+    { title:'🎯 目標', body:'記住轉盤的方向和次數，按照完全相同的順序操作，打開金庫！' },
+    { title:'📋 流程', items:['觀看畫面上的指令序列（例：← 3、→ 2、← 1）','觀察完後，指令消失，進入操作模式','按 ⬅ 或 ➡ 轉動旋鈕，每按一次轉一格','轉完一個指令後按 OK 確認，繼續下一個','全部指令正確 → 金庫解鎖！'] },
+    { title:'⚠️ 注意', body:'方向和次數都必須完全正確！轉錯方向或次數不符都算失敗，需重試。' },
+    { title:'📈 難度', body:'LV 1–10，指令從 3 組增加到 10 組，旋轉次數也越來越多。' },
+  ]},
+];
+
 // ── 共用規則 HTML 渲染函式 ──
 function renderRulesHTML(ruleData) {
   if (!ruleData) return '';
@@ -1797,19 +1873,26 @@ function renderRulesHTML(ruleData) {
 // ── 老師端：顯示規則覆蓋層 ──
 function showRulesOverlay() {
   const gIdx = window.state.selectedGame || 0;
-  const rule  = GAME_RULES[gIdx];
+
+  // W4：依照已選模式顯示對應規則
+  // W7：依照已選 Part 顯示對應規則
+  const rule = _getRuleForCurrentSelection(gIdx);
 
   const overlay   = document.getElementById('rules-overlay');
   const titleEl   = document.getElementById('rules-game-title');
   const codeEl    = document.getElementById('rules-room-code');
   const contentEl = document.getElementById('rules-content');
-  if (!overlay) { tcStartGame(); return; } // 防衛：無 DOM 直接開始
+  if (!overlay) { tcStartGame(); return; }
 
-  if (titleEl)   titleEl.textContent   = rule ? `${rule.icon} ${rule.name}` : '遊戲規則';
-  if (codeEl)    codeEl.textContent    = window.state.roomCode || '0000';
-  if (contentEl) contentEl.innerHTML   = renderRulesHTML(rule);
+  if (titleEl)   titleEl.textContent = rule ? `${rule.icon} ${rule.name}` : '遊戲規則';
+  if (codeEl)    codeEl.textContent  = window.state.roomCode || '0000';
+  if (contentEl) contentEl.innerHTML = renderRulesHTML(rule);
+
+  // 直接設定 display:flex（最可靠，避免 class 在各平板 WebKit 的歧異）
   overlay.style.display = 'flex';
-  overlay.scrollTop = 0;
+  overlay.classList.add('active'); // 同步 class 供 CSS 備援
+  // 捲回頂部
+  setTimeout(() => { overlay.scrollTop = 0; }, 0);
 
   // ★ 寫 Firebase：讓學生端同步跳規則頁
   const rooms = window.getRooms();
@@ -1817,15 +1900,30 @@ function showRulesOverlay() {
   if (r) {
     r.status    = 'rules';
     r.rulesGame = gIdx;
+    // 同時存 W4 模式 / W7 Part，讓學生端顯示正確的規則
+    if (gIdx === 3) r.rulesW4Mode = lsW4SelectedMode || 1;
+    if (gIdx === 6) r.rulesW7Part = _w7SelectedPart  || 1;
     window.saveRooms(rooms);
   }
+}
+
+// ── 根據當前選擇取得對應規則資料 ──
+function _getRuleForCurrentSelection(gIdx) {
+  if (gIdx === 3 && lsW4SelectedMode > 0) {
+    // W4：依選擇的模式返回對應規則
+    return GAME_RULES_W4[lsW4SelectedMode - 1] || GAME_RULES[3];
+  }
+  if (gIdx === 6 && _w7SelectedPart > 0) {
+    // W7：依選擇的 Part 返回對應規則
+    return GAME_RULES_W7[_w7SelectedPart - 1] || GAME_RULES[6];
+  }
+  return GAME_RULES[gIdx];
 }
 
 // ── 老師端：返回按鈕（取消，不開始）──
 function hideRulesOverlay() {
   const overlay = document.getElementById('rules-overlay');
-  if (overlay) overlay.style.display = 'none';
-  // 把 status 改回 level_select，讓學生回到等待畫面
+  if (overlay) { overlay.style.display = 'none'; overlay.classList.remove('active'); }
   const rooms = window.getRooms();
   const r = rooms[window.state.roomCode];
   if (r && r.status === 'rules') {
@@ -1837,15 +1935,22 @@ function hideRulesOverlay() {
 // ── 老師端：關閉規則 → 真正開始遊戲 ──
 function closeRulesAndStart() {
   const overlay = document.getElementById('rules-overlay');
-  if (overlay) overlay.style.display = 'none';
-  tcStartGame(); // 內部會把 status 改成 playing
+  if (overlay) { overlay.style.display = 'none'; overlay.classList.remove('active'); }
+  tcStartGame();
 }
 
 // ── 學生端：渲染規則頁內容 ──
-function showStudentRules(gIdx, roomCode) {
-  const rule    = GAME_RULES[gIdx] || GAME_RULES[0];
-  const titleEl = document.getElementById('srul-game-title');
-  const codeEl  = document.getElementById('srul-code');
+function showStudentRules(gIdx, roomCode, w4Mode, w7Part) {
+  let rule;
+  if (gIdx === 3 && w4Mode > 0) {
+    rule = GAME_RULES_W4[w4Mode - 1] || GAME_RULES[3];
+  } else if (gIdx === 6 && w7Part > 0) {
+    rule = GAME_RULES_W7[w7Part - 1] || GAME_RULES[6];
+  } else {
+    rule = GAME_RULES[gIdx] || GAME_RULES[0];
+  }
+  const titleEl   = document.getElementById('srul-game-title');
+  const codeEl    = document.getElementById('srul-code');
   const contentEl = document.getElementById('srul-content');
   if (titleEl)   titleEl.textContent = `${rule.icon} ${rule.name}`;
   if (codeEl)    codeEl.textContent  = roomCode || '0000';
@@ -2510,6 +2615,7 @@ function exitToLobby() {
     const rulesOverlay = document.getElementById('rules-overlay');
     if (rulesOverlay && rulesOverlay.style.display !== 'none') {
         rulesOverlay.style.display = 'none';
+        rulesOverlay.classList.remove('active');
         const rooms = window.getRooms();
         const r = rooms[window.state.roomCode];
         if (r && r.status === 'rules') { r.status = 'level_select'; window.saveRooms(rooms); }
@@ -2827,8 +2933,10 @@ setInterval(() => {
 
     // 偵測老師開啟規則頁 → 學生同步顯示規則
     if (r.status === 'rules') {
-      const gIdx = (r.rulesGame !== undefined) ? r.rulesGame : (r.selectedGame || 0);
-      showStudentRules(gIdx, window.state.roomCode);
+      const gIdx   = (r.rulesGame  !== undefined) ? r.rulesGame  : (r.selectedGame || 0);
+      const w4Mode = (r.rulesW4Mode !== undefined) ? r.rulesW4Mode : 0;
+      const w7Part = (r.rulesW7Part !== undefined) ? r.rulesW7Part : 0;
+      showStudentRules(gIdx, window.state.roomCode, w4Mode, w7Part);
       if (pData.screen !== 'screen-student-rules') {
         pData.screen = 'screen-student-rules';
         window.goTo('screen-student-rules');
@@ -3877,6 +3985,105 @@ document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') requestWakeLock();
 });
 requestWakeLock();
+
+// ══════════════════════════════════════════════════════════
+// 頁面關閉/離開時自動從房間移除（防止佔位）
+// 
+// 重要說明：
+//   - pagehide/beforeunload 時，瀏覽器隨時可能中止非同步 JS
+//   - localStorage 寫入是同步的，能在 pagehide 中可靠完成
+//   - Firebase 非同步寫入可能被中止，用 sendBeacon 作備援
+//   - tryRestoreSession 重連時也會主動清理，作為雙重保障
+// ══════════════════════════════════════════════════════════
+function _handlePageLeave() {
+    const p = window.state && window.state.perspective;
+    const roomCode = window.state && window.state.roomCode;
+    if (!roomCode) return;
+
+    // 直接操作 localStorage（同步，pagehide 中最可靠）
+    try {
+        const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        const r = local[roomCode];
+        if (!r) return;
+
+        if (p === 'teacher') {
+            r.teacherOffline = true;
+        } else {
+            const pData = window.pStates && window.pStates[p];
+            const myGroup = pData && pData.group;
+            if (myGroup) {
+                r.players = (r.players || []).filter(pl => pl.group !== myGroup);
+                r.playerCount = r.players.length;
+            }
+        }
+
+        // 同步寫回 localStorage
+        localStorage.setItem('playroom_rooms', JSON.stringify(local));
+
+        // 同步更新記憶體快取
+        if (window._allRoomsCache) window._allRoomsCache[roomCode] = r;
+
+        // Firebase 非同步寫入（盡力嘗試，可能被中止）
+        if (isFirebase && db && isFirebaseAuthComplete && fsSet && fsDoc) {
+            fsSet(fsDoc(db, 'rooms', roomCode), r).catch(() => {});
+        }
+
+        // sendBeacon 備援：部分瀏覽器支援在 pagehide 後繼續傳送小型請求
+        // 這裡用 localStorage 傳遞參數，讓下次頁面載入時能讀取並清理
+        if (p !== 'teacher') {
+            const pData = window.pStates && window.pStates[p];
+            const myGroup = pData && pData.group;
+            if (myGroup) {
+                const pendingClean = JSON.parse(localStorage.getItem('_pendingGroupClean') || '[]');
+                pendingClean.push({ roomCode, group: myGroup, ts: Date.now() });
+                localStorage.setItem('_pendingGroupClean', JSON.stringify(pendingClean));
+            }
+        }
+    } catch (e) {
+        // pagehide 中不能 console.error（會被忽略），靜默失敗
+    }
+}
+
+window.addEventListener('pagehide',      _handlePageLeave);
+window.addEventListener('beforeunload',  _handlePageLeave);
+
+// ── 頁面載入時：清理上次異常離開留下的待清項目 ──
+(function _cleanupPendingGroups() {
+    try {
+        const pendingClean = JSON.parse(localStorage.getItem('_pendingGroupClean') || '[]');
+        if (!pendingClean.length) return;
+
+        // 過濾掉超過 2 小時的舊記錄
+        const fresh = pendingClean.filter(item => Date.now() - item.ts < 2 * 60 * 60 * 1000);
+        localStorage.setItem('_pendingGroupClean', JSON.stringify([])); // 清空，避免重複處理
+
+        // 嘗試從 localStorage 的房間資料中清除這些群組
+        const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        let changed = false;
+        fresh.forEach(({ roomCode, group }) => {
+            const r = local[roomCode];
+            if (!r || !r.open) return;
+            // 若該 group 仍在 players 中，且沒有 persistent session（代表真的離開了）
+            const hasPersistent = (() => {
+                try {
+                    const s = JSON.parse(localStorage.getItem('game_session_persistent') || 'null');
+                    return s && s.roomCode === roomCode && s.group === group;
+                } catch { return false; }
+            })();
+            if (!hasPersistent) {
+                const before = (r.players || []).length;
+                r.players = (r.players || []).filter(pl => pl.group !== group);
+                r.playerCount = r.players.length;
+                if (r.players.length < before) changed = true;
+            }
+        });
+        if (changed) {
+            localStorage.setItem('playroom_rooms', JSON.stringify(local));
+            // Firebase 同步（頁面剛載入，JS 環境完整，非同步可靠）
+            // 等 Firebase 連線後再寫（透過 tryRestoreSession 流程自然同步）
+        }
+    } catch (e) {}
+})();
 
 // ==========================================
 // 綁定全域函數
