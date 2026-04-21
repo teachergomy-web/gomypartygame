@@ -3441,9 +3441,20 @@ function joinRoom() {
           }
           if (players.length >= 5) throw new Error('房間已滿');
 
-          players.push({ group: groupName, symbol });
-          tx.update(ref, { players, playerCount: players.length });
-          return players;
+         players.push({ group: groupName, symbol });
+
+         // 準備要更新的資料
+         const updates = { players, playerCount: players.length };
+
+         // 🌟 修正點：清除該組的 kicked 紀錄，避免學生端收到快照後又被輪詢機制誤踢
+         if (room.kicked && room.kicked[groupName]) {
+             const newKicked = { ...room.kicked };
+            delete newKicked[groupName];
+             updates.kicked = newKicked;
+}
+
+         tx.update(ref, updates);
+         return players;
       }).then((players) => {
           window._joinRetry = 0;
           window.state.players      = players;
@@ -3492,12 +3503,18 @@ function joinRoom() {
       restoreBtn(); window.showToast('⚠️ 符號已被使用'); return;
   }
   if (!latestPlayers.some(p => p.group === groupName)) {
-      if (latestPlayers.length >= 5) { restoreBtn(); window.showToast('⚠️ 房間已滿'); return; }
-      latestPlayers.push({ group: groupName, symbol });
-      rooms[roomCode].players = latestPlayers;
-      rooms[roomCode].playerCount = latestPlayers.length;
-      window.saveRooms(rooms);
-  }
+    if (latestPlayers.length >= 5) { restoreBtn(); window.showToast('⚠️ 房間已滿'); return; }
+    latestPlayers.push({ group: groupName, symbol });
+    rooms[roomCode].players = latestPlayers;
+    rooms[roomCode].playerCount = latestPlayers.length;
+    
+    // 🌟 修正點：清除本機快取的 kicked 紀錄
+    if (rooms[roomCode].kicked && rooms[roomCode].kicked[groupName]) {
+        delete rooms[roomCode].kicked[groupName];
+    }
+    
+    window.saveRooms(rooms);
+}
   window.state.players      = latestPlayers;
   window.state.takenSymbols = latestPlayers.map(p => p.symbol);
   window.state.takenGroups  = latestPlayers.map(p => p.group);
