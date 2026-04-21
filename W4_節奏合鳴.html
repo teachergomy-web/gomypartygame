@@ -407,29 +407,6 @@
             border-radius: 0 2px 2px 0;
         }
 
-        /* 放棄按鈕 */
-        .quit-btn {
-            position: absolute;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 8px;
-            padding: 7px 14px;
-            font-family: 'Orbitron', monospace;
-            font-size: 9px;
-            letter-spacing: 1px;
-            color: rgba(255,255,255,0.5);
-            cursor: pointer;
-            transition: all 0.2s;
-            top: 50%; transform: translateY(-50%);
-            right: 120px;
-        }
-        .quit-btn:hover {
-            background: rgba(231,76,60,0.2);
-            border-color: rgba(231,76,60,0.5);
-            color: #e74c3c;
-        }
-        .quit-btn:active { transform: translateY(-50%) scale(0.95); }
-
         /* ── COMBO POPUP ── */
         #combo-pop {
             position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
@@ -573,7 +550,6 @@
 </head>
 <body>
 
-<!-- ════ 主選單 ════ -->
 <div id="main-menu" class="overlay">
     <div class="menu-logo-wrap">
         <div class="menu-subtitle">WEEKLY CHALLENGE · W4</div>
@@ -609,7 +585,6 @@
     </div>
 </div>
 
-<!-- ════ 關卡選擇 ════ -->
 <div id="level-menu" class="overlay hidden">
     <div class="modal-box">
         <div class="modal-header">
@@ -622,26 +597,22 @@
     </div>
 </div>
 
-<!-- ════ 遊戲介面 ════ -->
 <div id="game-ui" class="hidden">
     <div id="canvas-container">
         <canvas id="gameCanvas"></canvas>
     </div>
 
     <div id="game-header">
-        <!-- 分數 -->
         <div class="hud-score-wrap">
             <div class="hud-label">SCORE</div>
             <div class="hud-score" id="cur-score">0</div>
         </div>
 
-        <!-- 中央 -->
         <div class="hud-center">
             <div class="hud-level-badge">LV <span id="cur-lvl">1</span></div>
             <div id="combo-badge"></div>
         </div>
 
-        <!-- 時間 -->
         <div class="hud-time-wrap">
             <div class="hud-label">TIME</div>
             <div class="hud-timer" id="timer">2:00</div>
@@ -650,12 +621,9 @@
         <div id="time-progress-bar" style="width:100%"></div>
     </div>
 
-
-
     <div id="combo-pop">0 COMBO</div>
 </div>
 
-<!-- ════ 暫停遮幕 ════ -->
 <div id="pause-overlay" class="hidden" style="position:absolute;inset:0;background:rgba(6,10,16,0.88);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
     <div style="font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(32px,8vw,56px);color:#f1c40f;letter-spacing:4px;text-shadow:0 0 30px rgba(241,196,15,0.6);margin-bottom:12px">PAUSED</div>
     <div style="font-family:'Press Start 2P',monospace;font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:3px">等待老師繼續...</div>
@@ -666,7 +634,6 @@
     </div>
 </div>
 
-<!-- ════ 倒數遮幕 ════ -->
 <div id="countdown-overlay" class="hidden" style="position:absolute;inset:0;background:rgba(6,10,16,0.75);z-index:201;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div id="countdown-num" style="font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(80px,20vw,140px);color:#00f5ff;text-shadow:0 0 40px rgba(0,245,255,0.8);line-height:1;animation:countPulse .6s ease-in-out">3</div>
 </div>
@@ -674,7 +641,6 @@
 @keyframes countPulse { 0%{transform:scale(1.4);opacity:0.5} 100%{transform:scale(1);opacity:1} }
 </style>
 
-<!-- ════ 結算畫面 ════ -->
 <div id="result-screen" class="overlay hidden">
     <div class="result-box">
         <div class="result-title">TIME UP!</div>
@@ -700,7 +666,6 @@
     </div>
 </div>
 
-<!-- ════ W4 學生端規則覆蓋層（平台模式下，PLATFORM_START 後先顯示規則）════ -->
 <div id="w4-rules-overlay" style="
   display:none; position:fixed; inset:0; z-index:900;
   background:#080a14;
@@ -722,7 +687,6 @@
   </div>
 </div>
 
-<!-- ════ 學生等待畫面（平台模式）════ -->
 <div id="platform-wait" class="overlay hidden" style="background:radial-gradient(ellipse at center,rgba(0,30,50,0.97),rgba(6,10,16,0.99))">
     <div style="text-align:center;padding:32px 24px;max-width:400px">
         <div style="font-size:3.5rem;animation:heroPulse 2s ease-in-out infinite;display:block;margin-bottom:16px">🎵</div>
@@ -751,6 +715,8 @@
     // ── 平台橋接：前置宣告（實際初始化在 script 底部）──
     var isPlatform    = new URLSearchParams(location.search).get('student') === '1';
     var platformGroup = new URLSearchParams(location.search).get('group') || '';
+    window._platformStarted = false; // 用來標記是否已經收到 PLATFORM_START
+
     function reportScore(isFinal) { /* 由底部橋接層覆寫 */ }
 
     let gameState = {
@@ -760,7 +726,7 @@
         entities: [], spawnTimer: 0
     };
 
-// 🌟 新增：用來記錄平台模式下的跨關卡累計分數
+    // 🌟 用來記錄平台模式下的跨關卡累計分數
     let accumulatedScore = 0;
 
     const COLORS = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f'];
@@ -794,6 +760,7 @@
 
     function startGame(level) {
         gameState.level = level;
+        // 🌟 平台模式從累計分數開始接續
         gameState.score = isPlatform ? accumulatedScore : 0; 
         
         gameState.combo = 0;
@@ -801,7 +768,7 @@
 
         document.getElementById('level-menu').classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
-        document.getElementById('cur-score').innerText = "0";
+        document.getElementById('cur-score').innerText = gameState.score;
         document.getElementById('cur-lvl').innerText = level;
         document.getElementById('combo-badge').style.opacity = '0';
         document.getElementById('time-progress-bar').style.width = '100%';
@@ -957,6 +924,10 @@
 
         // 時間
         gameState.timeLeft -= dt / 1000;
+        
+        // ==========================
+        // ⏳ 倒數結束結算區塊
+        // ==========================
         if (gameState.timeLeft <= 0) {
             gameState.active = false;
             stopBGM();
@@ -965,31 +936,70 @@
             document.getElementById('final-combo').innerText = gameState.maxCombo;
             document.getElementById('final-level').innerText = gameState.level;
 
-            // 平台模式：調整結算按鈕文字 + 上報分數
+            // 平台模式：調整結算按鈕文字與邏輯
             if (isPlatform) {
                 accumulatedScore = gameState.score; // 🌟 儲存目前累計總分
 
                 const btn = document.getElementById('result-action-btn');
-                const nextModes = { 1: "鋼琴黑塊", 2: "底線軌道", 3: "結算總成績" };
-                const nextText = nextModes[gameState.mode] || "結算總成績";
 
                 if (btn) {
-                    if (gameState.mode < 3) {
-                        btn.innerHTML = `<span style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:1px">等待老師同步開啟</span><br/><span style="font-size:15px;color:var(--gold);line-height:2">▶ 下一玩法：${nextText}</span>`;
+                    // 🌟 移除 HTML 上自帶的 onclick 屬性，避免誤觸發 quitGame() 回到模式選單
+                    btn.removeAttribute('onclick');
+
+                    // 如果是 LV10，且還不是最後一個玩法
+                    if (gameState.level === 10 && gameState.mode < 3) {
+                        const nextModes = { 1: "鋼琴黑塊", 2: "底線軌道" };
+                        const nextText = nextModes[gameState.mode];
+                        
+                        btn.innerHTML = `<span style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:1px">點擊準備進入下一階段</span><br/><span style="font-size:15px;color:var(--gold);line-height:2">▶ 下一玩法：${nextText}</span>`;
+                        btn.style.cursor = 'pointer';
+                        
+                        // 恢復按鈕原本的外觀
+                        btn.style.background = 'linear-gradient(135deg, rgba(0,245,255,0.15), rgba(0,245,255,0.05))';
+                        btn.style.borderColor = 'rgba(0,245,255,0.4)';
+                        btn.style.color = 'var(--cyan)';
+                        btn.style.boxShadow = '';
+                        btn.style.opacity = '1';
+
+                        // 重新綁定 JS 點擊事件：顯示下一個玩法的規則頁
+                        btn.onclick = function(e) {
+                            e.preventDefault();
+                            document.getElementById('result-screen').classList.add('hidden');
+                            
+                            const nextMode = gameState.mode + 1;
+                            // 顯示下一玩法的規則
+                            w4ShowRules(nextMode, () => {
+                                // 學生看完規則點擊「了解規則」，記錄起來，然後顯示等待畫面
+                                sessionStorage.setItem('w4_rules_seen_mode_' + nextMode, 'true');
+                                document.getElementById('platform-wait').classList.remove('hidden');
+                                const msg = document.getElementById('pw-status-msg');
+                                if (msg) msg.textContent = '✅ 已準備就緒！等待老師啟動...';
+                            });
+                        };
+
                     } else {
-                        btn.innerHTML = '⏳ 所有玩法結束！等待老師結算...';
+                        // 如果是 LV1 ~ LV9，或者是最後一玩法的 LV10
+                        if (gameState.level === 10 && gameState.mode === 3) {
+                            btn.innerHTML = '⏳ 所有玩法結束！等待老師結算...';
+                        } else {
+                            btn.innerHTML = '⏳ 等待老師開啟下一關...';
+                        }
+                        
+                        // 鎖定按鈕為純提示文字
+                        btn.style.cursor = 'default';
+                        btn.onclick = null;
+                        btn.style.background = 'rgba(255,255,255,0.05)';
+                        btn.style.borderColor = 'rgba(255,255,255,0.2)';
+                        btn.style.color = '#fff';
+                        btn.style.boxShadow = 'none';
+                        btn.style.transform = 'none';
+                        btn.style.opacity = '1';
                     }
-                    // 改變按鈕外觀，變成純提示文字
-                    btn.style.cursor = 'default';
-                    btn.onclick = null;
-                    btn.style.background = 'rgba(255,255,255,0.05)';
-                    btn.style.borderColor = 'rgba(255,255,255,0.2)';
-                    btn.style.color = '#fff';
-                    btn.style.boxShadow = 'none';
-                    btn.style.transform = 'none';
-                    btn.style.opacity = '1';
                 }
             }
+            reportScore(true);
+            return;
+        }
 
         // 時間進度條
         const pct = (gameState.timeLeft / 120) * 100;
@@ -1256,52 +1266,20 @@
     // ══════════════════════════════════
     // 🎼 SEQUENCER — 完整 2 分鐘樂曲
     // ══════════════════════════════════
-    // 每個 mode 有獨立的樂曲段落，分成 A/B/C/D 四段循環
-    // 每段 8 拍（=32 個16分音符），4 段 = 32 拍 ≈ 16秒（BPM=120）
-    // 2分鐘 = 120拍 ≈ 7.5 個循環
-
-    // 所有旋律均為 16 步序列（16分音符）
-    // null = 休止符，[音高, 時值倍數] 其中時值=16分音符倍數
-
     const SONGS = {
-        // ── Mode 1: C大調輕快電子流行 ──
         1: {
             bpm: 120,
             melody: [
-                // Phrase A (小星星變奏)
-                [NOTE.C4,NOTE.C4,NOTE.G4,NOTE.G4, NOTE.A4,NOTE.A4,NOTE.G4,null,
-                 NOTE.F4,NOTE.F4,NOTE.E4,NOTE.E4, NOTE.D4,NOTE.D4,NOTE.C4,null],
-                // Phrase B (往上爬)
-                [NOTE.E4,null,NOTE.G4,null,        NOTE.A4,NOTE.B4,NOTE.C5,null,
-                 NOTE.B4,null,NOTE.A4,null,        NOTE.G4,null,NOTE.E4,null],
-                // Phrase C (活潑跳音)
-                [NOTE.C5,NOTE.B4,NOTE.A4,NOTE.G4, NOTE.F4,NOTE.E4,NOTE.D4,NOTE.C4,
-                 NOTE.E4,NOTE.G4,NOTE.E4,NOTE.G4, NOTE.A4,null,NOTE.G4,null],
-                // Phrase D (回到C)
-                [NOTE.G4,NOTE.G4,NOTE.F4,NOTE.E4, NOTE.F4,NOTE.E4,NOTE.D4,null,
-                 NOTE.E4,NOTE.G4,NOTE.C4,null,    NOTE.G4,NOTE.E4,NOTE.C4,null],
+                [NOTE.C4,NOTE.C4,NOTE.G4,NOTE.G4, NOTE.A4,NOTE.A4,NOTE.G4,null, NOTE.F4,NOTE.F4,NOTE.E4,NOTE.E4, NOTE.D4,NOTE.D4,NOTE.C4,null],
+                [NOTE.E4,null,NOTE.G4,null,        NOTE.A4,NOTE.B4,NOTE.C5,null, NOTE.B4,null,NOTE.A4,null,        NOTE.G4,null,NOTE.E4,null],
+                [NOTE.C5,NOTE.B4,NOTE.A4,NOTE.G4, NOTE.F4,NOTE.E4,NOTE.D4,NOTE.C4, NOTE.E4,NOTE.G4,NOTE.E4,NOTE.G4, NOTE.A4,null,NOTE.G4,null],
+                [NOTE.G4,NOTE.G4,NOTE.F4,NOTE.E4, NOTE.F4,NOTE.E4,NOTE.D4,null, NOTE.E4,NOTE.G4,NOTE.C4,null,    NOTE.G4,NOTE.E4,NOTE.C4,null],
             ],
             chords: [
-                // A: C - G - Am - F
-                [[NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null],
-                // B: Am - F - C - G
-                [[NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null],
-                // C: F - G - Am - C
-                [[NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null,
-                 [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null],
-                // D: C - Am - F - G
-                [[NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null,
-                 [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null,
-                 [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null],
+                [[NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null],
+                [[NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null],
+                [[NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null],
+                [[NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null],
             ],
             drums: {
                 kick:  [1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0],
@@ -1310,37 +1288,19 @@
                 openHH:[0,0,0,0,0,0,0,1, 0,0,0,0,0,0,0,1],
             }
         },
-
-        // ── Mode 2: A小調鋼琴爵士 ──
         2: {
             bpm: 108,
             melody: [
-                [NOTE.A4,null,NOTE.C5,null,        NOTE.E5,null,NOTE.D5,NOTE.C5,
-                 NOTE.B4,null,NOTE.A4,null,        NOTE.G4,NOTE.F4,NOTE.E4,null],
-                [NOTE.E4,NOTE.G4,NOTE.A4,NOTE.B4, NOTE.C5,null,NOTE.B4,NOTE.A4,
-                 NOTE.G4,NOTE.E4,NOTE.G4,null,    NOTE.A4,null,null,null],
-                [NOTE.C5,NOTE.B4,NOTE.A4,NOTE.G4, NOTE.F4,NOTE.E4,NOTE.F4,NOTE.G4,
-                 NOTE.A4,NOTE.G4,NOTE.F4,NOTE.E4, NOTE.D4,NOTE.E4,NOTE.F4,null],
-                [NOTE.A4,null,NOTE.E4,null,        NOTE.F4,NOTE.G4,NOTE.A4,NOTE.B4,
-                 NOTE.C5,NOTE.B4,NOTE.A4,null,    NOTE.E4,null,NOTE.A3,null],
+                [NOTE.A4,null,NOTE.C5,null,        NOTE.E5,null,NOTE.D5,NOTE.C5, NOTE.B4,null,NOTE.A4,null,        NOTE.G4,NOTE.F4,NOTE.E4,null],
+                [NOTE.E4,NOTE.G4,NOTE.A4,NOTE.B4, NOTE.C5,null,NOTE.B4,NOTE.A4, NOTE.G4,NOTE.E4,NOTE.G4,null,    NOTE.A4,null,null,null],
+                [NOTE.C5,NOTE.B4,NOTE.A4,NOTE.G4, NOTE.F4,NOTE.E4,NOTE.F4,NOTE.G4, NOTE.A4,NOTE.G4,NOTE.F4,NOTE.E4, NOTE.D4,NOTE.E4,NOTE.F4,null],
+                [NOTE.A4,null,NOTE.E4,null,        NOTE.F4,NOTE.G4,NOTE.A4,NOTE.B4, NOTE.C5,NOTE.B4,NOTE.A4,null,    NOTE.E4,null,NOTE.A3,null],
             ],
             chords: [
-                [[NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null,
-                 [NOTE.D3,NOTE.F3,NOTE.A3], null, [NOTE.D3,NOTE.F3,NOTE.A3], null,
-                 [NOTE.E3,NOTE.G3,NOTE.B3], null, [NOTE.E3,NOTE.G3,NOTE.B3], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null],
-                [[NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null,
-                 [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null,
-                 [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null],
-                [[NOTE.D3,NOTE.F3,NOTE.A3], null, [NOTE.D3,NOTE.F3,NOTE.A3], null,
-                 [NOTE.E3,NOTE.G3,NOTE.B3], null, [NOTE.E3,NOTE.G3,NOTE.B3], null,
-                 [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null,
-                 [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null],
-                [[NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null,
-                 [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null,
-                 [NOTE.A2,NOTE.E3,NOTE.A3], null, [NOTE.A2,NOTE.E3,NOTE.A3], null],
+                [[NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.D3,NOTE.F3,NOTE.A3], null, [NOTE.D3,NOTE.F3,NOTE.A3], null, [NOTE.E3,NOTE.G3,NOTE.B3], null, [NOTE.E3,NOTE.G3,NOTE.B3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null],
+                [[NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null],
+                [[NOTE.D3,NOTE.F3,NOTE.A3], null, [NOTE.D3,NOTE.F3,NOTE.A3], null, [NOTE.E3,NOTE.G3,NOTE.B3], null, [NOTE.E3,NOTE.G3,NOTE.B3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null],
+                [[NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.A2,NOTE.C3,NOTE.E3], null, [NOTE.F2,NOTE.A2,NOTE.C3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.A2,NOTE.E3,NOTE.A3], null, [NOTE.A2,NOTE.E3,NOTE.A3], null],
             ],
             drums: {
                 kick:  [1,0,0,0,0,0,1,0, 1,0,0,0,0,0,0,0],
@@ -1349,37 +1309,19 @@
                 openHH:[0,0,0,0,0,0,0,1, 0,0,0,0,0,0,0,0],
             }
         },
-
-        // ── Mode 3: G大調 EDM 電子舞曲 ──
         3: {
             bpm: 138,
             melody: [
-                [NOTE.G4,null,NOTE.B4,null,        NOTE.D5,NOTE.D5,NOTE.B4,null,
-                 NOTE.A4,null,NOTE.G4,null,        NOTE.B4,NOTE.A4,NOTE.G4,null],
-                [NOTE.D5,NOTE.D5,NOTE.E5,NOTE.D5, NOTE.B4,null,NOTE.A4,null,
-                 NOTE.G4,NOTE.B4,NOTE.D5,null,    NOTE.E5,NOTE.D5,NOTE.B4,null],
-                [NOTE.G5,null,NOTE.G5,NOTE.Gb5,   NOTE.E5,null,NOTE.D5,null,
-                 NOTE.B4,NOTE.D5,NOTE.G5,NOTE.D5, NOTE.B4,NOTE.A4,NOTE.G4,null],
-                [NOTE.E5,NOTE.D5,NOTE.B4,NOTE.A4, NOTE.G4,NOTE.A4,NOTE.B4,NOTE.A4,
-                 NOTE.G4,NOTE.B4,NOTE.D5,NOTE.B4, NOTE.G4,null,NOTE.G4,null],
+                [NOTE.G4,null,NOTE.B4,null,        NOTE.D5,NOTE.D5,NOTE.B4,null, NOTE.A4,null,NOTE.G4,null,        NOTE.B4,NOTE.A4,NOTE.G4,null],
+                [NOTE.D5,NOTE.D5,NOTE.E5,NOTE.D5, NOTE.B4,null,NOTE.A4,null, NOTE.G4,NOTE.B4,NOTE.D5,null,    NOTE.E5,NOTE.D5,NOTE.B4,null],
+                [NOTE.G5,null,NOTE.G5,NOTE.Gb5,   NOTE.E5,null,NOTE.D5,null, NOTE.B4,NOTE.D5,NOTE.G5,NOTE.D5, NOTE.B4,NOTE.A4,NOTE.G4,null],
+                [NOTE.E5,NOTE.D5,NOTE.B4,NOTE.A4, NOTE.G4,NOTE.A4,NOTE.B4,NOTE.A4, NOTE.G4,NOTE.B4,NOTE.D5,NOTE.B4, NOTE.G4,null,NOTE.G4,null],
             ],
             chords: [
-                [[NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3], null],
-                [[NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null,
-                 [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null,
-                 [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null],
-                [[NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null,
-                 [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null,
-                 [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null,
-                 [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null],
-                [[NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null,
-                 [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null,
-                 [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null],
+                [[NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3], null],
+                [[NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.G2,NOTE.B2,NOTE.D3], null],
+                [[NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null],
+                [[NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null, [NOTE.G2,NOTE.B2,NOTE.D3], null, [NOTE.E2,NOTE.G2,NOTE.B2], null, [NOTE.C3,NOTE.E3,NOTE.G3], null, [NOTE.D3,NOTE.Gb3,NOTE.A3],null],
             ],
             drums: {
                 kick:  [1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0],
@@ -1395,13 +1337,11 @@
     // ══════════════════════════════════
     let seqCtx        = null;
     let seqStep       = 0;
-    let seqPhrase     = 0;     // 0-3 段落
-    let seqNextTime   = 0;     // 下次排程的 audioCtx 時間
-    let seqAniFrame   = null;
+    let seqPhrase     = 0;
+    let seqNextTime   = 0;
     let seqRunning    = false;
-    const LOOK_AHEAD  = 0.10;  // 預排 100ms
-    const SCHED_INT   = 25;    // 每 25ms 執行一次排程
-
+    const LOOK_AHEAD  = 0.10;
+    const SCHED_INT   = 25;
     let seqIntervalId = null;
 
     function startBGM() {
@@ -1424,8 +1364,8 @@
         if (!seqRunning || musicMuted) return;
         const ac   = seqCtx;
         const song = SONGS[gameState.mode] || SONGS[1];
-        const bpm  = song.bpm + (gameState.level - 1) * 2; // 關卡越高BPM略升
-        const step16 = 60 / bpm / 4; // 一個16分音符的秒數
+        const bpm  = song.bpm + (gameState.level - 1) * 2;
+        const step16 = 60 / bpm / 4;
 
         while (seqNextTime < ac.currentTime + LOOK_AHEAD) {
             scheduleTick(song, seqStep, seqPhrase, seqNextTime, step16);
@@ -1447,11 +1387,10 @@
         const melNote = song.melody[phrase][step];
         if (melNote) {
             schedPlayNote(melNote, 'square', step16 * 0.85, 0.13, delay, 2200, 0.01);
-            // 加一個稍微低一點的八度增加厚度
             schedPlayNote(melNote / 2, 'triangle', step16 * 0.9, 0.07, delay, 800);
         }
 
-        // 和弦（偶數步）
+        // 和弦
         const chord = song.chords[phrase][step];
         if (chord && Array.isArray(chord)) {
             chord.forEach(freq => {
@@ -1485,13 +1424,9 @@
         if (musicMuted) return;
         const ac = seqCtx; const now = ac.currentTime + delay;
         const o = ac.createOscillator(); const g = ac.createGain();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(180, now);
-        o.frequency.exponentialRampToValueAtTime(40, now + 0.15);
-        g.gain.setValueAtTime(0.55, now);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-        o.connect(g); g.connect(getMaster());
-        o.start(now); o.stop(now + 0.35);
+        o.type = 'sine'; o.frequency.setValueAtTime(180, now); o.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+        g.gain.setValueAtTime(0.55, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+        o.connect(g); g.connect(getMaster()); o.start(now); o.stop(now + 0.35);
     }
 
     function schedPlaySnare(delay) {
@@ -1503,8 +1438,7 @@
         const src = ac.createBufferSource(); src.buffer = buf;
         const f = ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2800; f.Q.value=0.8;
         const g = ac.createGain();
-        g.gain.setValueAtTime(0.28, now);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+        g.gain.setValueAtTime(0.28, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
         src.connect(f); f.connect(g); g.connect(getMaster()); src.start(now);
     }
 
@@ -1518,8 +1452,7 @@
         const src = ac.createBufferSource(); src.buffer = buf;
         const f = ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=9000;
         const g = ac.createGain();
-        g.gain.setValueAtTime(open ? 0.08 : 0.05, now);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + len);
+        g.gain.setValueAtTime(open ? 0.08 : 0.05, now); g.gain.exponentialRampToValueAtTime(0.0001, now + len);
         src.connect(f); f.connect(g); g.connect(getMaster()); src.start(now);
     }
 
@@ -1564,7 +1497,6 @@
     function playSnare() { schedPlaySnare(0); }
     function playHihat(o=false) { schedPlayHH(0, o); }
 
-    // ── 靜音按鈕（保留相容性）──
     function toggleMute() {
         musicMuted = !musicMuted;
         if (musicMuted) stopBGM(); else if (gameState.active) startBGM();
@@ -1574,20 +1506,16 @@
     // 🔧 原有函式改造 (注入音效)
     // ══════════════════════════════════
 
-    // 覆寫 addScore — 加入 hit sfx + 定期上報分數
     const _origAddScore = addScore;
     let _lastScoreReport = 0;
     addScore = function(pts, x, y, color, label) {
-        // 取得 trackIdx 估算（用 x 座標）
         const trackIdx = Math.floor(x / (trackWidth || 1)) % 4;
         playSfxHit(label, trackIdx);
-        // 連擊里程碑
         const nextCombo = gameState.combo + 1;
         if (nextCombo > 0 && nextCombo % 5 === 0) {
             setTimeout(() => playSfxComboMilestone(nextCombo), 80);
         }
         _origAddScore(pts, x, y, color, label);
-        // 每 5 秒向大廳同步一次分數
         const now = Date.now();
         if (isPlatform && now - _lastScoreReport > 5000) {
             _lastScoreReport = now;
@@ -1595,19 +1523,16 @@
         }
     };
 
-    // 覆寫 startGame — 啟動 BGM
     const _origStartGame = startGame;
     startGame = function(level) {
         _origStartGame(level);
         startBGM();
     };
 
-    // 覆寫 quitGame — 停止 BGM + 平台模式回等待畫面
     const _origQuitGame = quitGame;
     quitGame = function() {
         stopBGM();
         if (isPlatform) {
-            // 平台模式：不顯示主選單，回到等待畫面
             gameState.active = false;
             document.getElementById('game-ui').classList.add('hidden');
             document.getElementById('result-screen').classList.add('hidden');
@@ -1683,7 +1608,7 @@
     }
 
     // ══════════════════════════════════
-    // 🔗 平台橋接層 — 放在最底部確保所有函式已宣告
+    // 🔗 平台橋接層
     // ══════════════════════════════════
     const _urlP     = new URLSearchParams(location.search);
     const _urlMode  = parseInt(_urlP.get('mode'))  || 0;
@@ -1746,7 +1671,6 @@
 
       overlay.style.display = 'flex';
       overlay.scrollTop = 0;
-      // 儲存 callback 供關閉時呼叫
       overlay._onDone = onDone;
     }
 
@@ -1763,30 +1687,39 @@
       }
     }
 
-    // 啟動函式（URL 參數 or PLATFORM_START 皆呼叫此）
-    // 修改：先顯示該模式的規則頁，學生確認後才進遊戲
+    // 🌟 修改的 platformLaunch：利用 sessionStorage 記住是否看過規則
     function platformLaunch(mode, level) {
         document.getElementById('platform-wait').classList.add('hidden');
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('level-menu').classList.add('hidden');
-        // 🌟 新增：確保老師點擊下一關時，隱藏前一關的結算畫面
         document.getElementById('result-screen').classList.add('hidden'); 
         
         gameState.mode = mode;
 
-        // 顯示規則覆蓋層，確認後才 startGame
-        w4ShowRules(mode, () => {
+        // 檢查該模式是否已經看過規則
+        const rulesSeen = sessionStorage.getItem('w4_rules_seen_mode_' + mode) === 'true';
+
+        // 如果是該模式的第一關，且還沒看過規則，才跳規則頁
+        if (level === 1 && !rulesSeen) {
+            w4ShowRules(mode, () => {
+                sessionStorage.setItem('w4_rules_seen_mode_' + mode, 'true');
+                startGame(level);
+            });
+        } else {
+            // 如果已經看過，或是大於第一關，則直接進遊戲
             startGame(level);
-        });
+        }
     }
 
     // 接收大廳 postMessage
     window.addEventListener('message', (e) => {
         if (!e.data || !e.data.type) return;
         if (e.data.type === 'PLATFORM_START') {
+            window._platformStarted = true; // 標記已收到指令
             const mode  = e.data.w4mode  || _urlMode  || 1;
             const level = e.data.w4level || _urlLevel || e.data.level || 1;
-           // 🌟 新增：如果是老師全新開始 (模式1) 且不是重連，則歸零累計分數
+            
+            // 🌟 分數累加邏輯：若收到平台帶來的 rejoinScore，則接續分數
             if (mode === 1 && !e.data.rejoinScore) {
                 accumulatedScore = 0;
             } else if (e.data.rejoinScore !== undefined) {
@@ -1798,14 +1731,12 @@
         if (e.data.type === 'PLATFORM_PAUSE') {
             stopBGM();
             gameState.active = false;
-            // 顯示暫停遮幕，隱藏倒數
             const po = document.getElementById('pause-overlay');
             const co = document.getElementById('countdown-overlay');
             if (po) { po.classList.remove('hidden'); po.style.display = 'flex'; }
             if (co) { co.classList.add('hidden'); co.style.display = 'none'; }
         }
         if (e.data.type === 'PLATFORM_RESUME') {
-            // 隱藏暫停遮幕，開始 3-2-1 倒數
             const po = document.getElementById('pause-overlay');
             if (po) { po.classList.add('hidden'); po.style.display = 'none'; }
             startCountdown(() => {
@@ -1819,44 +1750,42 @@
         }
     });
 
-// 防止螢幕自動關閉
-let wakeLock = null;
-async function requestWakeLock() {
-    try {
-        wakeLock = await navigator.wakeLock.request('screen');
-    } catch (e) {}
-}
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') requestWakeLock();
-});
-requestWakeLock();
-
-// iOS Safari AudioContext 需在使用者互動後 resume
-// 在第一個 touchstart 時嘗試 resume，確保音效正常播放
-(function() {
-    function _resumeAudioOnTouch() {
-        // audioCtx 是在遊戲內部建立的，透過嘗試 resume 解鎖
-        try {
-            if (window._w4AudioCtx && window._w4AudioCtx.state === 'suspended') {
-                window._w4AudioCtx.resume();
-            }
-        } catch(e) {}
-        document.removeEventListener('touchstart', _resumeAudioOnTouch, true);
+    // 防止螢幕自動關閉
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
     }
-    document.addEventListener('touchstart', _resumeAudioOnTouch, true);
-})();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') requestWakeLock();
+    });
+    requestWakeLock();
 
-    // 平台模式初始化：隱藏主選單，顯示等待畫面或直接啟動
+    (function() {
+        function _resumeAudioOnTouch() {
+            try {
+                if (window._w4AudioCtx && window._w4AudioCtx.state === 'suspended') {
+                    window._w4AudioCtx.resume();
+                }
+            } catch(e) {}
+            document.removeEventListener('touchstart', _resumeAudioOnTouch, true);
+        }
+        document.addEventListener('touchstart', _resumeAudioOnTouch, true);
+    })();
+
+    // 平台模式初始化：隱藏主選單，顯示等待畫面
     if (isPlatform) {
         document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('platform-wait').classList.remove('hidden');
+        const badge = document.getElementById('pw-group-badge');
+        if (badge && platformGroup) badge.textContent = platformGroup;
+
+        // 備援機制：如果 1 秒後都沒收到 PLATFORM_START，才用 URL 參數自動啟動
         if (_urlMode > 0 && _urlLevel > 0) {
-            // URL 已帶參數 → 直接啟動
-            platformLaunch(_urlMode, _urlLevel);
-        } else {
-            // 等待 PLATFORM_START
-            document.getElementById('platform-wait').classList.remove('hidden');
-            const badge = document.getElementById('pw-group-badge');
-            if (badge && platformGroup) badge.textContent = platformGroup;
+            setTimeout(() => {
+                if (!window._platformStarted) {
+                    platformLaunch(_urlMode, _urlLevel);
+                }
+            }, 1000);
         }
     }
 
