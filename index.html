@@ -1040,6 +1040,22 @@ function startSyncListener() {
         localStorage.setItem('playroom_rooms', JSON.stringify(local));
         window._allRoomsCache[roomCode] = data;
 
+        // ★ 老師端：Firebase 快照一到就更新 players 並重繪大廳/踢人列
+        //   這樣學生加入或離開後，老師畫面立即反映，不需等 poll
+        const p = window.state.perspective;
+        if (p === 'teacher' && data.players !== undefined) {
+            window.state.players      = data.players;
+            window.state.takenSymbols = data.players.map(pl => pl.symbol);
+            window.state.takenGroups  = data.players.map(pl => pl.group);
+            window.renderLobby();
+            // 若控制台已開，也重繪分數和踢人列
+            const pTeacher = window.pStates['teacher'];
+            if (pTeacher && pTeacher.screen === 'screen-teacher-console') {
+                tcRenderScores();
+                tcRenderKickBar(document.getElementById('tc-kick-bar')?.style.display !== 'none');
+            }
+        }
+
         // 學生端：Firebase 資料一到就主動檢查是否需要跳轉
         const p = window.state.perspective;
         if (p !== 'teacher') {
@@ -3508,16 +3524,15 @@ function _finishJoin(groupName, symbol, roomCode) {
   //   這樣 snapshot polling 就不會再偵測到被踢而強制退出
   const rooms = window.getRooms();
   const room  = rooms[roomCode] || {};
+
+  // ★ 清除 kicked 紀錄：只在本機快取中把時間戳設為 0（讓 kickAge > 60000 偵測自然失效）
+  //   不額外呼叫 fsSet，因為 joinRoom Transaction 已寫入新 players，讓 Firebase 快照自然到達老師端
   if (room.kicked && room.kicked[groupName]) {
-    delete room.kicked[groupName];
-    // 同步更新記憶體快取和 Firebase
-    window._allRoomsCache[roomCode] = room;
-    const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-    local[roomCode] = room;
-    localStorage.setItem('playroom_rooms', JSON.stringify(local));
-    if (isFirebase && db && isFirebaseAuthComplete && fsSet && fsDoc) {
-        fsSet(fsDoc(db, 'rooms', roomCode), room).catch(() => {});
-    }
+      room.kicked[groupName] = { ts: 0 }; // 設為 0，kickAge 永遠 > 60000，等同失效
+      window._allRoomsCache[roomCode] = room;
+      const local2 = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+      local2[roomCode] = room;
+      localStorage.setItem('playroom_rooms', JSON.stringify(local2));
   }
 
   document.getElementById('sw-code').textContent = roomCode;
@@ -4076,16 +4091,13 @@ function tryRestoreSession() {
         pData.group  = saved.group;
         pData.symbol = saved.symbol || '';
 
-        // ★ 清除 kicked 紀錄（重新加入成功，移除舊的踢除標記，防止 polling 再次觸發踢出）
+        // ★ 清除 kicked 紀錄：只在本機把時間戳設 0（讓偵測自然失效），不額外呼叫 fsSet
         if (room.kicked && room.kicked[saved.group]) {
-            delete room.kicked[saved.group];
+            room.kicked[saved.group] = { ts: 0 };
             window._allRoomsCache[saved.roomCode] = room;
             const _loc = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
             _loc[saved.roomCode] = room;
             localStorage.setItem('playroom_rooms', JSON.stringify(_loc));
-            if (isFirebase && db && isFirebaseAuthComplete && fsSet && fsDoc) {
-                fsSet(fsDoc(db, 'rooms', saved.roomCode), room).catch(() => {});
-            }
         }
 
         const swStatus = document.getElementById('sw-my-group-status');
