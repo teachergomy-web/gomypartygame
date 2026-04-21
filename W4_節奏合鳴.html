@@ -938,66 +938,38 @@
 
             // 平台模式：調整結算按鈕文字與邏輯
             if (isPlatform) {
-                accumulatedScore = gameState.score; // 🌟 儲存目前累計總分
+                accumulatedScore = gameState.score; // 儲存累計總分
 
                 const btn = document.getElementById('result-action-btn');
-
                 if (btn) {
-                    // 🌟 移除 HTML 上自帶的 onclick 屬性，避免誤觸發 quitGame() 回到模式選單
                     btn.removeAttribute('onclick');
+                    btn.onclick = null;
+                    btn.style.cursor = 'default';
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.borderColor = 'rgba(255,255,255,0.2)';
+                    btn.style.color = 'rgba(255,255,255,0.6)';
+                    btn.style.boxShadow = 'none';
+                    btn.style.transform = 'none';
+                    btn.style.opacity = '1';
 
-                    // 如果是 LV10，且還不是最後一個玩法
-                    if (gameState.level === 10 && gameState.mode < 3) {
-                        const nextModes = { 1: "鋼琴黑塊", 2: "底線軌道" };
-                        const nextText = nextModes[gameState.mode];
-                        
-                        btn.innerHTML = `<span style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:1px">點擊準備進入下一階段</span><br/><span style="font-size:15px;color:var(--gold);line-height:2">▶ 下一玩法：${nextText}</span>`;
-                        btn.style.cursor = 'pointer';
-                        
-                        // 恢復按鈕原本的外觀
-                        btn.style.background = 'linear-gradient(135deg, rgba(0,245,255,0.15), rgba(0,245,255,0.05))';
-                        btn.style.borderColor = 'rgba(0,245,255,0.4)';
-                        btn.style.color = 'var(--cyan)';
-                        btn.style.boxShadow = '';
-                        btn.style.opacity = '1';
-
-                        // 重新綁定 JS 點擊事件：顯示下一個玩法的規則頁
-                        btn.onclick = function(e) {
-                            e.preventDefault();
-                            document.getElementById('result-screen').classList.add('hidden');
-                            
-                            const nextMode = gameState.mode + 1;
-                            // 顯示下一玩法的規則
-                            w4ShowRules(nextMode, () => {
-                                // 學生看完規則點擊「了解規則」，記錄起來，然後顯示等待畫面
-                                sessionStorage.setItem('w4_rules_seen_mode_' + nextMode, 'true');
-                                document.getElementById('platform-wait').classList.remove('hidden');
-                                const msg = document.getElementById('pw-status-msg');
-                                if (msg) msg.textContent = '✅ 已準備就緒！等待老師啟動...';
-                            });
-                        };
-
+                    if (gameState.level === 10 && gameState.mode === 3) {
+                        // 所有模式全部完成
+                        btn.innerHTML = '⏳ 所有玩法結束！等待老師結算...';
+                        reportScore(true); // 最終分數
+                    } else if (gameState.level === 10) {
+                        // 當前模式 10 關全通，等老師啟動下一模式
+                        const nextModes = { 1: '鋼琴黑塊', 2: '底線軌道' };
+                        btn.innerHTML = `⏳ 等待老師啟動下一玩法：${nextModes[gameState.mode] || ''}...`;
+                        reportScore(true); // 送出 W4_MODE_COMPLETE（見下方覆寫）
                     } else {
-                        // 如果是 LV1 ~ LV9，或者是最後一玩法的 LV10
-                        if (gameState.level === 10 && gameState.mode === 3) {
-                            btn.innerHTML = '⏳ 所有玩法結束！等待老師結算...';
-                        } else {
-                            btn.innerHTML = '⏳ 等待老師開啟下一關...';
-                        }
-                        
-                        // 鎖定按鈕為純提示文字
-                        btn.style.cursor = 'default';
-                        btn.onclick = null;
-                        btn.style.background = 'rgba(255,255,255,0.05)';
-                        btn.style.borderColor = 'rgba(255,255,255,0.2)';
-                        btn.style.color = '#fff';
-                        btn.style.boxShadow = 'none';
-                        btn.style.transform = 'none';
-                        btn.style.opacity = '1';
+                        // LV 1–9，等老師開下一關
+                        btn.innerHTML = `⏳ 等待老師開啟下一關 (LV${gameState.level + 1})...`;
+                        reportScore(false); // 送出 W4_SCORE
                     }
                 }
+            } else {
+                reportScore(true);
             }
-            reportScore(true);
             return;
         }
 
@@ -1617,13 +1589,16 @@
     // 覆寫 reportScore 真實實作
     reportScore = function(isFinal) {
         if (!isPlatform || !platformGroup) return;
+        const isModeDone = (gameState.level === 10); // 10 關全通算模式完成
         window.parent.postMessage({
-            type:  isFinal ? 'W4_GAMEOVER' : 'W4_SCORE',
+            type:  isModeDone ? 'W4_MODE_COMPLETE' : 'W4_SCORE',
             score: gameState.score,
             combo: gameState.maxCombo,
             group: platformGroup,
             level: gameState.level,
-            mode:  gameState.mode
+            mode:  gameState.mode,
+            // W4_MODE_COMPLETE 額外帶 allDone（是否三模式都跑完）
+            allDone: isModeDone && gameState.mode === 3,
         }, '*');
     };
 
@@ -1687,26 +1662,21 @@
       }
     }
 
-    // 🌟 修改的 platformLaunch：利用 sessionStorage 記住是否看過規則
+    // platformLaunch：收到老師的 PLATFORM_START 後的啟動邏輯
+    // LV1 一定先顯示規則頁（學生確認後才進遊戲）
+    // LV2+ 直接進遊戲（老師手動開下一關）
     function platformLaunch(mode, level) {
         document.getElementById('platform-wait').classList.add('hidden');
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('level-menu').classList.add('hidden');
-        document.getElementById('result-screen').classList.add('hidden'); 
-        
+        document.getElementById('result-screen').classList.add('hidden');
         gameState.mode = mode;
 
-        // 檢查該模式是否已經看過規則
-        const rulesSeen = sessionStorage.getItem('w4_rules_seen_mode_' + mode) === 'true';
-
-        // 如果是該模式的第一關，且還沒看過規則，才跳規則頁
-        if (level === 1 && !rulesSeen) {
-            w4ShowRules(mode, () => {
-                sessionStorage.setItem('w4_rules_seen_mode_' + mode, 'true');
-                startGame(level);
-            });
+        if (level === 1) {
+            // 每個模式第一關：顯示規則頁，學生確認後才進遊戲
+            w4ShowRules(mode, () => startGame(level));
         } else {
-            // 如果已經看過，或是大於第一關，則直接進遊戲
+            // LV2+ 直接進遊戲
             startGame(level);
         }
     }
@@ -1715,16 +1685,18 @@
     window.addEventListener('message', (e) => {
         if (!e.data || !e.data.type) return;
         if (e.data.type === 'PLATFORM_START') {
-            window._platformStarted = true; // 標記已收到指令
-            const mode  = e.data.w4mode  || _urlMode  || 1;
-            const level = e.data.w4level || _urlLevel || e.data.level || 1;
-            
-            // 🌟 分數累加邏輯：若收到平台帶來的 rejoinScore，則接續分數
-            if (mode === 1 && !e.data.rejoinScore) {
-                accumulatedScore = 0;
-            } else if (e.data.rejoinScore !== undefined) {
+            window._platformStarted = true;
+            const mode  = parseInt(e.data.w4mode  || _urlMode  || 1, 10);
+            const level = parseInt(e.data.w4level || _urlLevel || e.data.level || 1, 10);
+
+            // 分數累計邏輯：
+            // 重連帶 rejoinScore → 接續；模式1第一關 → 歸零；其他 → 保留累計
+            if (e.data.rejoinScore !== undefined && e.data.rejoinScore > 0) {
                 accumulatedScore = parseInt(e.data.rejoinScore) || 0;
+            } else if (mode === 1 && level === 1) {
+                accumulatedScore = 0;
             }
+            // 換模式（mode2/mode3 LV1）：保留 accumulatedScore 不動，繼續累計
 
             platformLaunch(mode, level);
         }

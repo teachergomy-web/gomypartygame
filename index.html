@@ -2264,42 +2264,30 @@ function tcStartGame() {
             }
         }
     } else if (window.state.selectedGame === 3) {
-        // W4：老師控制台顯示即時分數排行，並顯示當前 mode/level badge
+        // W4：老師控制台顯示即時分數排行
         const badge = document.getElementById('tc-level-badge');
         if (badge) {
             badge.textContent = `M${lsW4SelectedMode} · LV${lsW4SelectedLevel}`;
             badge.style.display = '';
         }
-        // 顯示底部「下一關」按鈕容器，並支援跨模式顯示
+        // 下一關按鈕：LV1-9 顯示，LV10 由 w4ShowModeCompletePanel 的按鈕接手
         const nextContainer = document.getElementById('tc-next-level-container');
         if (nextContainer) {
-            let nextM = lsW4SelectedMode;
-            let nextL = lsW4SelectedLevel + 1;
-            let hasNext = true;
-            
-            if (nextL > 10) {
-                if (nextM < 3) {
-                    nextM++;
-                    nextL = 1;
-                } else {
-                    hasNext = false;
-                }
-            }
-
-            if (hasNext) {
-                nextContainer.style.display = 'block';
-                const elMode = document.getElementById('nl-mode');
+            const canNext = lsW4SelectedLevel < 10;
+            nextContainer.style.display = canNext ? 'block' : 'none';
+            if (canNext) {
+                const elMode  = document.getElementById('nl-mode');
                 const elLevel = document.getElementById('nl-level');
-                if (elMode) elMode.textContent = nextM;
-                if (elLevel) elLevel.textContent = nextL;
-            } else {
-                nextContainer.style.display = 'none';
+                if (elMode)  elMode.textContent  = lsW4SelectedMode;
+                if (elLevel) elLevel.textContent = lsW4SelectedLevel + 1;
             }
         }
-        
-        tcRenderScores();
-        const sa = document.getElementById('tc-scores-area');
-        if (sa) sa.style.padding = '';
+        // 新模式開始時重置各組完成記錄
+        if (lsW4SelectedLevel === 1) {
+            window._w4ModeComplete = window._w4ModeComplete || {};
+            window.state.players.forEach(p => { delete window._w4ModeComplete[p.group]; });
+        }
+        w4RenderTCScores();
     } else {
         const nextContainer = document.getElementById('tc-next-level-container');
         if (nextContainer) nextContainer.style.display = 'none';
@@ -2330,34 +2318,126 @@ function tcStartGame() {
             : '🎮 遊戲開始！關卡 ' + TC.level);
 }
 
-// 修改: 下一關邏輯，直接啟動下一關，不回選關畫面，並支援跨模式銜接
-// 並移除 lobby 切換造成的畫面閃爍卡頓
+// ── W4 老師端：即時分數表 ──
+function w4RenderTCScores() {
+    const area = document.getElementById('tc-scores-area');
+    if (!area || window.state.selectedGame !== 3) return;
+    const players = window.state.players || [];
+    const modeNames = ['', '◎ 縮圈點擊', '▬ 鋼琴黑塊', '↓ 底線軌道'];
+    const curMode  = lsW4SelectedMode  || 1;
+    const curLevel = lsW4SelectedLevel || 1;
+    const sorted = [...players].sort((a, b) => (TC.scores[b.group] || 0) - (TC.scores[a.group] || 0));
+    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+
+    area.innerHTML = `
+      <div style="width:100%;max-width:640px;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.75rem;
+          color:rgba(180,79,255,.7);letter-spacing:.1em;margin-bottom:10px;text-align:center;">
+          🎵 ${modeNames[curMode]} · LV${curLevel} · 累計分數
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${sorted.map((p, i) => `
+            <div style="display:flex;align-items:center;gap:12px;
+              background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);
+              border-radius:16px;padding:12px 18px;">
+              <div style="font-size:1.6rem;width:32px;text-align:center">${medals[i] || ''}</div>
+              <div style="font-size:1.6rem">${p.symbol}</div>
+              <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:900;font-size:.95rem;color:white">${p.group}</div>
+              <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.6rem;color:#b44fff;min-width:70px;text-align:right;">${TC.scores[p.group] || 0}</div>
+              <button onclick="tcKickPlayer('${p.group.replace(/'/g,"\\'")}','${(p.symbol||'').replace(/'/g,"\\'")}',this)"
+                style="flex-shrink:0;background:rgba(232,32,32,.2);border:1px solid rgba(232,32,32,.5);
+                border-radius:6px;color:#ff6b6b;font-size:.58rem;font-weight:900;
+                padding:2px 7px;cursor:pointer;font-family:'Nunito',sans-serif;">✕</button>
+            </div>`).join('')}
+        </div>
+        <div id="tc-w4-complete-panel"></div>
+      </div>`;
+    area.style.padding = '12px 16px';
+}
+
+// ── W4 老師端：模式完成後的總分表 + 下一玩法按鈕 ──
+function w4ShowModeCompletePanel(completedMode, isAllDone) {
+    // 確保 w4RenderTCScores 已渲染，找到面板容器
+    const panelEl = document.getElementById('tc-w4-complete-panel');
+    if (!panelEl) { w4RenderTCScores(); return; }
+
+    const modeNames     = ['', '縮圈點擊', '鋼琴黑塊', '底線軌道'];
+    const nextModeNames = ['', '▬ 鋼琴黑塊', '↓ 底線軌道', ''];
+    const players = window.state.players || [];
+    const sorted  = [...players].sort((a, b) => (TC.scores[b.group] || 0) - (TC.scores[a.group] || 0));
+    const medals  = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+
+    const scoreRows = sorted.map((p, i) => `
+      <div style="display:flex;align-items:center;gap:10px;
+        background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+        border-radius:12px;padding:10px 16px;">
+        <div style="font-size:1.3rem;width:26px;text-align:center">${medals[i] || ''}</div>
+        <div style="font-size:1.3rem">${p.symbol}</div>
+        <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;color:white">${p.group}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.3rem;color:#f5c800;">${TC.scores[p.group] || 0}</div>
+      </div>`).join('');
+
+    if (isAllDone) {
+        panelEl.innerHTML = `
+          <div style="margin-top:14px;padding:16px;background:rgba(245,200,0,.08);
+            border:2px solid rgba(245,200,0,.3);border-radius:16px;text-align:center;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.88rem;
+              color:#f5c800;margin-bottom:10px;">🏆 三種玩法全部完成！最終總分</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">${scoreRows}</div>
+            <div style="font-size:.72rem;color:rgba(255,255,255,.35);font-family:'Nunito',sans-serif;">
+              按下方「🏆 結算」發布最終排名
+            </div>
+          </div>`;
+    } else {
+        const nextMode = completedMode + 1;
+        panelEl.innerHTML = `
+          <div style="margin-top:14px;padding:16px;background:rgba(180,79,255,.08);
+            border:2px solid rgba(180,79,255,.3);border-radius:16px;text-align:center;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.85rem;
+              color:#b44fff;margin-bottom:10px;">✅ ${modeNames[completedMode]} 完成！累計總分</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">${scoreRows}</div>
+            <button onclick="tcW4StartNextMode(${nextMode})"
+              style="width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;
+              background:linear-gradient(135deg,#b44fff,#7b2fff);color:#fff;
+              font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;
+              box-shadow:0 4px 0 #4a1a99;-webkit-tap-highlight-color:transparent;">
+              ▶ 下一玩法：${nextModeNames[completedMode] || ''}
+            </button>
+          </div>`;
+    }
+}
+
+// ── W4 老師端：啟動下一玩法（顯示規則覆蓋層，確認後 tcStartGame）──
+function tcW4StartNextMode(nextMode) {
+    lsW4SelectedMode  = nextMode;
+    lsW4SelectedLevel = 1;
+    TC.level = 1;
+    TC.isNextLevel = true; // 保留累計分數
+    // 重置完成記錄（等待下一模式各組完成）
+    window._w4ModeComplete = window._w4ModeComplete || {};
+    window.state.players.forEach(p => { delete window._w4ModeComplete[p.group]; });
+    // 顯示老師端規則覆蓋層（讓老師確認規則後按「全班開始！」）
+    showRulesOverlay();
+}
+
+// ── W4 下一關（LV1-9 用，LV10 由 w4ShowModeCompletePanel 的按鈕接手）──
 function tcW4NextLevel() {
     const rooms = window.getRooms();
     const r = rooms[window.state.roomCode];
 
-    let currentMode = parseInt(lsW4SelectedMode || (r && r.w4mode) || 1, 10);
+    let currentMode  = parseInt(lsW4SelectedMode  || (r && r.w4mode)  || 1, 10);
     let currentLevel = parseInt(lsW4SelectedLevel || (r && r.w4level) || TC.level || 1, 10);
-    let hasNext = true;
-    
-    if (currentLevel < 10) {
-        currentLevel++;
-    } else if (currentMode < 3) {
-        // 當前 LV10，且不是最後一個模式，切換到下一個模式的 LV1
-        currentMode++;
-        currentLevel = 1;
-    } else {
-        hasNext = false;
-    }
 
-    if (hasNext) {
-        lsW4SelectedMode = currentMode;
-        lsW4SelectedLevel = currentLevel;
-        TC.level = currentLevel;
-        TC.isNextLevel = true; // 告知 tcStartGame 這是下一關，保留分數
-        
-        // 直接啟動，不再透過切換 lobby 狀態來強迫載入，以避免 UI 卡頓與重新整理閃爍
+    if (currentLevel < 10) {
+        // LV1–9：直接開下一關
+        lsW4SelectedMode  = currentMode;
+        lsW4SelectedLevel = currentLevel + 1;
+        TC.level = currentLevel + 1;
+        TC.isNextLevel = true;
         tcStartGame();
+    } else if (currentMode < 3) {
+        // LV10：由「下一玩法」按鈕觸發，這裡提示等待
+        showToast('本模式已完成！等待全組完成後再切換玩法');
     } else {
         showToast('已是最後一模式的最後一關！');
     }
@@ -2770,8 +2850,8 @@ window.addEventListener('message', (e) => {
         return;
     }
 
-    // ── W4 學生端：直接寫入 Firebase (加上過往累積的 baseScores) ──
-    if ((type === 'W4_SCORE' || type === 'W4_GAMEOVER') && group && window.state.perspective !== 'teacher') {
+    // ── W4 學生端：直接寫入 Firebase ──
+    if ((type === 'W4_SCORE' || type === 'W4_GAMEOVER' || type === 'W4_MODE_COMPLETE') && group && window.state.perspective !== 'teacher') {
         const rooms = window.getRooms();
         if (rooms[window.state.roomCode]) {
             if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
@@ -2779,7 +2859,57 @@ window.addEventListener('message', (e) => {
             rooms[window.state.roomCode].scores[group] = (base[group] || 0) + score;
             window.saveRooms(rooms);
         }
-        return; 
+        return;
+    }
+
+    // ── W4 老師端：W4_SCORE（中途分數，每關結束） ──
+    if (type === 'W4_SCORE' && group && window.state.perspective === 'teacher') {
+        TC.scores[group] = Math.max(TC.scores[group] || 0, score);
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
+            rooms[window.state.roomCode].scores[group] = TC.scores[group];
+            window.saveRooms(rooms);
+        }
+        w4RenderTCScores();
+        return;
+    }
+
+    // ── W4 老師端：W4_MODE_COMPLETE（一個模式 10 關全通） ──
+    if (type === 'W4_MODE_COMPLETE' && group && window.state.perspective === 'teacher') {
+        const mode    = e.data.mode    || 1;
+        const allDone = e.data.allDone || false;
+        TC.scores[group] = Math.max(TC.scores[group] || 0, score);
+        const rooms = window.getRooms();
+        if (rooms[window.state.roomCode]) {
+            if (!rooms[window.state.roomCode].scores) rooms[window.state.roomCode].scores = {};
+            rooms[window.state.roomCode].scores[group] = TC.scores[group];
+            window.saveRooms(rooms);
+        }
+        // 記錄各組完成的模式
+        if (!window._w4ModeComplete) window._w4ModeComplete = {};
+        window._w4ModeComplete[group] = mode;
+
+        w4RenderTCScores();
+
+        // 檢查是否所有組都完成了這個模式
+        const players = window.state.players || [];
+        const doneCount = players.filter(p => (window._w4ModeComplete[p.group] || 0) >= mode).length;
+        const allComplete = players.length > 0 && doneCount >= players.length;
+
+        if (allComplete) {
+            const modeNames = ['', '縮圈點擊', '鋼琴黑塊', '底線軌道'];
+            if (allDone) {
+                showToast('🏆 三種玩法全部完成！');
+                w4ShowModeCompletePanel(mode, true);
+            } else {
+                showToast(`✅ 全組完成 ${modeNames[mode]}！`);
+                w4ShowModeCompletePanel(mode, false);
+            }
+        } else {
+            showToast(`${group} 完成！(${doneCount}/${players.length})`);
+        }
+        return;
     }
     
     // 老師端處理（W1/W2/W5/W3/W6 分數）
@@ -4266,7 +4396,7 @@ Object.assign(window, {
     doCloseRoom, selectGame, leaveRoomStudent, teacherLogin, _finishJoin,
     openTeacherConsole, changeLevel, jumpToPhase, updateLevelDisplay,
     tcStartGame, tcPauseGame, tcResumeGame, tcSettleGame, tcEndGame, tcW4NextLevel, exitToLobby, studentLeaveGame, tryRestoreSession,
-    tcKickPlayer,
+    tcKickPlayer, w4RenderTCScores, w4ShowModeCompletePanel, tcW4StartNextMode,
     showToast, setViewTeacher, setViewStudent,
     syncJoinDOM, renderLobby, renderSymbolPicker, renderGroupSelect, renderGroupPicker, renderGroupPicker, updateStudentWaitDisplay,
     getRooms, saveRooms,
