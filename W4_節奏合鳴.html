@@ -760,6 +760,9 @@
         entities: [], spawnTimer: 0
     };
 
+// 🌟 新增：用來記錄平台模式下的跨關卡累計分數
+    let accumulatedScore = 0;
+
     const COLORS = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f'];
     const TRACK_COUNT = 4;
     let trackWidth = 0;
@@ -791,10 +794,10 @@
 
     function startGame(level) {
         gameState.level = level;
-        gameState.score = 0; gameState.combo = 0;
+        gameState.score = isPlatform ? accumulatedScore : 0; 
+        
+        gameState.combo = 0;
         gameState.maxCombo = 0; gameState.timeLeft = 120;
-        gameState.entities = []; gameState.active = true;
-        gameState.spawnTimer = 0;
 
         document.getElementById('level-menu').classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
@@ -964,17 +967,29 @@
 
             // 平台模式：調整結算按鈕文字 + 上報分數
             if (isPlatform) {
-                const btn = document.getElementById('result-action-btn');
-                if (btn) { btn.textContent = '⏳ 等待老師下一關...'; btn.style.cursor = 'default'; btn.onclick = null; btn.style.opacity = '0.5'; }
-            }
-            reportScore(true);
-            return;
-        }
+                accumulatedScore = gameState.score; // 🌟 儲存目前累計總分
 
-        const secs = Math.ceil(gameState.timeLeft);
-        const mm = Math.floor(secs / 60);
-        const ss = String(secs % 60).padStart(2, '0');
-        document.getElementById('timer').innerText = mm + ':' + ss;
+                const btn = document.getElementById('result-action-btn');
+                const nextModes = { 1: "鋼琴黑塊", 2: "底線軌道", 3: "結算總成績" };
+                const nextText = nextModes[gameState.mode] || "結算總成績";
+
+                if (btn) {
+                    if (gameState.mode < 3) {
+                        btn.innerHTML = `<span style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:1px">等待老師同步開啟</span><br/><span style="font-size:15px;color:var(--gold);line-height:2">▶ 下一玩法：${nextText}</span>`;
+                    } else {
+                        btn.innerHTML = '⏳ 所有玩法結束！等待老師結算...';
+                    }
+                    // 改變按鈕外觀，變成純提示文字
+                    btn.style.cursor = 'default';
+                    btn.onclick = null;
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.borderColor = 'rgba(255,255,255,0.2)';
+                    btn.style.color = '#fff';
+                    btn.style.boxShadow = 'none';
+                    btn.style.transform = 'none';
+                    btn.style.opacity = '1';
+                }
+            }
 
         // 時間進度條
         const pct = (gameState.timeLeft / 120) * 100;
@@ -1754,6 +1769,9 @@
         document.getElementById('platform-wait').classList.add('hidden');
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('level-menu').classList.add('hidden');
+        // 🌟 新增：確保老師點擊下一關時，隱藏前一關的結算畫面
+        document.getElementById('result-screen').classList.add('hidden'); 
+        
         gameState.mode = mode;
 
         // 顯示規則覆蓋層，確認後才 startGame
@@ -1768,6 +1786,13 @@
         if (e.data.type === 'PLATFORM_START') {
             const mode  = e.data.w4mode  || _urlMode  || 1;
             const level = e.data.w4level || _urlLevel || e.data.level || 1;
+           // 🌟 新增：如果是老師全新開始 (模式1) 且不是重連，則歸零累計分數
+            if (mode === 1 && !e.data.rejoinScore) {
+                accumulatedScore = 0;
+            } else if (e.data.rejoinScore !== undefined) {
+                accumulatedScore = parseInt(e.data.rejoinScore) || 0;
+            }
+
             platformLaunch(mode, level);
         }
         if (e.data.type === 'PLATFORM_PAUSE') {
