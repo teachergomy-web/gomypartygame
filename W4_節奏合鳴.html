@@ -634,7 +634,7 @@
     </div>
 </div>
 
-<div id="countdown-overlay" class="hidden" style="position:absolute;inset:0;background:rgba(6,10,16,0.75);z-index:201;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+<div id="countdown-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(6,10,16,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div id="countdown-num" style="font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(80px,20vw,140px);color:#00f5ff;text-shadow:0 0 40px rgba(0,245,255,0.8);line-height:1;animation:countPulse .6s ease-in-out">3</div>
 </div>
 <style>
@@ -1541,7 +1541,7 @@
         num.style.animation = 'none';
         void num.offsetWidth;
         num.style.animation = 'countPulse .6s ease-in-out';
-        playSfxCountdown(count);
+        try { playSfxCountdown(count); } catch(e) {}
 
         const tick = setInterval(() => {
             count--;
@@ -1554,7 +1554,7 @@
                 num.style.animation = 'none';
                 void num.offsetWidth;
                 num.style.animation = 'countPulse .6s ease-in-out';
-                playSfxCountdown(count);
+                try { playSfxCountdown(count); } catch(e) {}
             } else {
                 clearInterval(tick);
                 num.textContent = 'GO!';
@@ -1563,7 +1563,7 @@
                 num.style.animation = 'none';
                 void num.offsetWidth;
                 num.style.animation = 'countPulse .5s ease-in-out';
-                playSfxCountdown(0);
+                try { playSfxCountdown(0); } catch(e) {}
                 setTimeout(() => {
                     co.classList.add('hidden');
                     co.style.display = 'none';
