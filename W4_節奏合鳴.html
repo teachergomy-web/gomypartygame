@@ -739,14 +739,17 @@
     }
 
     function startGame(level) {
-        gameState.level = level;
-        // 🌟 平台模式從累計分數開始接續
-        gameState.score = isPlatform ? accumulatedScore : 0; 
-        
-        gameState.combo = 0;
-        gameState.maxCombo = 0; gameState.timeLeft = 120;
+        gameState.level    = level;
+        gameState.score    = isPlatform ? accumulatedScore : 0;
+        gameState.combo    = 0;
+        gameState.maxCombo = 0;
+        gameState.timeLeft = 120;
+        gameState.entities = [];   // ★ 清空上一關殘留的物件
+        gameState.spawnTimer = 0;
+        gameState.active   = false; // 倒數期間暫不啟動
 
         document.getElementById('level-menu').classList.add('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
         document.getElementById('game-ui').classList.remove('hidden');
         document.getElementById('cur-score').innerText = gameState.score;
         document.getElementById('cur-lvl').innerText = level;
@@ -756,8 +759,13 @@
         document.getElementById('timer').classList.remove('urgent');
 
         resize();
-        gameState.lastFrameTime = performance.now();
-        requestAnimationFrame(gameLoop);
+
+        // ★ 倒數 3-2-1 GO！後才真正啟動 gameLoop
+        startCountdown(() => {
+            gameState.active = true;
+            gameState.lastFrameTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        });
     }
 
     function quitGame() {
@@ -1477,8 +1485,14 @@
 
     const _origStartGame = startGame;
     startGame = function(level) {
+        stopBGM(); // 先停掉舊 BGM
         _origStartGame(level);
-        startBGM();
+        // BGM 在 startCountdown 的 onDone 之後由 gameLoop 中的 active=true 觸發
+        // 這裡不立刻 startBGM，避免和倒數音效同時播放
+        // 等 active 變 true 後（gameLoop 第一幀）再啟動
+        const _waitBGM = setInterval(() => {
+            if (gameState.active) { clearInterval(_waitBGM); startBGM(); }
+        }, 100);
     };
 
     const _origQuitGame = quitGame;
