@@ -666,26 +666,6 @@
     </div>
 </div>
 
-<div id="w4-rules-overlay" style="
-  display:none; position:fixed; inset:0; z-index:900;
-  background:#080a14;
-  flex-direction:column; align-items:center; overflow-y:auto;
-  -webkit-overflow-scrolling:touch;">
-  <div style="width:100%;max-width:560px;padding:20px 20px 0;flex-shrink:0;border-bottom:1px solid rgba(180,79,255,.25);padding-bottom:14px;">
-    <div style="color:rgba(180,79,255,.6);font-size:.6rem;font-weight:900;letter-spacing:.12em;margin-bottom:3px;font-family:'Orbitron',monospace;">📖 GAME RULES</div>
-    <div id="w4-rules-title" style="color:#b44fff;font-family:'Orbitron',monospace;font-weight:900;font-size:1.1rem;">節奏合鳴</div>
-  </div>
-  <div id="w4-rules-content" style="width:100%;max-width:560px;padding:16px 20px;flex:1;"></div>
-  <div style="width:100%;max-width:560px;padding:12px 20px 36px;flex-shrink:0;">
-    <button onclick="w4CloseRules()" style="
-      display:block;width:100%;padding:16px;border-radius:14px;border:none;cursor:pointer;
-      background:linear-gradient(135deg,#b44fff,#7b2fff);color:#fff;
-      font-family:'Orbitron',monospace;font-weight:900;font-size:.95rem;
-      box-shadow:0 4px 0 #4a1a99;-webkit-tap-highlight-color:transparent;">
-      ▶ 了解規則，開始！
-    </button>
-  </div>
-</div>
 
 <div id="platform-wait" class="overlay hidden" style="background:radial-gradient(ellipse at center,rgba(0,30,50,0.97),rgba(6,10,16,0.99))">
     <div style="text-align:center;padding:32px 24px;max-width:400px">
@@ -1602,83 +1582,16 @@
         }, '*');
     };
 
-    // ── W4 學生端規則資料（≤30字/條）──
-    const W4_RULES = [
-      { icon:'◎', name:'縮圈點擊', color:'#3498db', items:[
-        '圓圈縮到最小時點擊，越準確分越高！',
-        'PERFECT < 50ms ★★★  GREAT < 120ms ★★  OK < 250ms ★',
-        '連擊累積 Combo 倍率（最高 2x），Miss 歸零。',
-      ]},
-      { icon:'▬', name:'鋼琴黑塊', color:'#9b59b6', items:[
-        '黑塊滑到底線時點擊，千萬別碰白塊！',
-        '點到白塊 → 立刻失敗！錯過黑塊 → 扣分。',
-        '連擊命中 Combo 倍率越高，失誤歸零。',
-      ]},
-      { icon:'↓', name:'底線軌道', color:'#e67e22', items:[
-        '音符進入底線時按住，離開時放開！',
-        '長音符需持續按住直到結束才算 PERFECT。',
-        '連續完美命中可累積 Combo 倍率。',
-      ]},
-    ];
 
-    // 顯示 W4 規則覆蓋層
-    function w4ShowRules(mode, onDone) {
-      const rule = W4_RULES[(mode-1) % 3];
-      const overlay = document.getElementById('w4-rules-overlay');
-      const titleEl = document.getElementById('w4-rules-title');
-      const contentEl = document.getElementById('w4-rules-content');
-      if (!overlay) { onDone(); return; }
-
-      if (titleEl) titleEl.textContent = `${rule.icon} ${rule.name}`;
-      if (contentEl) contentEl.innerHTML = `
-        <div style="font-size:2rem;margin-bottom:12px;">${rule.icon}</div>
-        <ul style="margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:14px;">
-          ${rule.items.map(it=>`
-            <li style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
-              border-radius:10px;padding:12px 14px;
-              font-size:.85rem;color:rgba(255,255,255,.8);line-height:1.6;
-              font-family:'Noto Sans TC',sans-serif;">${it}</li>
-          `).join('')}
-        </ul>
-        <div style="margin-top:16px;font-size:.7rem;color:rgba(255,255,255,.3);
-          font-family:'Orbitron',monospace;text-align:center;">共 10 關，越往後越難</div>
-      `;
-
-      overlay.style.display = 'flex';
-      overlay.scrollTop = 0;
-      overlay._onDone = onDone;
-    }
-
-    // 學生按「了解規則，開始！」
-    function w4CloseRules() {
-      const overlay = document.getElementById('w4-rules-overlay');
-      if (overlay) {
-        overlay.style.display = 'none';
-        if (typeof overlay._onDone === 'function') {
-          const cb = overlay._onDone;
-          overlay._onDone = null;
-          cb();
-        }
-      }
-    }
-
-    // platformLaunch：收到老師的 PLATFORM_START 後的啟動邏輯
-    // LV1 一定先顯示規則頁（學生確認後才進遊戲）
-    // LV2+ 直接進遊戲（老師手動開下一關）
+    // platformLaunch：收到老師的 PLATFORM_START 後直接進遊戲
+    // 規則頁由 index.html 老師端統一控制，學生看完規則老師才按「全班開始！」
     function platformLaunch(mode, level) {
         document.getElementById('platform-wait').classList.add('hidden');
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('level-menu').classList.add('hidden');
         document.getElementById('result-screen').classList.add('hidden');
         gameState.mode = mode;
-
-        if (level === 1) {
-            // 每個模式第一關：顯示規則頁，學生確認後才進遊戲
-            w4ShowRules(mode, () => startGame(level));
-        } else {
-            // LV2+ 直接進遊戲
-            startGame(level);
-        }
+        startGame(level);
     }
 
     // 接收大廳 postMessage

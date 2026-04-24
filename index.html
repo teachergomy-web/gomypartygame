@@ -1834,142 +1834,142 @@ function tcRenderKickBar(show) {
 
 // 各遊戲規則內容（依 GAMES 陣列索引 0–7 對應 W1–W8）
 // 規則每條 ≤30 字，簡潔易懂
+// 各遊戲規則（老師端顯示用，只說怎麼玩）
 const GAME_RULES = [
-  // 0 W1 星際採礦
-  { icon:'⭐', name:'星際採礦', color:'#00e5ff', sections:[
-    { title:'🎯 目標', body:'限時點擊飛來飛去的礦石，累積最高分！' },
-    { title:'🕹️ 操作', items:['點礦石得分，頂點點擊有加分','⭐ 金色護盾：需點 3 下，分最高','👻 幽靈 / 💣 炸彈：不要點，會扣分！'] },
-    { title:'📈 難度', items:['1–10 關 🌿：礦石從下飛來','11–20 關 ⚡：上下兩側同時出現','21–30 關 🔥：四面八方，有障礙物'] },
+  // 0 W1 消除方塊
+  { icon:'⭐', name:'消除方塊', color:'#00e5ff', lines:[
+    '點擊飛來飛去的方塊！',
+    '⭐ 金色護盾需點 3 下',
+    '👻 幽靈 / 💣 炸彈不要點',
   ]},
   // 1 W2 能源管線
-  { icon:'⚡', name:'能源管線', color:'#00e5ff', sections:[
-    { title:'🎯 目標', body:'全組合作旋轉管線，把發電機接到接收器！' },
-    { title:'🕹️ 操作', body:'點任意管線方塊即旋轉 90°，全組同時合作。' },
-    { title:'🔌 單管（1–22 關）', body:'S（青）→ D（青），完成通路即過關。' },
-    { title:'🔀 雙管（23–28 關）', items:['S→D（青）和 A→B（粉）同時要通','用 ┼ 交叉管讓兩線安全通過','兩線混接 = 短路，小心！'] },
+  { icon:'⚡', name:'能源管線', color:'#00e5ff', lines:[
+    '把發電機 S 接到接收器 D！',
+    '接通即過關！',
+    '點任意管線方塊即旋轉 90°',
+    '23 關後有兩條線同時要接通',
   ]},
   // 2 W3 五子棋
-  { icon:'⚔️', name:'五子棋對戰', color:'#f5c800', sections:[
-    { title:'🎯 目標', body:'兩組對戰，先連成五子（橫直斜皆可）獲勝！' },
-    { title:'🕹️ 操作', body:'輪到你時點棋盤交叉點落子，黑棋先手。' },
-    { title:'🏆 計分', body:'每勝一局得 1 分，老師決定進行幾局。' },
+  { icon:'⚔️', name:'五子棋對戰', color:'#f5c800', lines:[
+    '兩組對戰，黑棋先手',
+    '先在棋盤連成五子獲勝！',
+    '橫、直、斜都算',
   ]},
-  // 3 W4 節奏合鳴（老師端：三種模式總覽）
-  { icon:'🎵', name:'節奏合鳴', color:'#b44fff', sections:[
-    { title:'🎮 三大模式總覽', body:'每種模式各 10 關（共 30 關），分開計分。' },
-    { title:'◎ 縮圈點擊', items:['圓圈縮到最小時點擊，越準確分越高','連擊累積 Combo 倍率（最高 2x）'] },
-    { title:'▬ 鋼琴黑塊', items:['黑塊滑到底線時點擊，勿碰白塊','點到白塊立刻失敗！'] },
-    { title:'↓ 底線軌道', items:['音符進入底線時按住，離開時放開','長音符需持續按住到結束'] },
-    { title:'🔥 共同規則', body:'連擊命中 Combo 倍率越高，失誤歸零。' },
+  // 3 W4 縮圈點擊（模式1）
+  { icon:'◎', name:'節奏合鳴 — 縮圈點擊', color:'#b44fff', lines:[
+    '倒數結束時點擊圓圈！',
   ]},
   // 4 W5 你畫我猜
-  { icon:'🎨', name:'你畫我猜', color:'#34d399', sections:[
-    { title:'🎯 目標', body:'畫出老師給的題目，讓鄰組猜出來！' },
-    { title:'📋 流程', items:['看到題目後開始作畫（限時）','時間到進入猜題，每組猜上一組的畫','完全一樣才算答對'] },
-    { title:'💰 計分', items:['猜對：猜題組 +20 分','被猜中：作畫組 +10 分'] },
+  { icon:'🎨', name:'你畫我猜', color:'#34d399', lines:[
+    '派出一人依題目作畫',
+    '時間到，每組猜別組的畫',
+    '字完全一樣才算答對',
+    '別人答對你的圖也可以加分',
   ]},
   // 5 W6 雙人圈圈
-  { icon:'⭕', name:'雙人圈圈', color:'#f1c40f', sections:[
-    { title:'🎯 目標', body:'控制游標移進跑動的圈圈，讓圈圈停下！' },
-    { title:'🕹️ 操作', body:'拖曳角落搖桿移動游標，游標入圈圈減速。' },
-    { title:'📋 六回合', items:['第1回合：1人1圈','第2回合：2人同時','第3回合：3人同時','第4–5回合：隨機人數與圈數','第6回合★：全組移進同一個大圈'] },
+  { icon:'⭕', name:'雙人圈圈', color:'#f1c40f', lines:[
+    '多人合作，用搖桿移動游標',
+    '進入相應顏色的圈圈！',
+    '每關有 6 階段',
   ]},
-  // 6 W7 記憶力大考驗（老師端：三關總覽）
-  { icon:'🧠', name:'記憶力大考驗', color:'#a78bfa', sections:[
-    { title:'🎮 三關總覽', body:'三種記憶挑戰，分數可跨關累計。' },
-    { title:'🃏 第一關：記憶翻牌', items:['觀察所有牌的位置（限時）','蓋起後翻開找出所有配對','越快完成，時間分越高'] },
-    { title:'🎪 第二關：動果大遊行', items:['記住圖案出場順序','結束後依序點選還原','全對拿滿分'] },
-    { title:'🔐 第三關：金庫解碼', items:['記住轉盤方向與次數','按照順序轉動後按 OK','方向或次數錯誤需重試'] },
+  // 6 W7 翻牌（Part 1）
+  { icon:'🃏', name:'記憶力大考驗 — 翻牌', color:'#a78bfa', lines:[
+    '牌面翻開後蓋起',
+    '翻兩張找配對！',
   ]},
   // 7 W8 環遊大富翁
-  { icon:'🚀', name:'環遊大富翁', color:'#ff8c00', sections:[
-    { title:'🎯 目標', body:'輪流擲骰前進，靠答題與事件累積最多資金！' },
-    { title:'📍 格子類型', items:['❓ 機會問答：答對得 $500','⭐ 任務挑戰：老師裁判（+$600 / -$300）','💰 幸運事件：獲得金錢或優勢','💸 突發狀況：損失金錢','🏁 起點：每次經過得 $500'] },
-    { title:'⭐ 任務挑戰', body:'猜拳互動、繞口令、語詞挑戰，老師判定結果。' },
+  { icon:'🚀', name:'環遊大富翁', color:'#ff8c00', lines:[
+    '❓ 機會問答：冷知識問答',
+    '⭐ 任務挑戰：完成特殊任務',
+    '💰 幸運：好運降臨',
+    '💸 突發：倒楣纏身',
+    '經過起點（過一圈）有加分',
   ]},
 ];
 
-// W4 各模式細分規則（學生端在 iframe 內顯示，老師端用 GAME_RULES[3] 總覽）
+// W4 三種玩法（老師端各玩法開始前顯示）
 const GAME_RULES_W4 = [
-  // Mode 1：縮圈點擊
-  { icon:'◎', name:'縮圈點擊', color:'#3498db', sections:[
-    { title:'🎯 目標', body:'圓圈縮到最小時點擊，越準確分越高！' },
-    { title:'⭐ 評級', items:['PERFECT（< 50ms）：最高分','GREAT（< 120ms）：高分','OK（< 250ms）：基礎分','MISS：0 分，Combo 中斷'] },
-    { title:'🔥 Combo', body:'連續命中倍率最高 2x，Miss 歸零。' },
+  { icon:'◎', name:'節奏合鳴 — 縮圈點擊', color:'#b44fff', lines:[
+    '倒數結束時點擊圓圈！',
   ]},
-  // Mode 2：鋼琴黑塊
-  { icon:'▬', name:'鋼琴黑塊', color:'#9b59b6', sections:[
-    { title:'🎯 目標', body:'黑塊滑到底線時點擊，不要碰到白塊！' },
-    { title:'⚠️ 規則', items:['點到白塊 → 立刻失敗','錯過黑塊 → 扣分，Combo 中斷','黑塊完整落入底線時點最準'] },
-    { title:'🔥 Combo', body:'連續命中倍率越高，失誤歸零。' },
+  { icon:'▬', name:'節奏合鳴 — 鋼琴黑塊', color:'#9b59b6', lines:[
+    '方塊滑到底線時點擊！',
   ]},
-  // Mode 3：底線軌道
-  { icon:'↓', name:'底線軌道', color:'#e67e22', sections:[
-    { title:'🎯 目標', body:'音符進入底線按住，音符結束後放開！' },
-    { title:'⭐ 評級', items:['按住整個音符：PERFECT','太晚按 / 太早放：GOOD','完全錯過：MISS，Combo 中斷'] },
-    { title:'🔥 Combo', body:'連續完美命中可累積倍率。' },
+  { icon:'↓', name:'節奏合鳴 — 底線軌道', color:'#e67e22', lines:[
+    '方塊進入底線時按住',
+    '離開時放開！',
   ]},
 ];
 
-// W7 各 Part 細分規則（學生端在 iframe 內顯示，老師端用 GAME_RULES[6] 總覽）
+// W7 三個 Part（老師端各 Part 開始前顯示）
 const GAME_RULES_W7 = [
-  // Part 1：記憶翻牌
-  { icon:'🃏', name:'記憶翻牌', color:'#a78bfa', sections:[
-    { title:'🎯 目標', body:'記住牌的位置，翻開找出所有配對！' },
-    { title:'📋 流程', items:['牌面全翻開，記住圖案位置（限時）','倒數結束後蓋起','翻兩張，配對留開，不配對蓋回','找完所有配對即過關'] },
-    { title:'📈 難度', body:'LV1–10，牌數 12→30 張，Emoji 越來越像。' },
+  { icon:'🃏', name:'記憶力大考驗 — 翻牌', color:'#a78bfa', lines:[
+    '牌面翻開後蓋起',
+    '翻兩張找配對！',
   ]},
-  // Part 2：動果大遊行
-  { icon:'🎪', name:'動果大遊行', color:'#f59e0b', sections:[
-    { title:'🎯 目標', body:'記住圖案出場順序，結束後依序還原！' },
-    { title:'📋 流程', items:['圖案從右側依序跑過（順序就是答案）','結束後從選項格依序點選','點錯可按「重填」重來','全對滿分，部分正確依比例給分'] },
-    { title:'📈 難度', body:'LV1–10，物品 4→12 個。' },
+  { icon:'🎪', name:'記憶力大考驗 — 動果大遊行', color:'#f59e0b', lines:[
+    '記住圖案出場順序',
+    '結束後依序還原！',
   ]},
-  // Part 3：金庫解碼
-  { icon:'🔐', name:'金庫解碼', color:'#34d399', sections:[
-    { title:'🎯 目標', body:'記住轉盤方向與次數，精準操作解鎖！' },
-    { title:'📋 流程', items:['觀看指令（如 ← 3、→ 2）','指令消失後開始操作','按 ⬅ ➡ 轉動，轉完一組按 OK','全部正確 = 金庫解鎖！'] },
-    { title:'⚠️ 注意', body:'方向或次數錯誤需重試，不扣分。' },
-    { title:'📈 難度', body:'LV1–10，指令 3→10 組。' },
+  { icon:'🔐', name:'記憶力大考驗 — 金庫解碼', color:'#34d399', lines:[
+    '看完指令後，按 ⬅ ➡ 轉動',
+    '轉完一個就按 OK',
+    '直到所有指令完成！',
   ]},
 ];
 
-// ── 共用規則 HTML 渲染函式 ──
+// ── 規則 HTML 渲染（老師端覆蓋層用）──
 function renderRulesHTML(ruleData) {
   if (!ruleData) return '';
   const c = ruleData.color || '#f5c800';
-  const sections = ruleData.sections.map(s => `
-    <div style="margin-bottom:16px;">
-      <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.9rem;
-        color:${c};margin-bottom:7px;">${s.title}</div>
-      ${s.body ? `<div style="font-size:.85rem;color:rgba(255,255,255,.78);line-height:1.75;
-        font-family:'Noto Sans TC',sans-serif;">${s.body}</div>` : ''}
-      ${s.items ? `<ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:5px;">
-        ${s.items.map(it=>`<li style="font-size:.83rem;color:rgba(255,255,255,.7);
-          line-height:1.6;font-family:'Noto Sans TC',sans-serif;">${it}</li>`).join('')}
-      </ul>` : ''}
-    </div>`).join('');
-  return `
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;
-      padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.1);">
-      <div style="font-size:2.6rem;flex-shrink:0;">${ruleData.icon}</div>
-      <div>
-        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.3rem;
-          color:${c};">${ruleData.name}</div>
-        <div style="font-size:.72rem;color:rgba(255,255,255,.3);margin-top:2px;
-          font-family:'Noto Sans TC',sans-serif;">閱讀規則後，請等待老師關閉此頁</div>
+
+  // 新格式：lines[] — 每條一行，簡潔顯示
+  if (ruleData.lines) {
+    const items = ruleData.lines.map(line => `
+      <li style="
+        background:rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.1);
+        border-radius:10px;padding:13px 16px;
+        font-family:'Noto Sans TC',sans-serif;
+        font-size:1rem;font-weight:700;
+        color:rgba(255,255,255,.9);
+        line-height:1.5;
+        list-style:none;">
+        ${line}
+      </li>`).join('');
+    return `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div style="font-size:3rem;flex-shrink:0;">${ruleData.icon}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.4rem;color:${c};">${ruleData.name}</div>
       </div>
-    </div>
-    ${sections}`;
+      <ul style="margin:0;padding:0;display:flex;flex-direction:column;gap:10px;">${items}</ul>`;
+  }
+
+  // 舊格式：sections[]（向下相容）
+  if (ruleData.sections) {
+    const sHTML = ruleData.sections.map(s => `
+      <div style="margin-bottom:14px;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:.88rem;color:${c};margin-bottom:6px;">${s.title}</div>
+        ${s.body ? `<div style="font-size:.84rem;color:rgba(255,255,255,.78);line-height:1.7;font-family:'Noto Sans TC',sans-serif;">${s.body}</div>` : ''}
+        ${s.items ? `<ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px;">
+          ${s.items.map(it=>`<li style="font-size:.82rem;color:rgba(255,255,255,.7);line-height:1.6;font-family:'Noto Sans TC',sans-serif;">${it}</li>`).join('')}
+        </ul>` : ''}
+      </div>`).join('');
+    return `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.1);">
+        <div style="font-size:2.6rem;flex-shrink:0;">${ruleData.icon}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.2rem;color:${c};">${ruleData.name}</div>
+      </div>
+      ${sHTML}`;
+  }
+
+  return '';
 }
 
 // ── 老師端：顯示規則覆蓋層 ──
 function showRulesOverlay() {
   const gIdx = window.state.selectedGame || 0;
-
-  // W4：依照已選模式顯示對應規則
-  // W7：依照已選 Part 顯示對應規則
-  const rule = _getRuleForCurrentSelection(gIdx);
+  const rule  = _getRuleForCurrentSelection(gIdx);
 
   const overlay   = document.getElementById('rules-overlay');
   const titleEl   = document.getElementById('rules-game-title');
@@ -1981,19 +1981,17 @@ function showRulesOverlay() {
   if (codeEl)    codeEl.textContent  = window.state.roomCode || '0000';
   if (contentEl) contentEl.innerHTML = renderRulesHTML(rule);
 
-  // 直接設定 display:flex（最可靠，避免 class 在各平板 WebKit 的歧異）
   overlay.style.display = 'flex';
-  overlay.classList.add('active'); // 同步 class 供 CSS 備援
-  // 捲回頂部
+  overlay.classList.add('active');
   setTimeout(() => { overlay.scrollTop = 0; }, 0);
 
-  // ★ 寫 Firebase：讓學生端同步跳規則頁
+  // 寫 Firebase：讓學生端同步跳規則頁
   const rooms = window.getRooms();
   const r = rooms[window.state.roomCode];
   if (r) {
     r.status    = 'rules';
     r.rulesGame = gIdx;
-    // 同時存 W4 模式 / W7 Part，讓學生端顯示正確的規則
+    // 存模式/Part，讓學生端顯示正確的規則
     if (gIdx === 3) r.rulesW4Mode = lsW4SelectedMode || 1;
     if (gIdx === 6) r.rulesW7Part = _w7SelectedPart  || 1;
     window.saveRooms(rooms);
@@ -2001,10 +1999,19 @@ function showRulesOverlay() {
 }
 
 // ── 根據當前選擇取得對應規則資料 ──
-// 老師端：W4/W7 一律顯示所有玩法總覽（GAME_RULES[3]/[6]）
-// 細分規則（各模式/各 Part）由遊戲 iframe 內部自行顯示
+// W4：依選擇的模式顯示對應玩法規則（各玩法開始前各顯示各的）
+// W7：依選擇的 Part 顯示對應規則
 function _getRuleForCurrentSelection(gIdx) {
-  // W4 和 W7 老師端都顯示總覽
+  if (gIdx === 3) {
+    // W4：依目前選擇的模式
+    const mode = lsW4SelectedMode || 1;
+    return GAME_RULES_W4[(mode - 1)] || GAME_RULES_W4[0];
+  }
+  if (gIdx === 6) {
+    // W7：依目前選擇的 Part
+    const part = _w7SelectedPart || 1;
+    return GAME_RULES_W7[(part - 1)] || GAME_RULES_W7[0];
+  }
   return GAME_RULES[gIdx] || GAME_RULES[0];
 }
 
@@ -2027,13 +2034,18 @@ function closeRulesAndStart() {
   tcStartGame();
 }
 
-// ── 學生端：渲染規則頁內容 ──
-// W4/W7 的細分規則由遊戲 iframe 內部自行顯示（因為各組時間不同，無法由老師統一觸發）
-// 這裡只處理 W1/W2/W3/W5/W6/W8 的規則頁
+// ── 學生端規則頁（老師開啟規則時同步顯示）──
 function showStudentRules(gIdx, roomCode) {
-  // W4(3) / W7(6)：不顯示 index.html 的規則頁，由 iframe 自行處理
-  // 但仍渲染內容（萬一 iframe 沒處理，學生至少看到等待提示）
-  const rule = GAME_RULES[gIdx] || GAME_RULES[0];
+  let rule;
+  if (gIdx === 3) {
+    const mode = window._currentW4Mode || 1;
+    rule = GAME_RULES_W4[(mode - 1)] || GAME_RULES_W4[0];
+  } else if (gIdx === 6) {
+    const part = window._currentW7Part || 1;
+    rule = GAME_RULES_W7[(part - 1)] || GAME_RULES_W7[0];
+  } else {
+    rule = GAME_RULES[gIdx] || GAME_RULES[0];
+  }
   const titleEl   = document.getElementById('srul-game-title');
   const codeEl    = document.getElementById('srul-code');
   const contentEl = document.getElementById('srul-content');
@@ -3177,7 +3189,10 @@ setInterval(() => {
 
     // 偵測老師開啟規則頁 → 學生同步顯示規則
     if (r.status === 'rules') {
-      const gIdx   = (r.rulesGame  !== undefined) ? r.rulesGame  : (r.selectedGame || 0);
+      const gIdx = (r.rulesGame !== undefined) ? r.rulesGame : (r.selectedGame || 0);
+      // 把 W4 模式 / W7 Part 存到 window 供 showStudentRules 使用
+      if (r.rulesW4Mode) window._currentW4Mode = r.rulesW4Mode;
+      if (r.rulesW7Part) window._currentW7Part = r.rulesW7Part;
       showStudentRules(gIdx, window.state.roomCode);
       if (pData.screen !== 'screen-student-rules') {
         pData.screen = 'screen-student-rules';
