@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎮 GoMyParty 自動測試儀表板</title>
+<style>
+  :root {
+    --bg: #07090f;
+    --panel: #0e1118;
+    --border: #1e2535;
+    --accent: #00e5ff;
+    --green: #22c55e;
+    --yellow: #f5c800;
+    --red: #ff4444;
+    --purple: #a855f7;
+    --text: #e2e8f0;
+    --muted: rgba(226,232,240,0.4);
+    --font-mono: 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  #header {
+    flex-shrink: 0;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #header h1 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: .05em;
+    white-space: nowrap;
+  }
+  #header h1 span { color: var(--yellow); }
+
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .ctrl-label {
+    font-size: .72rem;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  select, input[type=text] {
+    background: rgba(255,255,255,.06);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 5px 10px;
+    font-size: .82rem;
+    outline: none;
+    cursor: pointer;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  option { background: #1a1f2e; }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 700;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn-cyan  { background: var(--accent);  color: #000; }
+  .btn-green { background: var(--green);   color: #fff; }
+  .btn-red   { background: var(--red);     color: #fff; }
+  .btn-yellow{ background: var(--yellow);  color: #000; }
+  .btn-ghost { background: rgba(255,255,255,.07); border: 1px solid var(--border); color: var(--text); }
+
+  #status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background .3s;
+  }
+  #status-dot.running { background: var(--green); animation: pulse 1s ease-in-out infinite alternate; }
+  #status-dot.error   { background: var(--red); }
+  @keyframes pulse { from { opacity: 1; } to { opacity: .3; } }
+
+  #step-label {
+    font-size: .78rem;
+    color: var(--yellow);
+    font-weight: 600;
+    min-width: 180px;
+  }
+
+  /* ── Main layout ── */
+  #main {
+    flex: 1;
+    display: flex;
+    gap: 0;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── Viewport area ── */
+  #viewports {
+    flex: 1;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    overflow: hidden;
+    background: #050709;
+  }
+
+  .vp-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow: hidden;
+  }
+
+  .vp-slot {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+
+  .vp-label {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: rgba(0,0,0,.3);
+    border-bottom: 1px solid var(--border);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .vp-label .badge {
+    padding: 1px 7px;
+    border-radius: 20px;
+    font-size: .6rem;
+    font-weight: 700;
+  }
+  .badge-teacher  { background: rgba(0,229,255,.15); color: var(--accent); border: 1px solid rgba(0,229,255,.3); }
+  .badge-student  { background: rgba(34,197,94,.12); color: var(--green);  border: 1px solid rgba(34,197,94,.3); }
+  .badge-tablet   { background: rgba(168,85,247,.12); color: var(--purple); border: 1px solid rgba(168,85,247,.3); }
+  .badge-mobile   { background: rgba(245,200,0,.12); color: var(--yellow); border: 1px solid rgba(245,200,0,.3); }
+
+  .vp-device-frame {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #020305;
+  }
+
+  /* 平板模擬框 */
+  .vp-device-frame.tablet-frame {
+    padding: 6px;
+  }
+  .vp-device-frame.tablet-frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 6px solid #1a1f2e;
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  iframe {
+    border: none;
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .iframe-full {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 平板比例 (4:3, 768px wide equiv) */
+  .iframe-tablet {
+    /* Will be sized by JS */
+    transform-origin: top left;
+  }
+
+  /* 手機比例 (9:16) */
+  .iframe-mobile {
+    transform-origin: top center;
+  }
+
+  /* ── Log panel ── */
+  #log-panel {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  #log-header {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #log-header span {
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  #log-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  #log-body::-webkit-scrollbar { width: 4px; }
+  #log-body::-webkit-scrollbar-track { background: transparent; }
+  #log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .log-entry {
+    display: flex;
+    gap: 6px;
+    font-size: .7rem;
+    line-height: 1.5;
+    font-family: var(--font-mono);
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .log-entry:hover { background: rgba(255,255,255,.04); }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-icon { flex-shrink: 0; }
+  .log-msg  { color: var(--text); word-break: break-word; }
+  .log-ok    .log-msg { color: var(--green); }
+  .log-warn  .log-msg { color: var(--yellow); }
+  .log-error .log-msg { color: var(--red); }
+  .log-info  .log-msg { color: var(--accent); }
+  .log-step  { background: rgba(245,200,0,.06); }
+  .log-step  .log-msg { color: var(--yellow); font-weight: 700; }
+
+  /* ── Step queue ── */
+  #steps-panel {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .step-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 5px;
+    font-size: .68rem;
+    font-family: var(--font-mono);
+    transition: all .2s;
+  }
+  .step-row.pending { color: var(--muted); }
+  .step-row.active  { background: rgba(245,200,0,.1); color: var(--yellow); font-weight: 700; }
+  .step-row.done    { color: rgba(34,197,94,.5); }
+  .step-row.failed  { color: var(--red); background: rgba(255,68,68,.05); }
+  .step-icon { flex-shrink: 0; width: 14px; text-align: center; }
+
+  /* ── Progress bar ── */
+  #progress-bar-wrap {
+    height: 3px;
+    background: rgba(255,255,255,.06);
+    flex-shrink: 0;
+  }
+  #progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    transition: width .4s ease;
+    width: 0%;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div id="header">
+  <h1>🎮 <span>GoMyParty</span> 測試儀表板</h1>
+
+  <div class="ctrl-group">
+    <span class="ctrl-label">遊戲</span>
+    <select id="game-select">
+      <option value="1">⭐ W1 消除方塊</option>
+      <option value="2">⚡ W2 能源管線</option>
+      <option value="3">⚫ W3 五子棋對戰</option>
+      <option value="4">🎵 W4 節奏合鳴</option>
+      <option value="5">🎨 W5 你畫我猜</option>
+      <option value="6">⭕ W6 雙人圈圈</option>
+      <option value="7">🧠 W7 記憶大考驗</option>
+      <option value="8">🚀 W8 環遊大富翁</option>
+    </select>
+  </div>
+
+  <div class="ctrl-group">
+    <span class="ctrl-label">學生數</span>
+    <select id="player-count">
+      <option value="2">2 組</option>
+      <option value="3" selected>3 組</option>
+      <option value="4">4 組</option>
+    </select>
+  </div>
+
+  <div class="ctrl-group">
+    <span class="ctrl-label">平台網址</span>
+    <input type="text" id="base-url" value="https://teachergomy-web.github.io/gomypartygame" style="width:320px">
+  </div>
+
+  <div class="ctrl-group">
+    <span class="ctrl-label">速度</span>
+    <select id="speed-select">
+      <option value="1000">正常</option>
+      <option value="500" selected>快速</option>
+      <option value="200">超快</option>
+    </select>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+    <div id="status-dot"></div>
+    <div id="step-label" style="color:var(--muted)">尚未開始</div>
+  </div>
+
+  <div class="ctrl-group">
+    <button class="btn btn-green" onclick="startTest()">▶ 開始測試</button>
+    <button class="btn btn-yellow" onclick="nextStep()">⏭ 下一步</button>
+    <button class="btn btn-ghost" onclick="pauseTest()">⏸ 暫停</button>
+    <button class="btn btn-red" onclick="resetTest()">↺ 重置</button>
+  </div>
+</div>
+
+<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+
+<!-- ── Main ── -->
+<div id="main">
+  <!-- Viewport grid -->
+  <div id="viewports">
+    <!-- 動態生成 -->
+  </div>
+
+  <!-- Log panel -->
+  <div id="log-panel">
+    <div id="log-header">
+      <span>📋 測試日誌</span>
+      <button class="btn btn-ghost" style="padding:2px 8px;font-size:.65rem" onclick="clearLog()">清除</button>
+    </div>
+    <div id="log-body"></div>
+    <div id="steps-panel"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// 配置
+// ════════════════════════════════════════
+const TEACHER_PW = '3758';
+const STEP_DELAY = () => parseInt(document.getElementById('speed-select').value);
+const LONG_DELAY = () => STEP_DELAY() * 3;
+
+let iframes = {}; // { teacher, student1, student2, ... }
+let testRunning = false;
+let testPaused  = false;
+let currentStepIdx = 0;
+let stepList = [];
+let abortTest = false;
+
+// ════════════════════════════════════════
+// 遊戲定義
+// ════════════════════════════════════════
+const GAMES = {
+  1: { name:'消除方塊',   icon:'⭐', file:'W1_消除方塊.html',     hasLevel: true  },
+  2: { name:'能源管線',   icon:'⚡', file:'W2_能源管線.html',     hasLevel: true  },
+  3: { name:'五子棋對戰', icon:'⚫', file:'W3_五子棋對戰.html',   hasLevel: false },
+  4: { name:'節奏合鳴',   icon:'🎵', file:'W4_節奏合鳴.html',     hasLevel: true  },
+  5: { name:'你畫我猜',   icon:'🎨', file:'W5_你畫我猜.html',     hasLevel: false },
+  6: { name:'雙人圈圈',   icon:'⭕', file:'W6_雙人圈圈.html',     hasLevel: true  },
+  7: { name:'記憶大考驗', icon:'🧠', file:'W7_記憶力大考驗.html', hasLevel: true  },
+  8: { name:'環遊大富翁', icon:'🚀', file:'W8_環遊大富翁.html',   hasLevel: false },
+};
+
+const GROUP_NAMES = ['第1組', '第2組', '第3組', '第4組'];
+const GROUP_SYMBOLS = ['🐻', '🐼', '🦊', '🐸'];
+
+// ════════════════════════════════════════
+// 裝置模擬尺寸
+// ════════════════════════════════════════
+const DEVICE_PRESETS = {
+  teacher: { label:'老師端（桌機）', w: null, h: null, isScaled: false },
+  student_desktop: { label:'學生（桌機）', w: null, h: null, isScaled: false },
+  student_tablet:  { label:'學生（iPad 11"）', w: 1194, h: 834, isScaled: true, badge:'tablet' },
+  student_mobile:  { label:'學生（iPhone 14）', w: 390, h: 844, isScaled: true, badge:'mobile' },
+};
+
+// ════════════════════════════════════════
+// 日誌
+// ════════════════════════════════════════
+function log(msg, type = 'info') {
+  const body = document.getElementById('log-body');
+  const icons = { ok:'✅', warn:'⚠️', error:'❌', info:'ℹ️', step:'▶', action:'🖱️' };
+  const now = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${type}`;
+  entry.innerHTML = `<span class="log-time">${now}</span><span class="log-icon">${icons[type]||'·'}</span><span class="log-msg">${msg}</span>`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+}
+function clearLog() { document.getElementById('log-body').innerHTML = ''; }
+
+// ════════════════════════════════════════
+// 步驟顯示
+// ════════════════════════════════════════
+function renderSteps() {
+  const panel = document.getElementById('steps-panel');
+  panel.innerHTML = '<div style="font-size:.62rem;color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:0 4px 4px">測試步驟</div>';
+  stepList.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.id = `step-${i}`;
+    div.className = 'step-row pending';
+    div.innerHTML = `<span class="step-icon">○</span><span>${s.label}</span>`;
+    panel.appendChild(div);
+  });
+}
+
+function setStepState(idx, state) {
+  const el = document.getElementById(`step-${idx}`);
+  if (!el) return;
+  const icons = { active:'▶', done:'✓', failed:'✗', pending:'○' };
+  el.className = `step-row ${state}`;
+  el.querySelector('.step-icon').textContent = icons[state] || '○';
+  if (state === 'active') el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  // 更新 header
+  if (state === 'active') {
+    document.getElementById('step-label').textContent = stepList[idx]?.label || '';
+  }
+}
+
+function updateProgress() {
+  const done = stepList.filter((_, i) => {
+    const el = document.getElementById(`step-${i}`);
+    return el && el.classList.contains('done');
+  }).length;
+  document.getElementById('progress-bar').style.width = `${(done / Math.max(stepList.length, 1)) * 100}%`;
+}
+
+// ════════════════════════════════════════
+// iframe 建立
+// ════════════════════════════════════════
+function buildViewports() {
+  const container = document.getElementById('viewports');
+  container.innerHTML = '';
+  iframes = {};
+
+  const numStudents = parseInt(document.getElementById('player-count').value);
+  const baseUrl = document.getElementById('base-url').value.trim();
+
+  // 裝置分配
+  const studentDevices = [
+    { type: 'student_desktop', role: 'student', label: '學生1 桌機', badge: 'badge-student' },
+    { type: 'student_tablet',  role: 'student', label: '學生2 iPad', badge: 'badge-tablet' },
+    { type: 'student_mobile',  role: 'student', label: '學生3 iPhone', badge: 'badge-mobile' },
+    { type: 'student_desktop', role: 'student', label: '學生4 桌機', badge: 'badge-student' },
+  ].slice(0, numStudents);
+
+  // Layout：左欄老師，右欄學生
+  container.style.gridTemplateColumns = `1fr 1fr`;
+
+  // 左欄：老師端
+  const leftCol = document.createElement('div');
+  leftCol.className = 'vp-col';
+
+  const teacherSlot = makeSlot('teacher', '老師端', 'badge-teacher', baseUrl);
+  leftCol.appendChild(teacherSlot);
+  container.appendChild(leftCol);
+
+  // 右欄：學生
+  const rightCol = document.createElement('div');
+  rightCol.className = 'vp-col';
+  rightCol.style.gap = '4px';
+
+  studentDevices.forEach((dev, i) => {
+    const slot = makeSlot(`student${i+1}`, dev.label, dev.badge, baseUrl, dev.type);
+    rightCol.appendChild(slot);
+  });
+  container.appendChild(rightCol);
+
+  // 稍後調整 iframe 比例
+  requestAnimationFrame(scaleIframes);
+}
+
+function makeSlot(id, label, badgeClass, baseUrl, deviceType = null) {
+  const slot = document.createElement('div');
+  slot.className = 'vp-slot';
+  slot.id = `slot-${id}`;
+  slot.style.flex = '1';
+
+  const isTablet = deviceType === 'student_tablet';
+  const isMobile = deviceType === 'student_mobile';
+
+  slot.innerHTML = `
+    <div class="vp-label">
+      <span class="badge ${badgeClass}">${id === 'teacher' ? '👨‍🏫' : '👤'} ${label}</span>
+      ${deviceType && DEVICE_PRESETS[deviceType] ? `<span style="color:var(--muted);font-size:.62rem">${DEVICE_PRESETS[deviceType].label}</span>` : ''}
+      <span id="status-${id}" style="margin-left:auto;font-size:.65rem;color:var(--muted)">待機</span>
+    </div>
+    <div class="vp-device-frame${isTablet||isMobile?' tablet-frame':''}" id="frame-${id}">
+      <iframe id="iframe-${id}" src="${baseUrl}" class="iframe-full"
+        allow="autoplay; microphone; camera"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals">
+      </iframe>
+    </div>`;
+
+  // 儲存 iframe 參考
+  setTimeout(() => {
+    iframes[id] = document.getElementById(`iframe-${id}`);
+    iframes[id]._deviceType = deviceType;
+  }, 0);
+
+  return slot;
+}
+
+function scaleIframes() {
+  Object.entries(iframes).forEach(([id, f]) => {
+    if (!f) return;
+    const preset = DEVICE_PRESETS[f._deviceType];
+    if (!preset || !preset.isScaled) return;
+
+    const frame = document.getElementById(`frame-${id}`);
+    if (!frame) return;
+    const fw = frame.clientWidth - 12;
+    const fh = frame.clientHeight - 12;
+    const scale = Math.min(fw / preset.w, fh / preset.h);
+    f.style.width  = preset.w + 'px';
+    f.style.height = preset.h + 'px';
+    f.style.transform = `scale(${scale})`;
+    f.style.transformOrigin = 'top left';
+    f.style.position = 'absolute';
+    f.style.top = '6px';
+    f.style.left = '6px';
+    f.classList.remove('iframe-full');
+  });
+}
+
+window.addEventListener('resize', scaleIframes);
+
+// ════════════════════════════════════════
+// iframe 操作助手
+// ════════════════════════════════════════
+function getWin(id) {
+  const f = iframes[id];
+  if (!f) throw new Error(`iframe ${id} 不存在`);
+  try { return f.contentWindow; } catch(e) { throw new Error(`無法存取 ${id} contentWindow: ${e.message}`); }
+}
+
+function getDoc(id) {
+  const f = iframes[id];
+  if (!f) return null;
+  try { return f.contentDocument || f.contentWindow.document; } catch(e) { return null; }
+}
+
+// 在 iframe 中找元素並點擊
+function clickIn(id, selector) {
+  const doc = getDoc(id);
+  if (!doc) { log(`❌ 找不到 ${id} 的 document`, 'error'); return false; }
+  const el = doc.querySelector(selector);
+  if (!el) { log(`⚠️ 在 ${id} 找不到 ${selector}`, 'warn'); return false; }
+  el.click();
+  return true;
+}
+
+// 在 iframe 中設定 input 值
+function setInput(id, selector, value) {
+  const doc = getDoc(id);
+  if (!doc) return false;
+  const el = doc.querySelector(selector);
+  if (!el) return false;
+  el.value = value;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+
+// 在 iframe 中執行函式
+function callFn(id, fn, ...args) {
+  const win = getWin(id);
+  if (typeof win[fn] === 'function') {
+    win[fn](...args);
+    return true;
+  }
+  return false;
+}
+
+// 等待某個條件成立
+function waitFor(condition, timeout = 8000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      if (abortTest) { reject(new Error('測試已中止')); return; }
+      try {
+        if (condition()) { resolve(); return; }
+      } catch(e) {}
+      if (Date.now() - start > timeout) { reject(new Error(`等待逾時 (${timeout}ms)`)); return; }
+      setTimeout(check, 100);
+    };
+    check();
+  });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => {
+    const check = setInterval(() => {
+      if (!testPaused) { clearInterval(check); setTimeout(resolve, 0); }
+    }, 100);
+    if (!testPaused) { clearInterval(check); setTimeout(resolve, ms); }
+  });
+}
+
+function setSlotStatus(id, text, color = 'var(--muted)') {
+  const el = document.getElementById(`status-${id}`);
+  if (el) { el.textContent = text; el.style.color = color; }
+}
+
+// ════════════════════════════════════════
+// 建立測試步驟
+// ════════════════════════════════════════
+function buildStepList(gameId, numStudents) {
+  const g = GAMES[gameId];
+  const steps = [];
+
+  // ── 1. 等待 iframe 載入 ──
+  steps.push({ label: '等待頁面載入', fn: stepWaitLoaded });
+
+  // ── 2. 老師登入 ──
+  steps.push({ label: '老師端：輸入密碼登入', fn: stepTeacherLogin });
+
+  // ── 3. 建立房間 ──
+  steps.push({ label: '老師端：建立房間', fn: stepCreateRoom });
+
+  // ── 4. 學生加入 ──
+  for (let i = 1; i <= numStudents; i++) {
+    steps.push({ label: `學生${i}：輸入房間密碼`, fn: () => stepStudentJoin(i) });
+  }
+
+  // ── 5. 確認大廳 ──
+  steps.push({ label: '確認所有學生已進入大廳', fn: stepWaitLobby });
+
+  // ── 6. 選擇遊戲 ──
+  steps.push({ label: `老師端：選擇 ${g.icon} ${g.name}`, fn: () => stepSelectGame(gameId) });
+
+  // ── 7. 開始前規則頁 ──
+  steps.push({ label: '老師端：開啟規則頁並確認開始', fn: stepStartWithRules });
+
+  // ── 8. 確認遊戲畫面 ──
+  steps.push({ label: '確認學生端進入遊戲', fn: stepConfirmGameStarted });
+
+  // ── 9. W4 特殊：等第一模式結束 ──
+  if (gameId === 4) {
+    steps.push({ label: 'W4：等待模式完成 → 切換下一玩法', fn: stepW4ModeComplete });
+  }
+
+  // ── 10. 觀察遊戲 ──
+  steps.push({ label: `觀察遊戲進行 ${STEP_DELAY()*5/1000}s`, fn: stepObserve });
+
+  // ── 11. 踢人測試 ──
+  steps.push({ label: '老師端：測試踢除學生1', fn: stepKickStudent });
+
+  // ── 12. 學生重新加入 ──
+  steps.push({ label: '學生1：重新加入房間', fn: () => stepStudentRejoin(1) });
+
+  // ── 13. 結算 ──
+  steps.push({ label: '老師端：結算遊戲', fn: stepSettle });
+
+  // ── 14. 回大廳 ──
+  steps.push({ label: '老師端：返回大廳', fn: stepReturnLobby });
+
+  // ── 15. 完成 ──
+  steps.push({ label: '✅ 測試完成', fn: stepDone });
+
+  return steps;
+}
+
+// ════════════════════════════════════════
+// 各步驟實作
+// ════════════════════════════════════════
+
+async function stepWaitLoaded() {
+  log('等待所有 iframe 載入中...', 'info');
+  await sleep(2000);
+  const ids = Object.keys(iframes);
+  for (const id of ids) {
+    try {
+      await waitFor(() => {
+        const doc = getDoc(id);
+        return doc && doc.readyState === 'complete';
+      }, 15000);
+      setSlotStatus(id, '已載入', 'var(--green)');
+      log(`${id} 頁面載入完成`, 'ok');
+    } catch(e) {
+      log(`${id} 載入逾時`, 'warn');
+    }
+  }
+  await sleep(STEP_DELAY());
+}
+
+async function stepTeacherLogin() {
+  log('老師端：前往登入頁面', 'action');
+  // 點擊「老師登入」
+  await sleep(500);
+  clickIn('teacher', '[onclick="goToTeacherLogin()"]') ||
+    callFn('teacher', 'goToTeacherLogin');
+  await sleep(STEP_DELAY());
+  setInput('teacher', '#tl-pw', TEACHER_PW);
+  await sleep(300);
+  callFn('teacher', 'teacherLogin');
+  setSlotStatus('teacher', '已登入', 'var(--accent)');
+  log('老師端：登入成功', 'ok');
+  await sleep(STEP_DELAY());
+}
+
+async function stepCreateRoom() {
+  log('老師端：正在建立房間...', 'action');
+  // teacherLogin 完成後自動建房，等待 roomCode 出現
+  const tw = getWin('teacher');
+  await waitFor(() => tw.state && tw.state.roomCode, 10000);
+  const code = tw.state.roomCode;
+  window._testRoomCode = code;
+  log(`✅ 房間建立成功，密碼：${code}`, 'ok');
+  setSlotStatus('teacher', `房間 #${code}`, 'var(--yellow)');
+  await sleep(STEP_DELAY());
+}
+
+async function stepStudentJoin(idx) {
+  const id = `student${idx}`;
+  const code = window._testRoomCode;
+  if (!code) { log(`找不到房間密碼，跳過學生${idx}`, 'warn'); return; }
+
+  log(`學生${idx}：前往加入頁面`, 'action');
+  callFn(id, 'goToJoin');
+  await sleep(STEP_DELAY());
+
+  // 輸入房間密碼
+  setInput(id, '#join-room-code', code);
+  await sleep(300);
+  callFn(id, 'verifyRoomPassword');
+  await sleep(STEP_DELAY());
+
+  // 等選組畫面
+  try {
+    await waitFor(() => {
+      const doc = getDoc(id);
+      return doc && (
+        doc.getElementById('screen-join')?.classList.contains('active') ||
+        doc.querySelector('.group-btn') !== null ||
+        doc.querySelector('[onclick*="pickGroup"]') !== null
+      );
+    }, 8000);
+  } catch(e) {}
+  await sleep(500);
+
+  // 選一個組別（第 idx 組）
+  const doc = getDoc(id);
+  const groupBtns = doc?.querySelectorAll('.group-btn, [onclick*="pickGroup"], [onclick*="onGroupSelect"]');
+  if (groupBtns && groupBtns.length >= idx) {
+    groupBtns[idx - 1].click();
+    log(`學生${idx}：選擇 ${GROUP_NAMES[idx-1]}`, 'action');
+  } else {
+    // 嘗試直接呼叫
+    const win = getWin(id);
+    if (win.pickGroup) {
+      win.pickGroup(GROUP_NAMES[idx-1], GROUP_SYMBOLS[idx-1]);
+    }
+  }
+  await sleep(500);
+
+  // 確認加入
+  const joinBtn = doc?.querySelector('#join-confirm-btn, [onclick*="joinRoom"], .btn-green');
+  if (joinBtn) { joinBtn.click(); log(`學生${idx}：確認加入`, 'action'); }
+  else callFn(id, 'joinRoom');
+
+  try {
+    await waitFor(() => {
+      const win = getWin(id);
+      const ps = win.pStates?.[win.state?.perspective];
+      return ps?.joined === true;
+    }, 8000);
+    setSlotStatus(id, `${GROUP_NAMES[idx-1]} 已加入`, 'var(--green)');
+    log(`學生${idx}（${GROUP_NAMES[idx-1]}）成功加入房間`, 'ok');
+  } catch(e) {
+    log(`學生${idx} 加入超時`, 'warn');
+  }
+  await sleep(STEP_DELAY());
+}
+
+async function stepWaitLobby() {
+  const numStudents = parseInt(document.getElementById('player-count').value);
+  log(`等待 ${numStudents} 位學生全部進入大廳...`, 'info');
+  try {
+    await waitFor(() => {
+      const tw = getWin('teacher');
+      const players = tw?.state?.players || [];
+      return players.length >= numStudents;
+    }, 15000);
+    const tw = getWin('teacher');
+    log(`大廳確認：${tw.state.players.length} 位學生就位`, 'ok');
+  } catch(e) {
+    log('等待大廳逾時，繼續下一步', 'warn');
+  }
+  await sleep(STEP_DELAY());
+}
+
+async function stepSelectGame(gameId) {
+  const g = GAMES[gameId];
+  log(`老師端：選擇遊戲 ${g.icon} ${g.name}`, 'action');
+  // 切到 level-select 並選遊戲
+  callFn('teacher', 'selectGame', gameId - 1);
+  await sleep(STEP_DELAY());
+  // W4 額外選模式和關卡
+  if (gameId === 4) {
+    const tw = getWin('teacher');
+    if (tw.lsW4SelectMode) { tw.lsW4SelectMode(1); await sleep(300); }
+    if (tw.lsW4SelectLevel) { tw.lsW4SelectLevel(1); }
+    await sleep(300);
+  }
+  // 其他遊戲選關卡（如有）
+  const g2 = GAMES[gameId];
+  if (g2.hasLevel && gameId !== 4) {
+    const tw = getWin('teacher');
+    if (tw.changeLevel) tw.changeLevel(1);
+    await sleep(300);
+  }
+  log(`已選擇 ${g.name}`, 'ok');
+  await sleep(STEP_DELAY());
+}
+
+async function stepStartWithRules() {
+  log('老師端：開啟規則頁', 'action');
+  const tw = getWin('teacher');
+  if (tw.showRulesOverlay) {
+    tw.showRulesOverlay();
+    setSlotStatus('teacher', '規則頁開啟', 'var(--purple)');
+    log('老師端：規則頁已開啟，學生端應顯示等待提示', 'ok');
+    await sleep(LONG_DELAY());
+    log('老師端：關閉規則頁，全班開始！', 'action');
+    tw.closeRulesAndStart();
+  } else {
+    log('找不到 showRulesOverlay，直接呼叫 tcStartGame', 'warn');
+    if (tw.tcStartGame) tw.tcStartGame();
+  }
+  setSlotStatus('teacher', '遊戲進行中', 'var(--green)');
+  await sleep(STEP_DELAY());
+}
+
+async function stepConfirmGameStarted() {
+  const numStudents = parseInt(document.getElementById('player-count').value);
+  log('確認學生端進入遊戲畫面...', 'info');
+  let confirmed = 0;
+  for (let i = 1; i <= numStudents; i++) {
+    const id = `student${i}`;
+    try {
+      await waitFor(() => {
+        const doc = getDoc(id);
+        const gameScreen = doc?.getElementById('screen-student-game');
+        return gameScreen?.classList.contains('active');
+      }, 8000);
+      confirmed++;
+      setSlotStatus(id, '遊戲中 ▶', 'var(--accent)');
+      log(`學生${i} 進入遊戲畫面 ✓`, 'ok');
+    } catch(e) {
+      log(`學生${i} 未能確認進入遊戲（可能還在 iframe 內）`, 'warn');
+    }
+  }
+  log(`${confirmed}/${numStudents} 位學生確認進入遊戲`, confirmed === numStudents ? 'ok' : 'warn');
+  await sleep(STEP_DELAY());
+}
+
+async function stepW4ModeComplete() {
+  log('W4：等待模式1完成，觀察老師端出現「下一玩法」按鈕...', 'info');
+  await sleep(LONG_DELAY() * 3);
+  const tw = getWin('teacher');
+  const doc = getDoc('teacher');
+  const nextBtn = doc?.querySelector('[onclick*="tcW4StartNextMode"]');
+  if (nextBtn) {
+    log('W4：「下一玩法」按鈕出現，點擊進入模式2', 'ok');
+    nextBtn.click();
+    await sleep(STEP_DELAY());
+    if (tw.closeRulesAndStart) { await sleep(LONG_DELAY()); tw.closeRulesAndStart(); }
+  } else {
+    log('W4：尚未看到「下一玩法」按鈕（可能還在遊戲中）', 'warn');
+  }
+}
+
+async function stepObserve() {
+  const observeTime = STEP_DELAY() * 5;
+  log(`觀察遊戲進行 ${observeTime/1000}s...`, 'info');
+  setSlotStatus('teacher', '觀察中...', 'var(--yellow)');
+  await sleep(observeTime);
+  // 讀取老師端分數
+  try {
+    const tw = getWin('teacher');
+    const scores = tw.TC?.scores;
+    if (scores) {
+      const scoreStr = Object.entries(scores).map(([g, s]) => `${g}: ${s}`).join('、');
+      log(`當前分數 → ${scoreStr}`, 'ok');
+    }
+  } catch(e) {}
+}
+
+async function stepKickStudent() {
+  log('老師端：測試踢除學生1', 'action');
+  const tw = getWin('teacher');
+  const players = tw?.state?.players || [];
+  if (players.length === 0) { log('沒有可踢的玩家', 'warn'); return; }
+
+  const target = players[0];
+  log(`踢除 ${target.symbol} ${target.group}`, 'action');
+  if (tw.tcKickPlayer) {
+    tw.tcKickPlayer(target.group, target.symbol, null);
+    log(`已發送踢除指令：${target.group}`, 'ok');
+    setSlotStatus('student1', '被踢出', 'var(--red)');
+  }
+  await sleep(LONG_DELAY());
+
+  // 確認學生1 被踢出
+  try {
+    await waitFor(() => {
+      const doc = getDoc('student1');
+      const homeScreen = doc?.getElementById('screen-home');
+      return homeScreen?.classList.contains('active');
+    }, 6000);
+    log('學生1 已成功被踢出，返回首頁 ✓', 'ok');
+  } catch(e) {
+    log('學生1 踢出確認逾時', 'warn');
+  }
+  await sleep(STEP_DELAY());
+}
+
+async function stepStudentRejoin(idx) {
+  const id = `student${idx}`;
+  const code = window._testRoomCode;
+  log(`學生${idx}：嘗試重新加入房間 ${code}`, 'action');
+  setSlotStatus(id, '重新加入中...', 'var(--yellow)');
+
+  callFn(id, 'goToJoin');
+  await sleep(STEP_DELAY());
+  setInput(id, '#join-room-code', code);
+  await sleep(300);
+  callFn(id, 'verifyRoomPassword');
+  await sleep(STEP_DELAY());
+
+  const doc = getDoc(id);
+  const groupBtns = doc?.querySelectorAll('.group-btn, [onclick*="pickGroup"]');
+  if (groupBtns && groupBtns.length > 0) {
+    groupBtns[0].click();
+    await sleep(400);
+    const joinBtn = doc?.querySelector('#join-confirm-btn, .btn-green');
+    if (joinBtn) joinBtn.click();
+    else callFn(id, 'joinRoom');
+  }
+
+  try {
+    await waitFor(() => {
+      const tw = getWin('teacher');
+      return (tw?.state?.players || []).some(p => p.group === GROUP_NAMES[idx-1]);
+    }, 8000);
+    setSlotStatus(id, '已重新加入 ✓', 'var(--green)');
+    log(`學生${idx} 重新加入成功，老師端應立即更新`, 'ok');
+  } catch(e) {
+    log(`學生${idx} 重新加入逾時`, 'warn');
+  }
+  await sleep(STEP_DELAY());
+}
+
+async function stepSettle() {
+  log('老師端：執行結算', 'action');
+  callFn('teacher', 'tcSettleGame');
+  setSlotStatus('teacher', '結算中', 'var(--purple)');
+  await sleep(LONG_DELAY());
+  log('結算完成', 'ok');
+}
+
+async function stepReturnLobby() {
+  log('老師端：返回大廳', 'action');
+  callFn('teacher', 'exitToLobby');
+  await sleep(STEP_DELAY());
+  setSlotStatus('teacher', '大廳', 'var(--accent)');
+  log('已返回大廳', 'ok');
+}
+
+async function stepDone() {
+  log(`🎉 測試完成！遊戲：${GAMES[parseInt(document.getElementById('game-select').value)]?.name}`, 'step');
+  document.getElementById('status-dot').className = '';
+  document.getElementById('status-dot').style.background = 'var(--green)';
+  document.getElementById('step-label').textContent = '測試完成 ✓';
+  testRunning = false;
+}
+
+// ════════════════════════════════════════
+// 測試執行控制
+// ════════════════════════════════════════
+async function startTest() {
+  if (testRunning) { log('測試已在執行中', 'warn'); return; }
+
+  abortTest = false;
+  testRunning = true;
+  testPaused  = false;
+  currentStepIdx = 0;
+
+  const gameId = parseInt(document.getElementById('game-select').value);
+  const numStudents = parseInt(document.getElementById('player-count').value);
+
+  clearLog();
+  log(`開始測試 ${GAMES[gameId]?.icon} ${GAMES[gameId]?.name}（${numStudents} 位學生）`, 'step');
+
+  // 建立 viewport
+  buildViewports();
+  await sleep(800);
+
+  // 建立步驟
+  stepList = buildStepList(gameId, numStudents);
+  renderSteps();
+
+  // 等 iframes 物件初始化
+  await sleep(200);
+
+  document.getElementById('status-dot').className = 'running';
+
+  // 逐步執行
+  for (let i = 0; i < stepList.length; i++) {
+    if (abortTest) break;
+    currentStepIdx = i;
+    const step = stepList[i];
+    setStepState(i, 'active');
+    log(`步驟 ${i+1}/${stepList.length}：${step.label}`, 'step');
+
+    try {
+      while (testPaused && !abortTest) await sleep(200);
+      if (abortTest) break;
+      await step.fn();
+      setStepState(i, 'done');
+      updateProgress();
+    } catch(e) {
+      log(`步驟失敗：${e.message}`, 'error');
+      setStepState(i, 'failed');
+      updateProgress();
+      // 繼續下一步（不中止）
+    }
+  }
+
+  testRunning = false;
+  document.getElementById('status-dot').className = '';
+}
+
+function nextStep() {
+  if (!testRunning) { log('測試未執行', 'warn'); return; }
+  testPaused = false;
+  log('手動跳過等待，執行下一步', 'info');
+}
+
+function pauseTest() {
+  if (!testRunning) return;
+  testPaused = !testPaused;
+  document.getElementById('status-dot').className = testPaused ? '' : 'running';
+  document.getElementById('step-label').textContent = testPaused ? '⏸ 已暫停' : (stepList[currentStepIdx]?.label || '');
+  log(testPaused ? '測試暫停' : '繼續測試', 'info');
+}
+
+function resetTest() {
+  abortTest = true;
+  testRunning = false;
+  testPaused  = false;
+  document.getElementById('status-dot').className = '';
+  document.getElementById('status-dot').style.background = 'var(--muted)';
+  document.getElementById('step-label').textContent = '尚未開始';
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('steps-panel').innerHTML = '';
+  buildViewports();
+  log('測試已重置', 'warn');
+}
+
+// ════════════════════════════════════════
+// 初始化
+// ════════════════════════════════════════
+buildViewports();
+log('儀表板已就緒。按「▶ 開始測試」啟動自動化測試。', 'info');
+log('提示：可用「⏭ 下一步」跳過等待，「⏸ 暫停」隨時停下觀察。', 'info');
+</script>
+</body>
+</html>
