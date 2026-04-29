@@ -179,23 +179,22 @@
     overflow: hidden;
     position: relative;
     min-height: 0;
-    display: flex;
-    align-items: stretch;
-    justify-content: stretch;
     background: #020305;
   }
 
-  iframe {
+  /* iframe 用 absolute + transform:scale 填滿格子 */
+  .vp-device-frame iframe {
+    position: absolute;
+    top: 0; left: 0;
     border: none;
     display: block;
-    width: 100%;
-    height: 100%;
-    flex: 1;
+    transform-origin: top left;
+    /* 實際尺寸和 scale 由 JS 動態計算 */
   }
 
   .iframe-full {
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   /* ── Log panel ── */
@@ -529,10 +528,11 @@ function makeSlot(id, label, badgeClass, baseUrl, deviceType = null) {
       ${deviceLabel}
       <span id="status-${id}" style="margin-left:auto;font-size:.65rem;color:var(--muted)">待機</span>
     </div>
-    <div class="vp-device-frame${isTablet||isMobile?' tablet-frame':''}" id="frame-${id}">
-      <iframe id="iframe-${id}" src="${baseUrl}" class="iframe-full"
+    <div class="vp-device-frame" id="frame-${id}">
+      <iframe id="iframe-${id}" src="${baseUrl}"
         allow="autoplay; microphone; camera"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals">
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+        onload="setTimeout(scaleIframes, 100)">
       </iframe>
     </div>`;
 
@@ -544,19 +544,34 @@ function makeSlot(id, label, badgeClass, baseUrl, deviceType = null) {
   return slot;
 }
 
+// 遊戲設計尺寸（index.html 設計給平板/桌機）
+const GAME_DESIGN_W = 1024;
+const GAME_DESIGN_H = 768;
+
 function scaleIframes() {
-  // 所有 iframe 直接填滿各自的格子，不做縮放
-  // 讓遊戲本身的 responsive layout 自適應
   Object.keys(iframes).forEach(id => {
     const f = iframes[id];
     if (!f) return;
-    f.style.width  = '100%';
-    f.style.height = '100%';
-    f.style.transform = '';
-    f.style.position = '';
-    f.style.top = '';
-    f.style.left = '';
-    f.classList.add('iframe-full');
+    const frame = document.getElementById(`frame-${id}`);
+    if (!frame) return;
+
+    const fw = frame.clientWidth;
+    const fh = frame.clientHeight;
+    if (!fw || !fh) return;
+
+    const scale = Math.min(fw / GAME_DESIGN_W, fh / GAME_DESIGN_H);
+
+    // iframe 用設計尺寸，然後縮放到格子大小
+    f.style.width  = GAME_DESIGN_W + 'px';
+    f.style.height = GAME_DESIGN_H + 'px';
+    f.style.transform = `scale(${scale})`;
+    f.style.transformOrigin = 'top left';
+    // 置中：剩餘空間平均分配
+    const offsetX = Math.max(0, (fw - GAME_DESIGN_W * scale) / 2);
+    const offsetY = Math.max(0, (fh - GAME_DESIGN_H * scale) / 2);
+    f.style.left = offsetX + 'px';
+    f.style.top  = offsetY + 'px';
+    f.classList.remove('iframe-full');
   });
 }
 
@@ -946,18 +961,34 @@ async function stepConfirmGameStarted() {
 }
 
 async function stepW4ModeComplete() {
-  log('W4：等待模式1完成，觀察老師端出現「下一玩法」按鈕...', 'info');
-  await sleep(LONG_DELAY() * 3);
-  const tw = getWin('teacher');
-  const doc = getDoc('teacher');
-  const nextBtn = doc?.querySelector('[onclick*="tcW4StartNextMode"]');
-  if (nextBtn) {
-    log('W4：「下一玩法」按鈕出現，點擊進入模式2', 'ok');
-    nextBtn.click();
-    await sleep(STEP_DELAY());
-    if (tw.closeRulesAndStart) { await sleep(LONG_DELAY()); tw.closeRulesAndStart(); }
-  } else {
-    log('W4：尚未看到「下一玩法」按鈕（可能還在遊戲中）', 'warn');
+  log('W4：等待模式完成，監控「下一玩法」按鈕...', 'info');
+  // 等待老師端出現「下一玩法」按鈕（最多等 5 分鐘）
+  try {
+    await waitFor(() => {
+      const doc = getDoc('teacher');
+      return !!doc?.querySelector('[onclick*="tcW4StartNextMode"]');
+    }, 300000); // 5 分鐘
+    log('W4：「下一玩法」按鈕出現！', 'ok');
+    const doc = getDoc('teacher');
+    const nextBtn = doc?.querySelector('[onclick*="tcW4StartNextMode"]');
+    if (nextBtn) {
+      nextBtn.click();
+      log('W4：已點擊「下一玩法」', 'action');
+      await sleep(STEP_DELAY());
+      // 等規則頁出現後按確認
+      const tw = getWin('teacher');
+      if (tw?.showRulesOverlay || getDoc('teacher')?.getElementById('rules-overlay')) {
+        await sleep(LONG_DELAY());
+        if (tw?.closeRulesAndStart) tw.closeRulesAndStart();
+        log('W4：已關閉規則頁，下一玩法開始', 'ok');
+        // 重新注入 AI
+        await sleep(STEP_DELAY());
+        stopAllAI();
+        await stepStartAI();
+      }
+    }
+  } catch(e) {
+    log('W4：等待「下一玩法」逾時（模式可能仍在進行）', 'warn');
   }
 }
 
@@ -1240,15 +1271,64 @@ function startAllAI(gameId) {
 
 async function stepStartAI() {
   const gameId = parseInt(document.getElementById('game-select').value);
-  log(`啟動 W${gameId} AI 自動通關...`, 'step');
+  const numStudents = parseInt(document.getElementById('player-count').value);
+  log(`等待遊戲啟動後注入 W${gameId} AI...`, 'step');
   stopAllAI();
-  await sleep(500);
-  // 等遊戲真正啟動後再注入（active 或 phase 就緒）
-  await sleep(STEP_DELAY());
-  startAllAI(gameId);
-  if (AI_SCRIPTS[gameId]) {
-    log('AI 持續運行，觀察各學生端畫面', 'info');
+
+  if (!AI_SCRIPTS[gameId]) {
+    log(`W${gameId} 無 AI（W3 五子棋 / W5 你畫我猜 需人工操作）`, 'warn');
+    return;
   }
+
+  // 等所有學生端的遊戲畫面真正啟動（game-ui visible 或 gameState.active）
+  const waitForGame = async (id) => {
+    try {
+      await waitFor(() => {
+        const doc = getDoc(id);
+        const win = getWin(id);
+        // W4：gameState.active === true
+        if (gameId === 4) return win?.gameState?.active === true;
+        // W8：gameState 存在且有 phase
+        if (gameId === 8) return win?.gameState?.phase === 'waiting_roll';
+        // W7：有 flipCards 或 paradeSeq 或 safeCmds
+        if (gameId === 7) return (win?.flipCards?.length > 0 ||
+                                   win?.paradeSeq?.length > 0 ||
+                                   win?.safeCmds?.length > 0);
+        // W6：gameState === 'PLAYING'
+        if (gameId === 6) return win?.gameState === 'PLAYING';
+        // W1：state.active === true
+        if (gameId === 1) return win?.state?.active === true;
+        // W2：canvas 可見且 gameStarted
+        if (gameId === 2) {
+          const canvas = doc?.getElementById('gameCanvas');
+          return canvas && canvas.offsetParent !== null;
+        }
+        // 通用：game-ui 可見
+        const gameUi = doc?.getElementById('game-ui');
+        if (gameUi && !gameUi.classList.contains('hidden') && gameUi.offsetParent !== null) return true;
+        // iframe 內的 screen-student-game（W8 用）
+        const gameScreen = doc?.getElementById('screen-student-game');
+        return gameScreen?.classList.contains('active');
+      }, 20000);
+      return true;
+    } catch(e) {
+      log(`${id} 等待遊戲啟動逾時`, 'warn');
+      return false;
+    }
+  };
+
+  // 等所有學生端都就緒
+  let readyCount = 0;
+  for (let i = 1; i <= numStudents; i++) {
+    const ready = await waitForGame(`student${i}`);
+    if (ready) readyCount++;
+  }
+  log(`${readyCount}/${numStudents} 個學生端遊戲已啟動，注入 AI`, 'ok');
+
+  // 稍等讓遊戲完全穩定後注入
+  await sleep(500);
+  startAllAI(gameId);
+  log('AI 持續運行，觀察各學生端畫面', 'info');
 }
 
 async function stepDone() {
