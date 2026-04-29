@@ -243,6 +243,21 @@ let syncTick   = 0;
 // ══════════════════════════════════════════════════
 //  postMessage — 接收 PLATFORM_START
 // ══════════════════════════════════════════════════
+// ★ AI 介面
+window._w6AI = {
+    isPlaying:  () => gameState === 'PLAYING',
+    getJoysticks: () => joysticks,
+    getCursors:   () => cursors,
+    getCircles:   () => circles,
+    setJoystick:  (i, dx, dy) => {
+        if (joysticks[i]) {
+            joysticks[i].dx = dx;
+            joysticks[i].dy = dy;
+            joysticks[i].active = true;
+        }
+    },
+};
+
 window.addEventListener('message', e => {
     const d = e.data;
     if (!d || !d.type) return;

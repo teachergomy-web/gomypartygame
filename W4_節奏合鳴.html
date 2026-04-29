@@ -1529,6 +1529,16 @@
             if (tIdx >= 0 && tIdx < 4) isTouching[tIdx] = true;
         }
     }
+
+    // ★ AI 介面（供測試儀表板使用）
+    window._w4AI = {
+        isActive:  () => gameState?.active === true,
+        getMode:   () => gameState?.mode || 1,
+        getCanvas: () => canvas,
+        getTW:     () => trackWidth,
+        entities:  () => gameState?.entities || [],
+        input:     (px, py, s) => handleInput(px, py, s),
+    };
     canvas.addEventListener('touchstart', e => { e.preventDefault(); updateTouchState(e); for (let t of e.changedTouches) handleInput(t.clientX, t.clientY, true); }, {passive:false});
     canvas.addEventListener('touchmove',  e => { e.preventDefault(); updateTouchState(e); }, {passive:false});
     canvas.addEventListener('touchend',   e => { e.preventDefault(); updateTouchState(e); }, {passive:false});

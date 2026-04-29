@@ -807,6 +807,25 @@
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) handleTap(e.changedTouches[i].clientX, e.changedTouches[i].clientY); }, {passive: false});
         canvas.addEventListener('mousedown', (e) => handleTap(e.clientX, e.clientY));
 
+        // ★ AI 介面
+        window._w2AI = {
+            isReady:  () => gameStarted && !isLevelComplete,
+            tapGrid:  (col, row) => {
+                // 直接旋轉指定格子（不經過座標轉換）
+                if (!gameStarted || isLevelComplete) return;
+                if (col >= 0 && col < cols && row >= 0 && row < rows) {
+                    const cell = grid[row][col];
+                    if (!['S','D','A','B','E','F'].includes(cell.type)) {
+                        cell.rotation = (cell.rotation + 1) % 4;
+                        checkPower(false);
+                    }
+                }
+            },
+            getGrid:  () => grid,
+            getCols:  () => cols,
+            getRows:  () => rows,
+        };
+
         // ==========================================
         // 渲染繪圖
         // ==========================================
@@ -928,8 +947,7 @@ requestWakeLock();
         renderLevelGrid();
 
         // ── PLATFORM BRIDGE ──
-        window.addEventListener('message', (e) => {
-            if (!e.data || !e.data.type) return;
+        window.addEventListener('message', (e) => {            if (!e.data || !e.data.type) return;
             switch(e.data.type) {
                 case 'PLATFORM_START':
                     if (e.data.group) window.GROUP_ID = e.data.group;

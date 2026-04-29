@@ -869,6 +869,13 @@ function reportScore() {
 }
 
 // 接收平台指令
+// ★ AI 介面
+window._w1AI = {
+    isActive:  () => state?.active === true,
+    entities:  () => state?.entities || [],
+    input:     (px, py) => handleInput(px, py),
+};
+
 window.addEventListener('message', (e) => {
     if (!e.data || !e.data.type) return;
     switch(e.data.type) {

@@ -477,10 +477,8 @@ function buildViewports() {
 
   const numStudents = parseInt(document.getElementById('player-count').value);
   const baseUrl = document.getElementById('base-url').value.trim();
-  const total = 1 + numStudents; // 老師 + 學生
+  const total = 1 + numStudents;
 
-  // ── 根據總視窗數決定格局 ──
-  // total=2 → 1×2, total=3 → 2+1(跨欄), total=4 → 2×2, total=5 → 2+3
   let cols, rows;
   if (total <= 2)      { cols = 2; rows = 1; }
   else if (total <= 4) { cols = 2; rows = 2; }
@@ -489,13 +487,10 @@ function buildViewports() {
   container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   container.style.gridTemplateRows    = `repeat(${rows}, 1fr)`;
 
-  // ── 老師端（放第一格）──
   const teacherSlot = makeSlot('teacher', '👨‍🏫 老師端', 'badge-teacher', baseUrl, 'teacher');
   teacherSlot.classList.add('is-teacher');
-  // 老師端佔第一格（不跨格）
   container.appendChild(teacherSlot);
 
-  // ── 學生端 ──
   const studentDevices = [
     { label: '學生1 桌機',  deviceType: 'student_desktop', badge: 'badge-student' },
     { label: '學生2 iPad',  deviceType: 'student_tablet',  badge: 'badge-tablet'  },
@@ -508,7 +503,6 @@ function buildViewports() {
     container.appendChild(slot);
   });
 
-  // 稍後調整 iframe 比例
   requestAnimationFrame(scaleIframes);
 }
 
@@ -522,6 +516,10 @@ function makeSlot(id, label, badgeClass, baseUrl, deviceType = null) {
   const preset = DEVICE_PRESETS[deviceType] || {};
   const deviceLabel = preset.label ? `<span style="color:var(--muted);font-size:.6rem;margin-left:4px;">${preset.label}</span>` : '';
 
+  const onloadAttr = id === 'teacher'
+    ? `onload="setTimeout(()=>{ try{ const w=this.contentWindow; if(w.testSetPerspective) w.testSetPerspective('teacher'); else if(w.goToTeacherLogin) w.goToTeacherLogin(); } catch(e){} scaleIframes(); }, 500)"`
+    : `onload="setTimeout(scaleIframes, 300)"`;
+
   slot.innerHTML = `
     <div class="vp-label">
       <span class="badge ${badgeClass}">${label}</span>
@@ -532,7 +530,7 @@ function makeSlot(id, label, badgeClass, baseUrl, deviceType = null) {
       <iframe id="iframe-${id}" src="${baseUrl}"
         allow="autoplay; microphone; camera"
         sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-        onload="setTimeout(scaleIframes, 100)">
+        ${onloadAttr}>
       </iframe>
     </div>`;
 
@@ -1088,155 +1086,161 @@ function injectScript(id, code) {
 // ── W1 消除方塊：直接呼叫 handleInput（state, entities 在 closure 內）──
 const AI_W1 = `
   if (window._aiStop) window._aiStop();
+  const _ai = window._w1AI;
+  if (!_ai) { console.warn('W1 AI 介面未就緒'); return; }
   const _t = setInterval(() => {
-    if (!state || !state.active) return;
-    const now = performance.now();
-    for (let i = state.entities.length - 1; i >= 0; i--) {
-      const e = state.entities[i];
+    if (!_ai.isActive()) return;
+    const ents = _ai.entities();
+    for (let i = ents.length - 1; i >= 0; i--) {
+      const e = ents[i];
       if (!e || !e.active) continue;
       if (e.type === 'ghost' || e.type === 'bomb') continue;
-      handleInput(e.x, e.y);
-      break; // 每次點一顆，避免消太快
+      _ai.input(e.x, e.y);
+      break;
+    }
+  }, 250);
+  window._aiStop = () => clearInterval(_t);
+`;
+
+const AI_W2 = `
+  if (window._aiStop) window._aiStop();
+  const _ai = window._w2AI;
+  if (!_ai) { console.warn('W2 AI 介面未就緒'); return; }
+  const _t = setInterval(() => {
+    if (!_ai.isReady()) return;
+    const cols = _ai.getCols(), rows = _ai.getRows();
+    const grid = _ai.getGrid();
+    if (!grid) return;
+    // 找一個可旋轉的格子（非固定格）
+    const rotatables = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = grid[r][c];
+        if (cell && !['S','D','A','B','E','F'].includes(cell.type)) {
+          rotatables.push({r,c});
+        }
+      }
+    }
+    if (rotatables.length > 0) {
+      const pick = rotatables[Math.floor(Math.random() * rotatables.length)];
+      _ai.tapGrid(pick.c, pick.r);
     }
   }, 200);
   window._aiStop = () => clearInterval(_t);
 `;
 
-// ── W2 能源管線：呼叫 handleTap 在 canvas 各格位置 ──
-const AI_W2 = `
-  if (window._aiStop) window._aiStop();
-  const _t = setInterval(() => {
-    if (typeof handleTap !== 'function') return;
-    const c = document.getElementById('gameCanvas');
-    if (!c) return;
-    const gw = c.width, gh = c.height;
-    const cols = 7, rows = 7; // 管線格大致數量
-    const cw = gw / cols, ch = gh / rows;
-    const col = Math.floor(Math.random() * cols);
-    const row = Math.floor(Math.random() * rows);
-    handleTap(col * cw + cw/2, row * ch + ch/2);
-  }, 180);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-// ── W4 節奏合鳴：依模式呼叫 handleInput ──
 const AI_W4 = `
   if (window._aiStop) window._aiStop();
+  const _ai = window._w4AI;
+  if (!_ai) { console.warn('W4 AI 介面未就緒'); return; }
   const _t = setInterval(() => {
-    if (!gameState || !gameState.active) return;
-    const mode = gameState.mode;
-    const c = document.querySelector('canvas');
-    if (!c) return;
-    const w = c.width, h = c.height;
-    const tw = w / 4;
+    if (!_ai.isActive()) return;
+    const mode = _ai.getMode();
+    const ents = _ai.entities();
+    const tw   = _ai.getTW() || 100;
+    const c    = _ai.getCanvas();
+    const h    = c ? c.height : 600;
 
-    gameState.entities.forEach(e => {
-      if (!e || e.hit) return;
+    ents.forEach(e => {
+      if (!e) return;
       if (mode === 1) {
-        // 縮圈：生命週期 > 60% 時點擊（progress > 0.6 分數最高）
-        const progress = 1 - (e.life / e.maxLife);
-        if (progress > 0.65 && progress < 0.95) {
-          handleInput(e.x, e.y, true);
-          e.hit = true;
+        const progress = e.maxLife ? 1 - (e.life / e.maxLife) : 0;
+        if (progress > 0.6 && progress < 0.98 && !e._aiHit) {
+          _ai.input(e.x, e.y, true);
+          e._aiHit = true;
         }
       } else if (mode === 2) {
-        // 鋼琴黑塊：方塊底部接近底線時點擊
         const baseline = h - 150;
-        const bottomY = e.y + e.h;
-        if (bottomY > baseline - 50 && bottomY < baseline + 80 && !e.hit) {
-          handleInput(e.track * tw + tw/2, baseline, true);
-          e.hit = true;
+        const bottomY = e.y + (e.h || 0);
+        if (!e.hit && bottomY > baseline - 60 && bottomY < baseline + 100) {
+          _ai.input(e.track * tw + tw / 2, baseline, true);
         }
       } else if (mode === 3) {
-        // 底線軌道：進入底線時按住
         const baseline = h - 100;
-        const headY = e.y + e.h;
-        if (Math.abs(headY - baseline) < 80 && !e.hit && !e.failed) {
-          handleInput(e.track * tw + tw/2, baseline, true);
+        const headY = e.y + (e.h || 0);
+        if (!e.hit && !e.failed && Math.abs(headY - baseline) < 100) {
+          _ai.input(e.track * tw + tw / 2, baseline, true);
         }
       }
     });
-  }, 80);
+  }, 60);
   window._aiStop = () => clearInterval(_t);
 `;
 
-// ── W6 雙人圈圈：直接設 joysticks[i].dx/dy 讓游標朝圈圈移動 ──
 const AI_W6 = `
   if (window._aiStop) window._aiStop();
+  const _ai = window._w6AI;
+  if (!_ai) { console.warn('W6 AI 介面未就緒'); return; }
   const _t = setInterval(() => {
-    if (gameState !== 'PLAYING' || !joysticks || !circles || !cursors) return;
+    if (!_ai.isPlaying()) return;
+    const joysticks = _ai.getJoysticks();
+    const cursors   = _ai.getCursors();
+    const circles   = _ai.getCircles();
+    if (!joysticks || !cursors || !circles) return;
     joysticks.forEach((js, i) => {
       const target = circles[i] || circles[0];
-      if (!target) return;
-      const cur = cursors[i];
-      if (!cur) return;
-      // 計算方向
+      const cur    = cursors[i];
+      if (!target || !cur) return;
       const dx = target.x - cur.x;
       const dy = target.y - cur.y;
-      const d = Math.hypot(dx, dy);
-      if (d < 5) { js.dx = 0; js.dy = 0; return; }
-      js.dx = dx / d;
-      js.dy = dy / d;
-      js.active = true;
+      const d  = Math.hypot(dx, dy);
+      if (d < 8) { _ai.setJoystick(i, 0, 0); return; }
+      _ai.setJoystick(i, dx / d, dy / d);
     });
   }, 50);
   window._aiStop = () => clearInterval(_t);
 `;
 
-// ── W7 記憶力大考驗：依當前 Part 自動操作 ──
 const AI_W7 = `
   if (window._aiStop) window._aiStop();
+  const _ai = window._w7AI;
+  if (!_ai) { console.warn('W7 AI 介面未就緒'); return; }
   const _t = setInterval(() => {
-    if (_pausedByPlatform) return;
+    if (_ai.isPaused()) return;
 
-    // Part1：翻牌配對
-    if (flipPhase === 'PLAY' && !flipLock && flipCards.length > 0) {
-      const unmatched = flipCards.filter(c => !c.matched && !c.flipped);
+    // Part1：翻牌
+    if (_ai.getFlipPhase() === 'PLAY' && !_ai.isFlipLock()) {
+      const cards = _ai.getFlipCards();
+      const unmatched = cards.filter(c => !c.matched && !c.flipped);
       if (unmatched.length >= 2) {
-        onFlipClick(unmatched[0]);
+        _ai.clickFlip(unmatched[0]);
         setTimeout(() => {
-          const still = flipCards.filter(c => !c.matched && !c.flipped);
-          // 找配對
+          const still = _ai.getFlipCards().filter(c => !c.matched && !c.flipped);
           const partner = still.find(c => c.emojiIdx === unmatched[0].emojiIdx);
-          if (partner) onFlipClick(partner);
-          else if (still.length > 0) onFlipClick(still[0]);
-        }, 400);
+          if (partner) _ai.clickFlip(partner);
+          else if (still[0]) _ai.clickFlip(still[0]);
+        }, 450);
       }
     }
 
-    // Part2：動果大遊行 - 按順序點選答案
-    if (paradePhase === 'INPUT' && paradeUserSeq.length < paradeSeq.length) {
-      const nextEmoji = paradeSeq[paradeUserSeq.length];
-      const btns = Array.from(document.querySelectorAll('.parade-choice-btn'));
-      const btn = btns.find(b => b.textContent.trim() === nextEmoji);
-      if (btn) btn.click();
-    }
-    if (paradePhase === 'INPUT' && paradeUserSeq.length === paradeSeq.length) {
-      const submitBtn = document.getElementById('parade-submit-btn') ||
-                        document.querySelector('[onclick*="checkParadeOrder"]');
-      if (submitBtn) submitBtn.click();
-    }
-
-    // Part3：金庫解碼 - 按照指令轉動
-    if (typeof safeCmds !== 'undefined' && safeCmds.length > 0 &&
-        safeStep < safeCmds.length && typeof operateGear === 'function') {
-      const cmd = safeCmds[safeStep];
-      if (!cmd) return;
-      const targetDir = cmd.dir === 'L' ? -1 : 1;
-      if (safeSubStep < cmd.val) {
-        operateGear(targetDir);
-      } else if (safeSubStep === cmd.val) {
-        setTimeout(() => {
-          const okBtn = document.getElementById('safe-ok-btn');
-          if (okBtn) okBtn.click();
-        }, 300);
+    // Part2：動果大遊行
+    if (_ai.getParadePhase() === 'INPUT') {
+      const seq  = _ai.getParadeSeq();
+      const user = _ai.getParadeUser();
+      if (user.length < seq.length) {
+        _ai.pushParade(seq[user.length]);
+      } else {
+        _ai.submitParade();
       }
     }
-  }, 600);
+
+    // Part3：金庫解碼
+    const cmds = _ai.getSafeCmds();
+    const step = _ai.getSafeStep();
+    const sub  = _ai.getSafeSubStep();
+    if (cmds.length > 0 && step < cmds.length) {
+      const cmd = cmds[step];
+      const dir = cmd.dir === 'L' ? -1 : 1;
+      if (sub < cmd.val) {
+        _ai.operateGear(dir);
+      } else if (sub === cmd.val) {
+        setTimeout(() => _ai.confirmSafe(), 200);
+      }
+    }
+  }, 500);
   window._aiStop = () => clearInterval(_t);
 `;
 
-// ── W8 大富翁：直接呼叫 rollDice（已在 window 上）──
 const AI_W8 = `
   if (window._aiStop) window._aiStop();
   const _t = setInterval(() => {

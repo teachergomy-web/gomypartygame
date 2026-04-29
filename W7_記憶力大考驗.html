@@ -511,6 +511,25 @@ let platformMode=false;  // 是否由平台啟動（iframe 嵌入）
 let platformGroup='';    // 組別名稱
 
 // ── W7 學生端規則資料（≤30字/條）──
+// ★ AI 介面
+window._w7AI = {
+    getFlipCards:   () => typeof flipCards !== 'undefined' ? flipCards : [],
+    getFlipPhase:   () => typeof flipPhase !== 'undefined' ? flipPhase : '',
+    isFlipLock:     () => typeof flipLock !== 'undefined' ? flipLock : false,
+    clickFlip:      (card) => { if(typeof onFlipClick==='function') onFlipClick(card); },
+    getParadePhase: () => typeof paradePhase !== 'undefined' ? paradePhase : '',
+    getParadeSeq:   () => typeof paradeSeq !== 'undefined' ? paradeSeq : [],
+    getParadeUser:  () => typeof paradeUserSeq !== 'undefined' ? paradeUserSeq : [],
+    pushParade:     (emoji) => { if(typeof paradeUserSeq!=='undefined'&&typeof updateParadeUI==='function'&&paradeUserSeq.length<paradeSeq.length){paradeUserSeq.push(emoji);updateParadeUI();} },
+    submitParade:   () => { if(typeof checkParadeOrder==='function') checkParadeOrder(); },
+    getSafeCmds:    () => typeof safeCmds !== 'undefined' ? safeCmds : [],
+    getSafeStep:    () => typeof safeStep !== 'undefined' ? safeStep : 0,
+    getSafeSubStep: () => typeof safeSubStep !== 'undefined' ? safeSubStep : 0,
+    operateGear:    (dir) => { if(typeof operateGear==='function') operateGear(dir); },
+    confirmSafe:    () => { if(typeof confirmSafeCommand==='function') confirmSafeCommand(); },
+    isPaused:       () => typeof _pausedByPlatform !== 'undefined' ? _pausedByPlatform : false,
+};
+
 // PLATFORM_START / PAUSE / RESUME 監聽
 let _pausedByPlatform=false;
 let _pausedFlipTimer=null;    // 暫停時儲存 flipMemSeconds 剩餘
