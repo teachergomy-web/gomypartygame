@@ -1669,6 +1669,8 @@
         gameState.active = false;
         gameState.mode   = mode;
 
+        // ★ 所有畫面都隱藏，確保 game-ui 可以正常顯示
+        document.getElementById('platform-wait').classList.add('hidden');
         document.getElementById('main-menu').classList.add('hidden');
         document.getElementById('level-menu').classList.add('hidden');
         document.getElementById('result-screen').classList.add('hidden');

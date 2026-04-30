@@ -391,6 +391,13 @@ body::before {
     <div style="display:flex;gap:8px;align-items:center">
       <button class="kr-btn kr-btn-ghost" onclick="toggleQR()">📱 QR</button>
       <button class="kr-btn kr-btn-danger" onclick="doCloseRoom()">🚪 關閉</button>
+      <button id="bgm-mute-btn" onclick="toggleBGMMute()"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+        border-radius:8px;color:white;font-size:.9rem;padding:6px 10px;
+        cursor:pointer;-webkit-tap-highlight-color:transparent;">🔊</button>
+      <input id="bgm-volume-slider" type="range" min="0" max="100" value="40"
+        oninput="setBGMVolume(this.value)"
+        style="width:72px;accent-color:#f5c800;cursor:pointer;">
     </div>
     <div style="flex:1"></div>
     <!-- 遊戲控制區（遊戲進行中顯示）-->
@@ -660,22 +667,6 @@ body::before {
   <div class="kr-footer">
     <button class="kr-btn kr-btn-ghost" onclick="exitToLobby()">← 返回大廳</button>
   </div>
-</div>
-
-<!-- ══ 老師端浮動音量控制（所有老師端畫面常駐右下角）══ -->
-<div id="teacher-bgm-bar" style="
-  display:none; position:fixed; bottom:16px; right:16px; z-index:9000;
-  background:rgba(13,15,26,0.92); border:1px solid rgba(255,255,255,.18);
-  border-radius:12px; padding:7px 12px;
-  align-items:center; gap:10px;
-  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-  box-shadow:0 4px 20px rgba(0,0,0,.5);">
-  <button id="bgm-mute-btn" onclick="toggleBGMMute()"
-    style="background:none;border:none;color:white;font-size:1.1rem;
-    cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0;">🔊</button>
-  <input id="bgm-volume-slider" type="range" min="0" max="100" value="40"
-    oninput="setBGMVolume(this.value)"
-    style="width:88px;accent-color:#f5c800;cursor:pointer;">
 </div>
 
 <!-- ════════════════════════════════════════
@@ -4016,17 +4007,11 @@ function teacherLogin() {
   window.renderLobby();
   window.goTo('screen-lobby');
   window.showToast(`🏠 房間 ${code} 已建立！`);
-  // ★ 顯示老師端浮動音量 bar
-  const bgmBar = document.getElementById('teacher-bgm-bar');
-  if (bgmBar) bgmBar.style.display = 'flex';
   setTimeout(() => startTeacherBGM(), 300);
 }
 
 function doCloseRoom() {
   stopTeacherBGM();
-  // 隱藏音量 bar
-  const bgmBar = document.getElementById('teacher-bgm-bar');
-  if (bgmBar) bgmBar.style.display = 'none';
   const code = window.state.roomCode;
   if (code) {
       const rooms = window.getRooms();
@@ -4522,51 +4507,59 @@ window.addEventListener('beforeunload',  _handlePageLeave);
 // W4 遊戲時不播，其餘遊戲統一一首輕快循環 BGM
 // ══════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════
-// 老師端 BGM（mp3 版本，music/teacher_bgm.mp3）
+// 老師端 BGM（兩首依序循環：teacher_bgm → game_bgm → teacher_bgm → ...）
 // ══════════════════════════════════════════════════════════
-let _teacherBGMAudio = null;
-let _teacherBGMMuted = false;
-let _teacherBGMVolume = 0.4;
+const _BGM_PLAYLIST = ['./music/teacher_bgm.mp3', './music/game_bgm.mp3'];
+let _bgmIdx     = 0;
+let _bgmAudioTC = null;
+let _bgmMuted   = false;
+let _bgmVolume  = 0.4;
+let _bgmActive  = false;
 
-function startTeacherBGM() {
-    if (window.state.selectedGame === 3) return; // W4 不播
-    if (_teacherBGMAudio && !_teacherBGMAudio.paused) return; // 已在播
-    if (_teacherBGMMuted) return;
+function _bgmPlayCurrent() {
+    if (_bgmMuted || !_bgmActive) return;
     try {
-        if (!_teacherBGMAudio) {
-            _teacherBGMAudio = new Audio('./music/teacher_bgm.mp3');
-            _teacherBGMAudio.loop   = true;
-            _teacherBGMAudio.volume = _teacherBGMVolume;
-        }
-        _teacherBGMAudio.play().catch(() => {});
+        if (_bgmAudioTC) { _bgmAudioTC.pause(); _bgmAudioTC.src = ''; }
+        _bgmAudioTC = new Audio(_BGM_PLAYLIST[_bgmIdx]);
+        _bgmAudioTC.volume = _bgmVolume;
+        _bgmAudioTC.loop   = false;
+        _bgmAudioTC.onended = () => {
+            if (!_bgmActive) return;
+            _bgmIdx = (_bgmIdx + 1) % _BGM_PLAYLIST.length; // 切下一首
+            _bgmPlayCurrent();
+        };
+        _bgmAudioTC.play().catch(() => {});
     } catch(e) {}
 }
 
+function startTeacherBGM() {
+    if (window.state.selectedGame === 3) return; // W4 不播
+    if (_bgmActive) return;
+    _bgmActive = true;
+    _bgmIdx = 0;
+    _bgmPlayCurrent();
+}
+
 function stopTeacherBGM() {
-    if (_teacherBGMAudio) {
-        _teacherBGMAudio.pause();
-    }
+    _bgmActive = false;
+    if (_bgmAudioTC) { _bgmAudioTC.pause(); _bgmAudioTC.src = ''; _bgmAudioTC = null; }
 }
 
 function toggleBGMMute() {
-    _teacherBGMMuted = !_teacherBGMMuted;
+    _bgmMuted = !_bgmMuted;
     const btn = document.getElementById('bgm-mute-btn');
-    if (btn) btn.textContent = _teacherBGMMuted ? '🔇' : '🔊';
-    if (_teacherBGMAudio) {
-        _teacherBGMAudio.volume = _teacherBGMMuted ? 0 : _teacherBGMVolume;
-    }
-    if (!_teacherBGMMuted) startTeacherBGM();
+    if (btn) btn.textContent = _bgmMuted ? '🔇' : '🔊';
+    if (_bgmAudioTC) _bgmAudioTC.volume = _bgmMuted ? 0 : _bgmVolume;
+    if (!_bgmMuted && !_bgmActive) startTeacherBGM();
 }
 
 function setBGMVolume(val) {
-    _teacherBGMVolume = parseInt(val) / 100;
-    _teacherBGMMuted  = _teacherBGMVolume === 0;
+    _bgmVolume = parseInt(val) / 100;
+    _bgmMuted  = _bgmVolume === 0;
     const btn = document.getElementById('bgm-mute-btn');
-    if (btn) btn.textContent = _teacherBGMMuted ? '🔇' : '🔊';
-    if (_teacherBGMAudio) {
-        _teacherBGMAudio.volume = _teacherBGMVolume;
-    }
-    if (!_teacherBGMMuted) startTeacherBGM();
+    if (btn) btn.textContent = _bgmMuted ? '🔇' : '🔊';
+    if (_bgmAudioTC) _bgmAudioTC.volume = _bgmMuted ? 0 : _bgmVolume;
+    if (!_bgmMuted && !_bgmActive) startTeacherBGM();
 }
 
 
