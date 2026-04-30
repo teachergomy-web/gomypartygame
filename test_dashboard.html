@@ -658,54 +658,37 @@ function buildStepList(gameId, numStudents) {
   const g = GAMES[gameId];
   const steps = [];
 
-  // ── 1. 等待 iframe 載入 ──
+  // ── 1. 等待頁面載入 ──
   steps.push({ label: '等待頁面載入', fn: stepWaitLoaded });
 
-  // ── 2. 老師登入 ──
-  steps.push({ label: '老師端：輸入密碼登入', fn: stepTeacherLogin });
+  // ── 2. 老師建房 ──
+  steps.push({ label: '老師端：登入並建立房間', fn: stepTeacherLogin });
+  steps.push({ label: '老師端：等待房間建立', fn: stepCreateRoom });
 
-  // ── 3. 建立房間 ──
-  steps.push({ label: '老師端：建立房間', fn: stepCreateRoom });
-
-  // ── 4. 學生加入 ──
+  // ── 3. 學生依序自動加入 ──
   for (let i = 1; i <= numStudents; i++) {
-    steps.push({ label: `學生${i}：輸入房間密碼`, fn: () => stepStudentJoin(i) });
+    steps.push({ label: `學生${i}：自動加入房間`, fn: (idx => () => stepStudentJoin(idx))(i) });
   }
 
-  // ── 5. 確認大廳 ──
-  steps.push({ label: '確認所有學生已進入大廳', fn: stepWaitLobby });
+  // ── 4. 等所有學生進入大廳 ──
+  steps.push({ label: '確認所有學生進入大廳', fn: stepWaitLobby });
 
-  // ── 6. 選擇遊戲 ──
-  steps.push({ label: `老師端：選擇 ${g.icon} ${g.name}`, fn: () => stepSelectGame(gameId) });
+  // ── 5. 移交給你手動操作 ──
+  steps.push({ label: '🖐 請在老師端：選遊戲 → 看規則 → 開始。準備好後按「⏭ 下一步」', fn: stepHandoverToTeacher });
 
-  // ── 7. 開始前規則頁 ──
-  steps.push({ label: '老師端：開啟規則頁並確認開始', fn: stepStartWithRules });
+  // ── 6. 自動等遊戲啟動 → 注入 AI ──
+  steps.push({ label: `🤖 偵測遊戲啟動，自動注入 AI（${g.icon} ${g.name}）`, fn: stepStartAI });
 
-  // ── 8. 確認遊戲畫面 ──
-  steps.push({ label: '確認學生端進入遊戲', fn: stepConfirmGameStarted });
-
-  // ── 9. 啟動 AI 自動通關 ──
-  steps.push({ label: `🤖 啟動 AI 自動通關（W${gameId}）`, fn: stepStartAI });
-
-  // ── 10. W4 特殊：等第一模式結束 ──
+  // ── 7. W4 持續監測模式完成 ──
   if (gameId === 4) {
-    steps.push({ label: 'W4：等待模式完成 → 切換下一玩法（手動觀察）', fn: stepW4ModeComplete });
+    steps.push({ label: '🔍 W4：監測模式完成，出現「下一玩法」時通知你', fn: stepWatchW4Progress });
   }
 
-  // ── 11. 觀察遊戲（長時間，讓 AI 跑） ──
-  steps.push({ label: `👀 觀察 AI 遊玩中（按「⏭ 下一步」可跳過）`, fn: stepObserve });
+  // ── 8. 等你手動結算 ──
+  steps.push({ label: '✅ AI 持續運行中。請自由操作老師端，結算後按「⏭ 下一步」', fn: stepWaitForManualEnd });
 
-  // ── 12. 踢人測試（手動）──
-  steps.push({ label: '🖐 手動踢人測試（按「⏭ 下一步」繼續）', fn: stepKickStudent });
-
-  // ── 13. 學生重新加入 ──
-  steps.push({ label: '學生1：重新加入房間', fn: () => stepStudentRejoin(1) });
-
-  // ── 14. 手動結算（不自動）──
-  steps.push({ label: '🖐 手動操作老師端（結算等），按「⏭ 下一步」結束', fn: stepSettle });
-
-  // ── 15. 完成 ──
-  steps.push({ label: '✅ 測試完成', fn: stepDone });
+  // ── 9. 完成 ──
+  steps.push({ label: '🎉 測試完成', fn: stepDone });
 
   return steps;
 }
@@ -958,381 +941,128 @@ async function stepConfirmGameStarted() {
   await sleep(STEP_DELAY());
 }
 
-async function stepW4ModeComplete() {
-  log('W4：等待模式完成，監控「下一玩法」按鈕...', 'info');
-  // 等待老師端出現「下一玩法」按鈕（最多等 5 分鐘）
-  try {
-    await waitFor(() => {
-      const doc = getDoc('teacher');
-      return !!doc?.querySelector('[onclick*="tcW4StartNextMode"]');
-    }, 300000); // 5 分鐘
-    log('W4：「下一玩法」按鈕出現！', 'ok');
-    const doc = getDoc('teacher');
-    const nextBtn = doc?.querySelector('[onclick*="tcW4StartNextMode"]');
-    if (nextBtn) {
-      nextBtn.click();
-      log('W4：已點擊「下一玩法」', 'action');
-      await sleep(STEP_DELAY());
-      // 等規則頁出現後按確認
-      const tw = getWin('teacher');
-      if (tw?.showRulesOverlay || getDoc('teacher')?.getElementById('rules-overlay')) {
-        await sleep(LONG_DELAY());
-        if (tw?.closeRulesAndStart) tw.closeRulesAndStart();
-        log('W4：已關閉規則頁，下一玩法開始', 'ok');
-        // 重新注入 AI
-        await sleep(STEP_DELAY());
-        stopAllAI();
-        await stepStartAI();
-      }
-    }
-  } catch(e) {
-    log('W4：等待「下一玩法」逾時（模式可能仍在進行）', 'warn');
-  }
-}
-
-async function stepObserve() {
-  const observeTime = STEP_DELAY() * 20; // AI 跑更長時間
-  log(`AI 遊玩觀察中（${observeTime/1000}s，按「⏭ 下一步」可提前跳過）`, 'info');
-  setSlotStatus('teacher', '🤖 AI 遊玩中', 'var(--purple)');
-  // 分段 sleep，讓「下一步」按鈕可以打斷
-  const chunk = 500;
-  let elapsed = 0;
-  while (elapsed < observeTime && !abortTest) {
-    if (!testPaused) elapsed += chunk;
-    await sleep(chunk);
-  }
-  // 讀取老師端分數
-  try {
-    const tw = getWin('teacher');
-    const scores = tw.TC?.scores;
-    if (scores) {
-      const scoreStr = Object.entries(scores).map(([g, s]) => `${g}: ${s}`).join('、');
-      log(`當前分數 → ${scoreStr}`, 'ok');
-    }
-  } catch(e) {}
-}
-
-async function stepKickStudent() {
-  // ★ 踢人改為手動操作：提示使用者自行在老師端點「✕ 踢除」
-  log('【手動步驟】請在老師端點擊任一學生的「✕ 踢除」按鈕，完成後按「⏭ 下一步」繼續', 'warn');
-  setSlotStatus('teacher', '⚠️ 等待手動踢人', 'var(--yellow)');
-  testPaused = true; // 自動暫停，等使用者操作後按「下一步」繼續
-}
-
-async function stepStudentRejoin(idx) {
-  const id = `student${idx}`;
-  log(`學生${idx}：被踢後重新加入`, 'action');
-  setSlotStatus(id, '重新加入中...', 'var(--yellow)');
-  const success = await doStudentJoinFlow(id, idx, idx - 1);
-  if (success) {
-    try {
-      await waitFor(() => {
-        const tw = getWin('teacher');
-        return (tw?.state?.players || []).some(p => p.group === `第 ${idx} 組`);
-      }, 8000);
-      log(`老師端已看到學生${idx}重新加入 ✓`, 'ok');
-    } catch(e) { log(`老師端更新逾時`, 'warn'); }
-  }
-  await sleep(STEP_DELAY());
-}
-
-async function stepSettle() {
-  // ★ 結算改為手動：讓使用者自己操作老師端
-  log('【手動步驟】遊戲進行中，請自行操作老師端（結算、返回大廳等）。按「⏭ 下一步」結束測試。', 'warn');
-  setSlotStatus('teacher', '⏳ 等待手動操作', 'var(--yellow)');
+// ── 移交手動：暫停等使用者操作 ──
+async function stepHandoverToTeacher() {
+  log('🖐 請在老師端：選擇遊戲 → 查看規則 → 按「全班開始！」', 'warn');
+  log('準備好後，按上方「⏭ 下一步」繼續', 'warn');
+  setSlotStatus('teacher', '⏳ 等待你操作', 'var(--yellow)');
   testPaused = true;
 }
 
-async function stepReturnLobby() {
-  // 由使用者手動操作，這裡只記錄
-  log('測試已移交手動操作', 'info');
-}
-
-
-// ════════════════════════════════════════
-// AI 自動通關模組
-// 用 eval 注入腳本到 iframe closure，直接呼叫遊戲內部函式
-// ════════════════════════════════════════
-
-function stopAllAI() {
-  window._aiTimers = window._aiTimers || [];
-  window._aiTimers.forEach(t => clearInterval(t));
-  window._aiTimers = [];
-  // 也清除各 iframe 內注入的 AI
-  Object.keys(iframes).forEach(id => {
-    try {
-      const win = getWin(id);
-      if (win._aiStop) win._aiStop();
-    } catch(e) {}
-  });
-  log('所有 AI 已停止', 'info');
-}
-
-// 在 iframe 內注入並執行腳本（腳本可存取 iframe 的 closure 變數）
-function injectScript(id, code) {
-  try {
-    const win = getWin(id);
-    // 先停掉舊的 AI
-    if (win._aiStop) { win._aiStop(); }
-    // 注入新腳本
-    const fn = new win.Function(code);
-    fn.call(win);
-    log(`${id} AI 注入成功`, 'ok');
-  } catch(e) {
-    log(`${id} AI 注入失敗：${e.message}`, 'error');
-  }
-}
-
-// ── W1 消除方塊：直接呼叫 handleInput（state, entities 在 closure 內）──
-const AI_W1 = `
-  if (window._aiStop) window._aiStop();
-  const _ai = window._w1AI;
-  if (!_ai) { console.warn('W1 AI 介面未就緒'); return; }
-  const _t = setInterval(() => {
-    if (!_ai.isActive()) return;
-    const ents = _ai.entities();
-    for (let i = ents.length - 1; i >= 0; i--) {
-      const e = ents[i];
-      if (!e || !e.active) continue;
-      if (e.type === 'ghost' || e.type === 'bomb') continue;
-      _ai.input(e.x, e.y);
-      break;
-    }
-  }, 250);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-const AI_W2 = `
-  if (window._aiStop) window._aiStop();
-  const _ai = window._w2AI;
-  if (!_ai) { console.warn('W2 AI 介面未就緒'); return; }
-  const _t = setInterval(() => {
-    if (!_ai.isReady()) return;
-    const cols = _ai.getCols(), rows = _ai.getRows();
-    const grid = _ai.getGrid();
-    if (!grid) return;
-    // 找一個可旋轉的格子（非固定格）
-    const rotatables = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const cell = grid[r][c];
-        if (cell && !['S','D','A','B','E','F'].includes(cell.type)) {
-          rotatables.push({r,c});
-        }
-      }
-    }
-    if (rotatables.length > 0) {
-      const pick = rotatables[Math.floor(Math.random() * rotatables.length)];
-      _ai.tapGrid(pick.c, pick.r);
-    }
-  }, 200);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-const AI_W4 = `
-  if (window._aiStop) window._aiStop();
-  const _ai = window._w4AI;
-  if (!_ai) { console.warn('W4 AI 介面未就緒'); return; }
-  const _t = setInterval(() => {
-    if (!_ai.isActive()) return;
-    const mode = _ai.getMode();
-    const ents = _ai.entities();
-    const tw   = _ai.getTW() || 100;
-    const c    = _ai.getCanvas();
-    const h    = c ? c.height : 600;
-
-    ents.forEach(e => {
-      if (!e) return;
-      if (mode === 1) {
-        const progress = e.maxLife ? 1 - (e.life / e.maxLife) : 0;
-        if (progress > 0.6 && progress < 0.98 && !e._aiHit) {
-          _ai.input(e.x, e.y, true);
-          e._aiHit = true;
-        }
-      } else if (mode === 2) {
-        const baseline = h - 150;
-        const bottomY = e.y + (e.h || 0);
-        if (!e.hit && bottomY > baseline - 60 && bottomY < baseline + 100) {
-          _ai.input(e.track * tw + tw / 2, baseline, true);
-        }
-      } else if (mode === 3) {
-        const baseline = h - 100;
-        const headY = e.y + (e.h || 0);
-        if (!e.hit && !e.failed && Math.abs(headY - baseline) < 100) {
-          _ai.input(e.track * tw + tw / 2, baseline, true);
-        }
-      }
-    });
-  }, 60);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-const AI_W6 = `
-  if (window._aiStop) window._aiStop();
-  const _ai = window._w6AI;
-  if (!_ai) { console.warn('W6 AI 介面未就緒'); return; }
-  const _t = setInterval(() => {
-    if (!_ai.isPlaying()) return;
-    const joysticks = _ai.getJoysticks();
-    const cursors   = _ai.getCursors();
-    const circles   = _ai.getCircles();
-    if (!joysticks || !cursors || !circles) return;
-    joysticks.forEach((js, i) => {
-      const target = circles[i] || circles[0];
-      const cur    = cursors[i];
-      if (!target || !cur) return;
-      const dx = target.x - cur.x;
-      const dy = target.y - cur.y;
-      const d  = Math.hypot(dx, dy);
-      if (d < 8) { _ai.setJoystick(i, 0, 0); return; }
-      _ai.setJoystick(i, dx / d, dy / d);
-    });
-  }, 50);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-const AI_W7 = `
-  if (window._aiStop) window._aiStop();
-  const _ai = window._w7AI;
-  if (!_ai) { console.warn('W7 AI 介面未就緒'); return; }
-  const _t = setInterval(() => {
-    if (_ai.isPaused()) return;
-
-    // Part1：翻牌
-    if (_ai.getFlipPhase() === 'PLAY' && !_ai.isFlipLock()) {
-      const cards = _ai.getFlipCards();
-      const unmatched = cards.filter(c => !c.matched && !c.flipped);
-      if (unmatched.length >= 2) {
-        _ai.clickFlip(unmatched[0]);
-        setTimeout(() => {
-          const still = _ai.getFlipCards().filter(c => !c.matched && !c.flipped);
-          const partner = still.find(c => c.emojiIdx === unmatched[0].emojiIdx);
-          if (partner) _ai.clickFlip(partner);
-          else if (still[0]) _ai.clickFlip(still[0]);
-        }, 450);
-      }
-    }
-
-    // Part2：動果大遊行
-    if (_ai.getParadePhase() === 'INPUT') {
-      const seq  = _ai.getParadeSeq();
-      const user = _ai.getParadeUser();
-      if (user.length < seq.length) {
-        _ai.pushParade(seq[user.length]);
-      } else {
-        _ai.submitParade();
-      }
-    }
-
-    // Part3：金庫解碼
-    const cmds = _ai.getSafeCmds();
-    const step = _ai.getSafeStep();
-    const sub  = _ai.getSafeSubStep();
-    if (cmds.length > 0 && step < cmds.length) {
-      const cmd = cmds[step];
-      const dir = cmd.dir === 'L' ? -1 : 1;
-      if (sub < cmd.val) {
-        _ai.operateGear(dir);
-      } else if (sub === cmd.val) {
-        setTimeout(() => _ai.confirmSafe(), 200);
-      }
-    }
-  }, 500);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-const AI_W8 = `
-  if (window._aiStop) window._aiStop();
-  const _t = setInterval(() => {
-    if (typeof rollDice === 'function') rollDice();
-  }, 1500);
-  window._aiStop = () => clearInterval(_t);
-`;
-
-const AI_SCRIPTS = {
-  1: AI_W1, 2: AI_W2, 3: null, 4: AI_W4,
-  5: null,  6: AI_W6, 7: AI_W7, 8: AI_W8
-};
-
-function startAllAI(gameId) {
+// ── 等待遊戲啟動後持續偵測並注入 AI ──
+async function stepStartAI() {
+  const gameId = parseInt(document.getElementById('game-select').value);
   const numStudents = parseInt(document.getElementById('player-count').value);
   const script = AI_SCRIPTS[gameId];
+
   if (!script) {
     log(`W${gameId} 無 AI（W3 五子棋 / W5 你畫我猜 需人工操作）`, 'warn');
     return;
   }
-  let ok = 0;
-  for (let i = 1; i <= numStudents; i++) {
-    try {
-      injectScript(`student${i}`, script);
-      ok++;
-    } catch(e) {
-      log(`student${i} AI 啟動失敗：${e.message}`, 'error');
+
+  log(`🤖 持續偵測遊戲啟動，就緒後自動注入 AI...`, 'info');
+  stopAllAI();
+  // 重置注入標記
+  Object.keys(iframes).forEach(id => { if(iframes[id]) iframes[id]._aiInjected = false; });
+
+  const maxWait = 15 * 60 * 1000; // 最多等 15 分鐘
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWait && !abortTest) {
+    // 若手動暫停也繼續等（這個步驟不受 testPaused 影響）
+    let injected = 0;
+    for (let i = 1; i <= numStudents; i++) {
+      const id = `student${i}`;
+      if (iframes[id]?._aiInjected) { injected++; continue; }
+      try {
+        const win = getWin(id);
+        let ready = false;
+        if      (gameId === 4) ready = win?._w4AI?.isActive?.() === true;
+        else if (gameId === 1) ready = win?._w1AI?.isActive?.() === true;
+        else if (gameId === 2) ready = win?._w2AI?.isReady?.() === true;
+        else if (gameId === 6) ready = win?._w6AI?.isPlaying?.() === true;
+        else if (gameId === 7) ready = (win?._w7AI?.getFlipCards?.()?.length > 0 || win?._w7AI?.getSafeCmds?.()?.length > 0);
+        else if (gameId === 8) ready = win?.gameState?.phase === 'waiting_roll';
+        else {
+          const doc = getDoc(id);
+          const gui = doc?.getElementById('game-ui');
+          ready = gui && !gui.classList.contains('hidden');
+        }
+        if (ready) {
+          injectScript(id, script);
+          iframes[id]._aiInjected = true;
+          injected++;
+          setSlotStatus(id, '🤖 AI 運行中', 'var(--purple)');
+          log(`student${i} AI 注入成功`, 'ok');
+        }
+      } catch(e) {}
     }
+
+    if (injected >= numStudents) {
+      log(`✅ 全部 ${numStudents} 個學生端 AI 已注入，持續自動闖關`, 'ok');
+      setSlotStatus('teacher', '🎮 遊戲進行中', 'var(--green)');
+      break;
+    }
+    await sleep(800);
   }
-  log(`W${gameId} AI 已注入 ${ok}/${numStudents} 個學生端`, ok > 0 ? 'ok' : 'error');
 }
 
-async function stepStartAI() {
-  const gameId = parseInt(document.getElementById('game-select').value);
-  const numStudents = parseInt(document.getElementById('player-count').value);
-  log(`等待遊戲啟動後注入 W${gameId} AI...`, 'step');
-  stopAllAI();
+// ── W4 持續監測模式完成 ──
+async function stepWatchW4Progress() {
+  log('🔍 W4 監測中：模式完成時日誌會顯示提示', 'info');
+  let lastMode = 0;
+  const maxWait = 30 * 60 * 1000;
+  const startTime = Date.now();
 
-  if (!AI_SCRIPTS[gameId]) {
-    log(`W${gameId} 無 AI（W3 五子棋 / W5 你畫我猜 需人工操作）`, 'warn');
-    return;
-  }
-
-  // 等所有學生端的遊戲畫面真正啟動（game-ui visible 或 gameState.active）
-  const waitForGame = async (id) => {
+  while (Date.now() - startTime < maxWait && !abortTest) {
     try {
-      await waitFor(() => {
-        const doc = getDoc(id);
-        const win = getWin(id);
-        // W4：gameState.active === true
-        if (gameId === 4) return win?.gameState?.active === true;
-        // W8：gameState 存在且有 phase
-        if (gameId === 8) return win?.gameState?.phase === 'waiting_roll';
-        // W7：有 flipCards 或 paradeSeq 或 safeCmds
-        if (gameId === 7) return (win?.flipCards?.length > 0 ||
-                                   win?.paradeSeq?.length > 0 ||
-                                   win?.safeCmds?.length > 0);
-        // W6：gameState === 'PLAYING'
-        if (gameId === 6) return win?.gameState === 'PLAYING';
-        // W1：state.active === true
-        if (gameId === 1) return win?.state?.active === true;
-        // W2：canvas 可見且 gameStarted
-        if (gameId === 2) {
-          const canvas = doc?.getElementById('gameCanvas');
-          return canvas && canvas.offsetParent !== null;
+      const doc = getDoc('teacher');
+      const btn = doc?.querySelector('[onclick*="tcW4StartNextMode"]');
+      if (btn) {
+        const m = btn.getAttribute('onclick')?.match(/\d/);
+        const nextMode = m ? parseInt(m[0]) : 0;
+        if (nextMode > lastMode) {
+          lastMode = nextMode;
+          const names = ['', '縮圈點擊', '鋼琴黑塊', '底線軌道'];
+          log(`🎵 W4 模式完成！請點老師端「▶ 下一玩法：${names[nextMode]||''}」按鈕`, 'ok');
+          const el = document.getElementById('step-label');
+          if (el) { el.textContent = `⚠️ W4 下一玩法：${names[nextMode]||''} 請操作老師端`; }
+          // 重置 AI 注入標記，等新模式啟動後重新注入
+          Object.keys(iframes).forEach(id => { if(iframes[id]) iframes[id]._aiInjected = false; });
+          // 背景繼續等新模式的 AI
+          stepStartAI().catch(()=>{});
         }
-        // 通用：game-ui 可見
-        const gameUi = doc?.getElementById('game-ui');
-        if (gameUi && !gameUi.classList.contains('hidden') && gameUi.offsetParent !== null) return true;
-        // iframe 內的 screen-student-game（W8 用）
-        const gameScreen = doc?.getElementById('screen-student-game');
-        return gameScreen?.classList.contains('active');
-      }, 20000);
-      return true;
-    } catch(e) {
-      log(`${id} 等待遊戲啟動逾時`, 'warn');
-      return false;
-    }
-  };
-
-  // 等所有學生端都就緒
-  let readyCount = 0;
-  for (let i = 1; i <= numStudents; i++) {
-    const ready = await waitForGame(`student${i}`);
-    if (ready) readyCount++;
+      }
+    } catch(e) {}
+    await sleep(1500);
   }
-  log(`${readyCount}/${numStudents} 個學生端遊戲已啟動，注入 AI`, 'ok');
+}
 
-  // 稍等讓遊戲完全穩定後注入
-  await sleep(500);
-  startAllAI(gameId);
-  log('AI 持續運行，觀察各學生端畫面', 'info');
+// ── 等待手動結算 ──
+async function stepWaitForManualEnd() {
+  log('✅ AI 持續運行。你可以自由操作老師端（踢人、暫停、結算等）', 'info');
+  log('完成測試後，按「⏭ 下一步」結束', 'warn');
+  setSlotStatus('teacher', '🎮 自由操作中', 'var(--green)');
+  testPaused = true;
+}
+
+async function stepObserve() {
+  log('AI 遊玩中，按「⏭ 下一步」繼續', 'info');
+  testPaused = true;
+}
+
+async function stepKickStudent() {
+  log('【可選】請在老師端點「✕ 踢除」測試踢人，按「⏭ 下一步」繼續', 'warn');
+  testPaused = true;
+}
+
+async function stepSettle() {
+  log('請在老師端結算，完成後按「⏭ 下一步」', 'warn');
+  testPaused = true;
+}
+
+async function stepReturnLobby() {
+  log('測試移交手動操作', 'info');
 }
 
 async function stepDone() {
