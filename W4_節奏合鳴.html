@@ -783,21 +783,39 @@
     window.addEventListener('resize', resize);
 
     // ── 生成器 ──
+    // ── 各關卡 BPM（對應 track_01 ~ track_10）──
+    // life = 4拍（圓圈從出現到消失剛好4個節拍）
+    const TRACK_BPM = [78.3, 161.5, 136.0, 107.7, 117.5, 117.5, 184.6, 161.5, 112.3, 123.0];
+    function getTrackLife(level) {
+        const bpm  = TRACK_BPM[Math.max(0, Math.min(9, level - 1))];
+        const beat = 60000 / bpm;   // 一拍毫秒
+        return Math.round(beat * 4); // 4拍 = 一個縮圈週期
+    }
+    function getTrackSpawnInterval(level) {
+        const bpm  = TRACK_BPM[Math.max(0, Math.min(9, level - 1))];
+        const beat = 60000 / bpm;
+        // 每 2 拍生成一顆（高關卡多圈同時出現）
+        const beatsPerSpawn = level <= 3 ? 4 : level <= 6 ? 3 : 2;
+        return Math.round(beat * beatsPerSpawn);
+    }
+
     function spawn() {
         const level = gameState.level;
         if (gameState.mode === 1) {
-            const count = (Math.random() > 0.7) ? 2 : 1;
+            const life = getTrackLife(level);
+            // 高關卡（LV7+）有機率同時生成 2 顆
+            const count = (level >= 7 && Math.random() > 0.5) ? 2 : (level >= 4 && Math.random() > 0.7) ? 2 : 1;
             for (let i = 0; i < count; i++) {
                 const r = 60;
                 gameState.entities.push({
                     type: 'circle',
                     x: r + Math.random() * (canvas.width - r*2),
                     y: 150 + Math.random() * (canvas.height - 300),
-                    radius: r, life: 3000, maxLife: 3000,
+                    radius: r, life, maxLife: life,
                     color: COLORS[Math.floor(Math.random()*4)]
                 });
             }
-            return Math.max(400, 1800 - (level * 130));
+            return getTrackSpawnInterval(level);
         } else if (gameState.mode === 2) {
             const track = Math.floor(Math.random() * TRACK_COUNT);
             gameState.entities.push({ type: 'piano', track, y: -150, h: 150, hit: false });
@@ -984,7 +1002,9 @@
         ctx.fillStyle = '#060a10';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const speed = 4 + (gameState.level * 0.6);
+        const bpmNow = TRACK_BPM[Math.max(0, Math.min(9, gameState.level - 1))];
+        // 速度依 BPM 線性對應：60BPM → 4px/frame，185BPM → 12px/frame
+        const speed = 4 + (bpmNow - 60) / (185 - 60) * 8;
 
         if (gameState.mode >= 2) {
             for (let i = 0; i < TRACK_COUNT; i++) {
@@ -1311,18 +1331,30 @@
     const SCHED_INT   = 25;
     let seqIntervalId = null;
 
+    // ── BGM：依關卡播放對應 mp3（music/w4/track_01.mp3 ~ track_10.mp3）──
+    let _bgmAudio = null;
+
     function startBGM() {
         stopBGM();
         if (musicMuted) return;
-        seqCtx      = getAudioCtx();
-        seqStep     = 0;
-        seqPhrase   = 0;
-        seqRunning  = true;
-        seqNextTime = seqCtx.currentTime + 0.05;
-        seqIntervalId = setInterval(scheduleAhead, SCHED_INT);
+        const level = Math.max(1, Math.min(10, gameState.level || 1));
+        const track = String(level).padStart(2, '0');
+        const url   = `./music/w4/track_${track}.mp3`;
+        try {
+            _bgmAudio = new Audio(url);
+            _bgmAudio.loop   = true;
+            _bgmAudio.volume = 0.7;
+            _bgmAudio.play().catch(() => {}); // 部分瀏覽器需要使用者互動後才能播放
+        } catch(e) {}
     }
 
     function stopBGM() {
+        if (_bgmAudio) {
+            _bgmAudio.pause();
+            _bgmAudio.src = '';
+            _bgmAudio = null;
+        }
+        // 同時停止舊的 Web Audio Sequencer（若殘留）
         seqRunning = false;
         if (seqIntervalId) { clearInterval(seqIntervalId); seqIntervalId = null; }
     }
