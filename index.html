@@ -738,6 +738,13 @@ body::before {
         <div style="color:rgba(245,200,0,.6);font-size:7px;font-weight:900;font-family:'Nunito',sans-serif;white-space:nowrap">密碼</div>
         <div style="color:#f5c800;font-family:'Fredoka One',sans-serif;font-size:14px;letter-spacing:.1em;line-height:1.1" id="tc-room-code-badge">0000</div>
       </div>
+      <button id="tc-bgm-mute-btn" onclick="toggleBGMMute()"
+        style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+        border-radius:8px;color:white;font-size:.85rem;padding:5px 8px;
+        cursor:pointer;-webkit-tap-highlight-color:transparent;flex-shrink:0;">🔊</button>
+      <input id="tc-bgm-vol-slider" type="range" min="0" max="100" value="40"
+        oninput="setBGMVolume(this.value)"
+        style="width:60px;accent-color:#f5c800;cursor:pointer;flex-shrink:0;">
       <button class="kr-btn kr-btn-ghost" onclick="exitToLobby()" style="font-size:.8rem;padding:7px 10px">← 大廳</button>
     </div>
   </div>
@@ -2897,6 +2904,9 @@ function tcEndGame() {
     window.renderLobby();
     window.goTo('screen-lobby');
     showToast('✓ 遊戲結束，返回大廳');
+    // ★ 返回大廳重啟 BGM（W4 停了，其他遊戲也確保有播）
+    _bgmActive = false; // 重置讓 startTeacherBGM 可以重新啟動
+    setTimeout(() => startTeacherBGM(), 300);
 }
 
 function exitToLobby() {
@@ -4545,21 +4555,31 @@ function stopTeacherBGM() {
     if (_bgmAudioTC) { _bgmAudioTC.pause(); _bgmAudioTC.src = ''; _bgmAudioTC = null; }
 }
 
+function _syncBGMUI() {
+    const icon = _bgmMuted ? '🔇' : '🔊';
+    ['bgm-mute-btn', 'tc-bgm-mute-btn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.textContent = icon;
+    });
+    ['bgm-volume-slider', 'tc-bgm-vol-slider'].forEach(id => {
+        const sl = document.getElementById(id);
+        if (sl) sl.value = Math.round(_bgmVolume * 100);
+    });
+}
+
 function toggleBGMMute() {
     _bgmMuted = !_bgmMuted;
-    const btn = document.getElementById('bgm-mute-btn');
-    if (btn) btn.textContent = _bgmMuted ? '🔇' : '🔊';
     if (_bgmAudioTC) _bgmAudioTC.volume = _bgmMuted ? 0 : _bgmVolume;
     if (!_bgmMuted && !_bgmActive) startTeacherBGM();
+    _syncBGMUI();
 }
 
 function setBGMVolume(val) {
     _bgmVolume = parseInt(val) / 100;
     _bgmMuted  = _bgmVolume === 0;
-    const btn = document.getElementById('bgm-mute-btn');
-    if (btn) btn.textContent = _bgmMuted ? '🔇' : '🔊';
     if (_bgmAudioTC) _bgmAudioTC.volume = _bgmMuted ? 0 : _bgmVolume;
     if (!_bgmMuted && !_bgmActive) startTeacherBGM();
+    _syncBGMUI();
 }
 
 
