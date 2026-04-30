@@ -764,6 +764,7 @@
         startCountdown(() => {
             gameState.active = true;
             gameState.lastFrameTime = performance.now();
+            _loopRunning = true;
             requestAnimationFrame(gameLoop);
         });
     }
@@ -923,8 +924,13 @@
     const floatingTexts = [];
 
     // ── 渲染 ──
+    let _loopRunning = false;
+
     function gameLoop(now) {
+        _loopRunning = false;
         if (!gameState.active) return;
+        _loopRunning = true;
+        requestAnimationFrame(gameLoop); // ★ 先排程下一幀，確保 loop 不中斷
         const dt = now - gameState.lastFrameTime;
         gameState.lastFrameTime = now;
 
@@ -1146,8 +1152,7 @@
         }
         ctx.globalAlpha = 1.0;
         ctx.textAlign = 'left';
-
-        requestAnimationFrame(gameLoop);
+        // requestAnimationFrame 已在函式開頭排程
     }
 
     // ══════════════════════════════════
@@ -1657,7 +1662,7 @@
     function platformLaunch(mode, level) {
         const key = `${mode}-${level}`;
         const now = Date.now();
-        if (key === _lastLaunchKey && now - _lastLaunchTime < 2000) return;
+        if (key === _lastLaunchKey && now - _lastLaunchTime < 10000) return;
         _lastLaunchKey  = key;
         _lastLaunchTime = now;
 

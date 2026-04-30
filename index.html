@@ -370,17 +370,7 @@ body::before {
       <div style="color:rgba(245,200,0,0.7);font-size:.6rem;font-weight:900">房間密碼</div>
       <div class="kr-code" id="lobby-code">0000</div>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <button id="bgm-mute-btn" onclick="toggleBGMMute()"
-          style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:6px;
-          color:white;font-size:.85rem;padding:3px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          🔊
-        </button>
-        <input id="bgm-volume-slider" type="range" min="0" max="100" value="40"
-          oninput="setBGMVolume(this.value)"
-          style="width:80px;accent-color:#f5c800;cursor:pointer;">
-      </div>
+    <div style="text-align:right">
       <div style="color:white;font-weight:900;font-size:1.2rem" id="lobby-count">0/5</div>
       <div style="color:rgba(255,255,255,0.4);font-size:.6rem">玩家人數</div>
     </div>
@@ -670,6 +660,22 @@ body::before {
   <div class="kr-footer">
     <button class="kr-btn kr-btn-ghost" onclick="exitToLobby()">← 返回大廳</button>
   </div>
+</div>
+
+<!-- ══ 老師端浮動音量控制（所有老師端畫面常駐右下角）══ -->
+<div id="teacher-bgm-bar" style="
+  display:none; position:fixed; bottom:16px; right:16px; z-index:9000;
+  background:rgba(13,15,26,0.92); border:1px solid rgba(255,255,255,.18);
+  border-radius:12px; padding:7px 12px;
+  align-items:center; gap:10px;
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);">
+  <button id="bgm-mute-btn" onclick="toggleBGMMute()"
+    style="background:none;border:none;color:white;font-size:1.1rem;
+    cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0;">🔊</button>
+  <input id="bgm-volume-slider" type="range" min="0" max="100" value="40"
+    oninput="setBGMVolume(this.value)"
+    style="width:88px;accent-color:#f5c800;cursor:pointer;">
 </div>
 
 <!-- ════════════════════════════════════════
@@ -4010,12 +4016,17 @@ function teacherLogin() {
   window.renderLobby();
   window.goTo('screen-lobby');
   window.showToast(`🏠 房間 ${code} 已建立！`);
-  // ★ 進入大廳自動開始 BGM
+  // ★ 顯示老師端浮動音量 bar
+  const bgmBar = document.getElementById('teacher-bgm-bar');
+  if (bgmBar) bgmBar.style.display = 'flex';
   setTimeout(() => startTeacherBGM(), 300);
 }
 
 function doCloseRoom() {
-  stopTeacherBGM(); // ★ 關閉房間時停止 BGM
+  stopTeacherBGM();
+  // 隱藏音量 bar
+  const bgmBar = document.getElementById('teacher-bgm-bar');
+  if (bgmBar) bgmBar.style.display = 'none';
   const code = window.state.roomCode;
   if (code) {
       const rooms = window.getRooms();
@@ -4510,149 +4521,54 @@ window.addEventListener('beforeunload',  _handlePageLeave);
 // 老師端 BGM 系統（Web Audio 生成，進入大廳自動播放）
 // W4 遊戲時不播，其餘遊戲統一一首輕快循環 BGM
 // ══════════════════════════════════════════════════════════
-const _BGM = {
-    ctx:       null,
-    gainNode:  null,
-    running:   false,
-    muted:     false,
-    volume:    0.4,
-    timerId:   null,
-    nextTime:  0,
-    step:      0,
-};
+// ══════════════════════════════════════════════════════════
+// 老師端 BGM（mp3 版本，music/teacher_bgm.mp3）
+// ══════════════════════════════════════════════════════════
+let _teacherBGMAudio = null;
+let _teacherBGMMuted = false;
+let _teacherBGMVolume = 0.4;
 
-function _bgmGetCtx() {
-    if (!_BGM.ctx) {
-        _BGM.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        _BGM.gainNode = _BGM.ctx.createGain();
-        _BGM.gainNode.gain.value = _BGM.muted ? 0 : _BGM.volume;
-        _BGM.gainNode.connect(_BGM.ctx.destination);
-    }
-    if (_BGM.ctx.state === 'suspended') _BGM.ctx.resume();
-    return _BGM.ctx;
-}
-
-function _bgmNote(freq, type, start, dur, vol = 0.15) {
+function startTeacherBGM() {
+    if (window.state.selectedGame === 3) return; // W4 不播
+    if (_teacherBGMAudio && !_teacherBGMAudio.paused) return; // 已在播
+    if (_teacherBGMMuted) return;
     try {
-        const ac  = _BGM.ctx;
-        const osc = ac.createOscillator();
-        const g   = ac.createGain();
-        osc.type = type;
-        osc.frequency.value = freq;
-        g.gain.setValueAtTime(0, start);
-        g.gain.linearRampToValueAtTime(vol, start + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, start + dur);
-        osc.connect(g);
-        g.connect(_BGM.gainNode);
-        osc.start(start);
-        osc.stop(start + dur + 0.05);
+        if (!_teacherBGMAudio) {
+            _teacherBGMAudio = new Audio('./music/teacher_bgm.mp3');
+            _teacherBGMAudio.loop   = true;
+            _teacherBGMAudio.volume = _teacherBGMVolume;
+        }
+        _teacherBGMAudio.play().catch(() => {});
     } catch(e) {}
 }
 
-// ── BGM 旋律定義（輕快 C 大調進行曲風格）──
-// 音符：[頻率Hz, 音值(16分音符數), 音量, 波形]
-const _BGM_PHRASES = [
-    // Phrase A（主題）
-    [
-        [523, 1, .18, 'square'], [659, 1, .15, 'square'], [784, 2, .2, 'square'],
-        [698, 1, .15, 'square'], [659, 1, .15, 'square'], [587, 2, .18, 'square'],
-        [523, 1, .15, 'square'], [587, 1, .15, 'square'], [659, 2, .18, 'square'],
-        [784, 4, .22, 'square'],
-        [698, 1, .15, 'square'], [659, 1, .15, 'square'], [587, 1, .15, 'square'], [523, 1, .15, 'square'],
-        [440, 4, .2, 'square'],
-    ],
-    // Phrase B（副歌）
-    [
-        [784, 2, .22, 'square'], [880, 2, .22, 'square'],
-        [988, 2, .2, 'square'],  [880, 2, .18, 'square'],
-        [784, 1, .18, 'square'], [698, 1, .16, 'square'], [659, 2, .18, 'square'],
-        [587, 1, .15, 'square'], [659, 1, .15, 'square'], [698, 2, .18, 'square'],
-        [784, 4, .22, 'square'],
-        [523, 2, .15, 'square'], [587, 2, .15, 'square'], [659, 4, .2, 'square'],
-    ],
-    // Bass line（低音）— 和主旋律同時跑
-];
-
-// 每個 phrase 共 16 個 16分音符 = 4拍
-const _BGM_BPM = 128;
-
-function _bgmSchedule() {
-    if (!_BGM.running || _BGM.muted) return;
-    const ac   = _bgmGetCtx();
-    const step16 = 60 / _BGM_BPM / 4; // 一個 16分音符的秒數
-    const lookahead = 0.15;
-
-    while (_BGM.nextTime < ac.currentTime + lookahead) {
-        const phrases = _BGM_PHRASES;
-        const phraseIdx = Math.floor(_BGM.step / 16) % phrases.length;
-        const noteIdx   = _BGM.step % 16;
-        const phrase    = phrases[phraseIdx];
-
-        if (noteIdx < phrase.length) {
-            const [freq, beats, vol, type] = phrase[noteIdx];
-            _bgmNote(freq, type, _BGM.nextTime, step16 * beats * 0.85, vol * _BGM.volume);
-        }
-
-        // 低音鼓節拍（每拍 4 個 16分音符中的第 1 個）
-        if (_BGM.step % 4 === 0) {
-            _bgmNote(65, 'sine', _BGM.nextTime, 0.12, 0.25 * _BGM.volume);
-        }
-        // Hi-hat（每個 16 分音符）
-        if (_BGM.step % 2 === 0) {
-            try {
-                const ac2 = _BGM.ctx;
-                const buf = ac2.createBuffer(1, 512, ac2.sampleRate);
-                const d   = buf.getChannelData(0);
-                for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.3;
-                const src = ac2.createBufferSource();
-                const g2  = ac2.createGain();
-                src.buffer = buf;
-                g2.gain.setValueAtTime(0.06 * _BGM.volume, _BGM.nextTime);
-                g2.gain.exponentialRampToValueAtTime(0.001, _BGM.nextTime + 0.06);
-                src.connect(g2); g2.connect(_BGM.gainNode);
-                src.start(_BGM.nextTime);
-            } catch(e) {}
-        }
-
-        _BGM.nextTime += step16;
-        _BGM.step++;
-    }
-}
-
-function startTeacherBGM() {
-    // W4（selectedGame === 3）不播
-    if (window.state.selectedGame === 3) return;
-    if (_BGM.running) return;
-    _bgmGetCtx();
-    _BGM.running  = true;
-    _BGM.step     = 0;
-    _BGM.nextTime = _BGM.ctx.currentTime + 0.1;
-    _BGM.timerId  = setInterval(_bgmSchedule, 50);
-}
-
 function stopTeacherBGM() {
-    _BGM.running = false;
-    if (_BGM.timerId) { clearInterval(_BGM.timerId); _BGM.timerId = null; }
+    if (_teacherBGMAudio) {
+        _teacherBGMAudio.pause();
+    }
 }
 
 function toggleBGMMute() {
-    _BGM.muted = !_BGM.muted;
+    _teacherBGMMuted = !_teacherBGMMuted;
     const btn = document.getElementById('bgm-mute-btn');
-    if (btn) btn.textContent = _BGM.muted ? '🔇' : '🔊';
-    if (_BGM.gainNode) _BGM.gainNode.gain.setTargetAtTime(_BGM.muted ? 0 : _BGM.volume, _BGM.ctx?.currentTime || 0, 0.05);
-    if (!_BGM.muted && !_BGM.running) startTeacherBGM();
+    if (btn) btn.textContent = _teacherBGMMuted ? '🔇' : '🔊';
+    if (_teacherBGMAudio) {
+        _teacherBGMAudio.volume = _teacherBGMMuted ? 0 : _teacherBGMVolume;
+    }
+    if (!_teacherBGMMuted) startTeacherBGM();
 }
 
 function setBGMVolume(val) {
-    _BGM.volume = parseInt(val) / 100;
-    _BGM.muted  = _BGM.volume === 0;
+    _teacherBGMVolume = parseInt(val) / 100;
+    _teacherBGMMuted  = _teacherBGMVolume === 0;
     const btn = document.getElementById('bgm-mute-btn');
-    if (btn) btn.textContent = _BGM.muted ? '🔇' : '🔊';
-    if (_BGM.gainNode && _BGM.ctx) {
-        _BGM.gainNode.gain.setTargetAtTime(_BGM.volume, _BGM.ctx.currentTime, 0.05);
+    if (btn) btn.textContent = _teacherBGMMuted ? '🔇' : '🔊';
+    if (_teacherBGMAudio) {
+        _teacherBGMAudio.volume = _teacherBGMVolume;
     }
-    if (!_BGM.muted && !_BGM.running) startTeacherBGM();
+    if (!_teacherBGMMuted) startTeacherBGM();
 }
+
 
 Object.assign(window, {
     testResetToHome, testSetPerspective, toggleQR, goToTeacherLogin, goToJoin, goTo,
