@@ -676,6 +676,15 @@
             <div id="pw-group-badge" style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:#00f5ff;margin-bottom:8px"></div>
             <div id="pw-status-msg" style="font-family:'Press Start 2P',monospace;font-size:8px;color:rgba(255,255,255,0.4);line-height:1.8">等待老師開始遊戲...</div>
         </div>
+        <!-- ★ 音訊解鎖按鈕：第一次點擊解鎖瀏覽器音訊政策 -->
+        <button id="audio-unlock-btn" onclick="unlockAudio()"
+          style="display:block;width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;
+          background:linear-gradient(135deg,#b44fff,#7b2fff);color:#fff;
+          font-family:'Orbitron',monospace;font-weight:900;font-size:.85rem;
+          box-shadow:0 4px 0 #4a1a99;margin-bottom:16px;
+          animation:heroPulse 1.5s ease-in-out infinite;">
+          🔊 點我準備音樂！
+        </button>
         <div style="display:flex;gap:8px;justify-content:center">
             <div style="width:8px;height:8px;border-radius:50%;background:#00f5ff;animation:dotBounce 1.2s ease-in-out infinite"></div>
             <div style="width:8px;height:8px;border-radius:50%;background:#00f5ff;animation:dotBounce 1.2s ease-in-out infinite 0.2s"></div>
@@ -1331,30 +1340,62 @@
     const SCHED_INT   = 25;
     let seqIntervalId = null;
 
-    // ── BGM：依關卡播放對應 mp3（music/w4/track_01.mp3 ~ track_10.mp3）──
+    // ── 音訊解鎖（解決瀏覽器自動播放政策）──
+    let _audioUnlocked = false;
+    let _pendingBGMLevel = null; // 記錄等待播放的關卡
+
+    function unlockAudio() {
+        _audioUnlocked = true;
+        const btn = document.getElementById('audio-unlock-btn');
+        if (btn) {
+            btn.textContent = '✅ 音樂已準備好！';
+            btn.style.background = 'rgba(34,192,64,.3)';
+            btn.style.border = '1px solid rgba(34,192,64,.6)';
+            btn.style.animation = 'none';
+            btn.style.cursor = 'default';
+            btn.onclick = null;
+        }
+        // 若遊戲已開始但因未解鎖而沒播音樂，現在補播
+        if (_pendingBGMLevel !== null) {
+            startBGM(_pendingBGMLevel);
+            _pendingBGMLevel = null;
+        }
+    }
+
+    // ── BGM：依關卡播放對應 mp3 ──
     let _bgmAudio = null;
 
-    function startBGM() {
+    function startBGM(levelOverride) {
         stopBGM();
         if (musicMuted) return;
-        const level = Math.max(1, Math.min(10, gameState.level || 1));
+        const level = levelOverride !== undefined ? levelOverride : Math.max(1, Math.min(10, gameState.level || 1));
+        if (!_audioUnlocked) {
+            // 尚未解鎖，先記住待播關卡，等用戶點擊後補播
+            _pendingBGMLevel = level;
+            return;
+        }
         const track = String(level).padStart(2, '0');
         const url   = `./music/w4/track_${track}.mp3`;
         try {
             _bgmAudio = new Audio(url);
             _bgmAudio.loop   = true;
             _bgmAudio.volume = 0.7;
-            _bgmAudio.play().catch(() => {}); // 部分瀏覽器需要使用者互動後才能播放
+            const p = _bgmAudio.play();
+            if (p && p.catch) p.catch(() => {
+                // 播放失敗再等解鎖
+                _pendingBGMLevel = level;
+                _audioUnlocked = false;
+            });
         } catch(e) {}
     }
 
     function stopBGM() {
+        _pendingBGMLevel = null;
         if (_bgmAudio) {
             _bgmAudio.pause();
             _bgmAudio.src = '';
             _bgmAudio = null;
         }
-        // 同時停止舊的 Web Audio Sequencer（若殘留）
         seqRunning = false;
         if (seqIntervalId) { clearInterval(seqIntervalId); seqIntervalId = null; }
     }
@@ -1571,6 +1612,7 @@
         entities:  () => gameState?.entities || [],
         input:     (px, py, s) => handleInput(px, py, s),
     };
+    window.unlockAudio = unlockAudio;
     canvas.addEventListener('touchstart', e => { e.preventDefault(); updateTouchState(e); for (let t of e.changedTouches) handleInput(t.clientX, t.clientY, true); }, {passive:false});
     canvas.addEventListener('touchmove',  e => { e.preventDefault(); updateTouchState(e); }, {passive:false});
     canvas.addEventListener('touchend',   e => { e.preventDefault(); updateTouchState(e); }, {passive:false});
