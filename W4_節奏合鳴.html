@@ -927,10 +927,14 @@
     let _loopRunning = false;
 
     function gameLoop(now) {
-        _loopRunning = false;
-        if (!gameState.active) return;
+        // ★ 先排程下一幀（不管 active 狀態），確保 loop 永不中斷
+        if (gameState.active) {
+            requestAnimationFrame(gameLoop);
+        } else {
+            _loopRunning = false;
+            return;
+        }
         _loopRunning = true;
-        requestAnimationFrame(gameLoop); // ★ 先排程下一幀，確保 loop 不中斷
         const dt = now - gameState.lastFrameTime;
         gameState.lastFrameTime = now;
 
