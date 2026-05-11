@@ -839,10 +839,7 @@ function attachSync() {
               applyState(JSON.stringify(data.w8State));
           }
           if (data && data.w8Action && myRole === 'teacher') {
-              const a = data.w8Action;
-              if (a && a.ts && a.ts !== _lastActionTs) {
-                  processAction(a);
-              }
+              processAction(data.w8Action);
           }
       });
     }
@@ -850,8 +847,7 @@ function attachSync() {
 
   const pollNow = () => {
     if (myRole === 'student') {
-      // ★ 只用 rooms 記憶體快取（老師廣播即時寫入）
-      // 不讀 localStorage.W8_STATE（多裝置時是舊值，會覆蓋最新狀態）
+      applyState(localStorage.getItem('W8_STATE'));
       try {
           if (window.parent && window.parent.getRooms) {
               const rooms = window.parent.getRooms();
@@ -900,7 +896,7 @@ function attachSync() {
     }
   };
   pollNow();
-  setInterval(pollNow, 200); // ★ 縮短間隔讓平板反應更快
+  setInterval(pollNow, 400);
 }
 
 function processAction(action) {
@@ -1014,7 +1010,7 @@ window.addEventListener('message', e => {
     }
   }
   if (e.data.type === 'W8_STATE' && myRole === 'student') {
-    if (myRole === 'teacher' && window._isMoving) return; // ★ 只封鎖老師端
+    if (window._isMoving) return;
     const incoming = e.data.state;
     if (!incoming?.teams) return;
     const str = JSON.stringify(incoming);
@@ -1033,7 +1029,7 @@ window.addEventListener('message', e => {
 
 window.addEventListener('storage', e => {
   if (e.key === 'W8_STATE' && myRole === 'student') {
-      if (myRole === 'teacher' && window._isMoving) return; // ★ 只封鎖老師端
+      if (window._isMoving) return;
       gameState = JSON.parse(e.newValue); syncTeamsFromParent(); render(); 
   }
   if (e.key === 'W8_ROLL' && myRole === 'teacher') { processAction(JSON.parse(e.newValue)); }
@@ -2111,7 +2107,7 @@ function movePiece() {
     }
 
     if (step < steps) {
-      setTimeout(moveStep, 400); 
+      setTimeout(moveStep, 800); // ★ 800ms 讓 Firebase 有時間推送每步給學生
     } else {
       setTimeout(() => {
         window._isMoving = false;
