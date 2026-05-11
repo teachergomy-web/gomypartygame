@@ -943,19 +943,25 @@ window.getRooms = function() {
     return JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
 };
 
+let _saveRoomsTimer = null;
 window.saveRooms = function(r) {
     const myCode = window.state && window.state.roomCode;
     if (!myCode || !r[myCode]) return;
-    // 更新記憶體快取
+    // 更新記憶體快取和 localStorage（立即）
     window._allRoomsCache[myCode] = r[myCode];
-    // 備份到 localStorage
     const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
     local[myCode] = r[myCode];
     localStorage.setItem('playroom_rooms', JSON.stringify(local));
-    // 寫入 Firebase
+    // ★ Firebase 寫入節流：500ms 內多次 saveRooms 合併為一次
     if (isFirebase && db && isFirebaseAuthComplete) {
-        fsSet(fsDoc(db, 'rooms', myCode), r[myCode])
-            .catch(e => console.error("Firebase Save Error:", e));
+        clearTimeout(_saveRoomsTimer);
+        _saveRoomsTimer = setTimeout(() => {
+            const latestData = window._allRoomsCache[myCode];
+            if (latestData) {
+                fsSet(fsDoc(db, 'rooms', myCode), latestData)
+                    .catch(e => console.error("Firebase Save Error:", e));
+            }
+        }, 500);
     }
 };
 
@@ -977,40 +983,48 @@ let _allRoomsFirstSnap = false; // 是否已收到第一次快照
 function startAllRoomsListener() {
     if (!isFirebase || !db) return;
     if (allRoomsUnsubscribe) { allRoomsUnsubscribe(); allRoomsUnsubscribe = null; }
-    const colRef = fsCollection(db, 'rooms');
-    allRoomsUnsubscribe = fsOnSnap(colRef, (snapshot) => {
-        const now = Date.now();
-        const newCache = {};
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.createdAt && (now - data.createdAt) > 2 * 60 * 60 * 1000) {
-                // 超過2小時靜默刪除
-                if (isFirebaseAuthComplete) fsDelete(fsDoc(db, 'rooms', doc.id)).catch(()=>{});
-            } else {
-                newCache[doc.id] = data;
-            }
-        });
-        // Firebase 快照完整取代記憶體快取（確保刪除即時反映）
-        window._allRoomsCache = newCache;
+    // ★ 不監聽整個 collection（高消耗），改為一次性讀取可見房間
+    // 只在學生進入加入頁時執行一次性查詢
+    _fetchRoomsOnce();
+}
 
-        // 同時清理 localStorage 中已不在 Firebase 的房間
+// ★ 一次性讀取房間（不持續監聽 collection，大幅降低讀取次數）
+let _lastFetchTime = 0;
+async function _fetchRoomsOnce() {
+    if (!isFirebase || !db || !fsGetDoc) return;
+    const now = Date.now();
+    if (now - _lastFetchTime < 10000) return; // 10秒內不重複讀取
+    _lastFetchTime = now;
+    try {
+        // 只讀取 localStorage 中已知的房間碼
         const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-        let changed = false;
-        Object.keys(local).forEach(id => {
-            if (!newCache[id]) { delete local[id]; changed = true; }
-        });
-        if (changed) localStorage.setItem('playroom_rooms', JSON.stringify(local));
-
-        // ── 每次快照到達都嘗試恢復（直到成功為止）──
-        if (window._pendingRestore) tryRestoreSession();
-
-        // 重新渲染房間列表
-        const p = window.state && window.state.perspective;
-        const pData = p && window.pStates && window.pStates[p];
-        if (pData && pData.screen === 'screen-join' && pData.joinStep === 1) {
-            window.renderRoomList();
+        const codes = Object.keys(local);
+        // 若有 pendingRestore，加入要恢復的房間碼
+        if (window._pendingRestore?.roomCode) codes.push(window._pendingRestore.roomCode);
+        if (codes.length === 0) {
+            if (window._pendingRestore) tryRestoreSession();
+            return;
         }
-    }, err => console.error('All rooms sync error:', err));
+        // 每個已知房間各讀一次（不讀整個 collection）
+        const snapPromises = [...new Set(codes)].map(code =>
+            fsGetDoc(fsDoc(db, 'rooms', code)).catch(() => null)
+        );
+        const snaps = await Promise.all(snapPromises);
+        snaps.forEach(snap => {
+            if (!snap || !snap.exists || !snap.exists()) return;
+            const data = snap.data();
+            window._allRoomsCache[snap.id] = data;
+            local[snap.id] = data;
+        });
+        localStorage.setItem('playroom_rooms', JSON.stringify(local));
+    } catch(e) {}
+    if (window._pendingRestore) tryRestoreSession();
+    // 重新渲染房間列表
+    const p = window.state?.perspective;
+    const pData = p && window.pStates?.[p];
+    if (pData?.screen === 'screen-join' && pData.joinStep === 1) {
+        window.renderRoomList();
+    }
 }
 
 // ── 監聽單一房間（遊戲中即時同步）──
@@ -3566,6 +3580,17 @@ function selectRoom(code, num) {
 function verifyRoomPassword() {
     if (document.getElementById('room-pw-input').value === window.state.tempRoomCode) {
         window.state.roomCode = window.state.tempRoomCode;
+        // ★ 加入前先確保該房間資料在快取中
+        if (isFirebase && db && fsGetDoc && !window._allRoomsCache[window.state.roomCode]) {
+            fsGetDoc(fsDoc(db, 'rooms', window.state.roomCode)).then(snap => {
+                if (snap.exists()) {
+                    window._allRoomsCache[snap.id] = snap.data();
+                    const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+                    local[snap.id] = snap.data();
+                    localStorage.setItem('playroom_rooms', JSON.stringify(local));
+                }
+            }).catch(()=>{});
+        }
         startSyncListener(); // 學生加入後開始監聽 Firebase
         const room = window.getRooms()[window.state.roomCode];
         if(!room || !room.open) { window.showToast('⚠️ 房間已關閉'); return; }
@@ -4281,6 +4306,10 @@ function tryRestoreSession() {
             TC.scores = room.scores    || {};
             window.pStates['teacher'].screen = 'screen-teacher-console';
             window.goTo('screen-teacher-console');
+            // ★ 恢復到遊戲畫面時也嘗試播 BGM（W4 playing 除外，由 startBGM 控制）
+            if (room.selectedGame !== 3 || room.status !== 'playing') {
+                setTimeout(() => startTeacherBGM(), 400);
+            }
             // 恢復遊戲畫面：W5 和 W8 需要重新呼叫 tcStartGame
             if (room.selectedGame === 5) {
                 TC.isNextLevel = true;
@@ -4293,6 +4322,7 @@ function tryRestoreSession() {
         } else {
             window.pStates['teacher'].screen = 'screen-lobby';
             window.goTo('screen-lobby');
+            setTimeout(() => startTeacherBGM(), 400); // ★ 重整後恢復大廳也要播 BGM
         }
         showToast('🔄 已恢復連線');
         hideLoading();

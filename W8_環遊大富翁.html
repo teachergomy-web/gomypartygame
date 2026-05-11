@@ -851,6 +851,7 @@ function attachSync() {
         if (raw) {
           const action = JSON.parse(raw);
           if (action.ts && action.ts !== _lastActionTs) {
+            _lastActionTs = action.ts; // ★ 先記錄，防止重入
             processAction(action);
           }
         }
