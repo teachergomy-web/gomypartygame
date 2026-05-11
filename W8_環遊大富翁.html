@@ -370,6 +370,16 @@ body {
   <div style="color:var(--yellow); font-size:2.5rem; font-weight:900;">遊戲暫停中</div>
 </div>
 
+<!-- ★ 緊急停止按鈕（固定右上角，只對老師顯示）-->
+<button id="emergency-stop-btn" onclick="emergencyStop()" style="
+  position:fixed; top:10px; right:10px; z-index:9999;
+  background:#cc0000; color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:0.8rem; font-weight:900;
+  cursor:pointer; opacity:0.75; display:none;
+  box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+  ⛔ 緊急停止
+</button>
+
 <!-- TEACHER VIEW -->
 <div id="teacher-view">
   <div class="t-header" id="t-header">
@@ -1217,6 +1227,30 @@ window.startGame = function() {
 }
 
 // 讓 HTML onclick 可以直接呼叫這些函式
+// ★ 緊急停止：清除所有待處理 action，鎖定在 waiting_roll
+function emergencyStop() {
+  // 清除 localStorage
+  try { localStorage.removeItem('W8_ROLL'); } catch(e) {}
+  // 清除 rooms
+  try {
+    if (window.parent && window.parent.getRooms && window.parent.saveRooms) {
+      const rooms = window.parent.getRooms();
+      const rc = window.parent.state?.roomCode;
+      if (rooms && rc && rooms[rc]) {
+        rooms[rc].w8Action = null;
+        window.parent.saveRooms(rooms);
+      }
+    }
+  } catch(e) {}
+  // 強制停在 waiting_roll
+  if (gameState) {
+    gameState.phase = 'waiting_roll';
+    window._isMoving = false;
+    broadcast();
+  }
+  alert('已緊急停止！遊戲已重置到等待擲骰狀態。');
+}
+
 // ─── AI 測試介面 ───
 window._w8AI = {
     canRoll:   () => gameState && gameState.phase === 'waiting_roll',
@@ -1299,6 +1333,9 @@ function updateTeam(tid, patch) {
 
 function render() {
   const isT = myRole === 'teacher';
+  // ★ 緊急停止按鈕只對老師顯示
+  const stopBtn = document.getElementById('emergency-stop-btn');
+  if (stopBtn) stopBtn.style.display = isT ? 'block' : 'none';
   document.getElementById('teacher-view').style.display = isT ? 'block' : 'none';
   document.getElementById('student-view').style.display = isT ? 'none' : 'flex';
   if (!gameState) return;
