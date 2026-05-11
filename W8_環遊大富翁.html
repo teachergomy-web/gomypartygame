@@ -212,7 +212,8 @@ body {
   width: 100%; padding: 14px; border: none; border-radius: 12px; margin-top: 10px;
   font-family: var(--font); font-weight: 900; font-size: 1.1rem; cursor: pointer; transition: all 0.2s;
 }
-.btn-pub { background: linear-gradient(135deg, #d500f9, #aa00ff); color: #fff; box-shadow: 0 4px 15px rgba(213,0,249,0.3); }
+.btn-pub { background: linear-gradient(135deg, #d500f9, #aa00ff); color: #fff; box-shadow: 0 4px 15px rgba(213,0,249,0.3);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; }
 .btn-pub:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; background: #555; }
 .btn-next { background: linear-gradient(135deg, #00e676, #00c853); color: #000; box-shadow: 0 4px 15px rgba(0,230,118,0.3); }
 .btn-pub:not(:disabled):active, .btn-next:active { transform: scale(0.96); }
@@ -1416,7 +1417,7 @@ function render() {
               html = `<div class="co-title" style="color:var(--red);">⏸ 這回合停止行動！</div>`;
           } else {
               html = `<div class="co-title">✨ 輪到你們了！</div>
-                      <button class="btn-pub" style="display:block; font-size:1.5rem; padding:16px; margin-top:20px;" onclick="rollDice()">🎲 擲骰！</button>`;
+                      <button class="btn-pub" style="display:block; font-size:1.5rem; padding:16px; margin-top:20px; touch-action:manipulation; -webkit-tap-highlight-color:transparent;" ontouchstart="this._t=Date.now()" ontouchend="if(Date.now()-this._t<300)rollDice()" onclick="if(!this._t||Date.now()-this._t>=300)rollDice()">🎲 擲骰！</button>`;
           }
       }
       else if (gameState.phase === 'land_reveal') {
@@ -2016,6 +2017,9 @@ function showDiceAnim(d1, d2, total) {
 })();
 
 function rollDice() {
+  // ★ 立刻視覺回饋（防止感覺「沒反應」再按）
+  const _btn = document.querySelector('.btn-pub[ontouchend]');
+  if (_btn && !_btn.disabled) { _btn.disabled = true; setTimeout(() => { if(_btn) _btn.disabled = false; }, 2000); }
   try { if(typeof sfxRoll==="function") sfxRoll(); } catch(e) {}
   if (!gameState) return;
   const curTurn = gameState.currentTurn;
@@ -2024,7 +2028,7 @@ function rollDice() {
 
   // ★ 防止連點（1.5秒 debounce）
   const now = Date.now();
-  if (rollDice._lastTime && now - rollDice._lastTime < 1500) return;
+  if (rollDice._lastTime && now - rollDice._lastTime < 800) return; // ★ 縮短 debounce
   rollDice._lastTime = now;
 
   const team = gameState.teams[myTeamId] || gameState.teams[String(myTeamId)];
