@@ -810,11 +810,21 @@ function attachSync() {
   }
 
   const applyState = (raw) => {
-    if (window._isMoving) return; 
+    // ★ _isMoving 只封鎖老師端（避免移動中被外部狀態打斷）
+    // 學生端不設 _isMoving，應正常接收每步更新以顯示動畫
+    if (myRole === 'teacher' && window._isMoving) return;
     if (!raw || raw === _lastStateStr) return;
     try {
       const parsed = JSON.parse(raw);
       if (!parsed?.teams) return;
+
+      // ★ 防止舊狀態覆蓋：若本地已是 'rolled' 以後，忽略 'waiting_roll' 的舊廣播
+      const phaseOrder = { intro:0, waiting_roll:1, rolled:2, land_reveal:3,
+                           event:4, challenge:4, answering:4, revealing:4, done:5 };
+      const localRank    = phaseOrder[gameState?.phase] ?? 0;
+      const incomingRank = phaseOrder[parsed.phase]    ?? 0;
+      if (myRole === 'student' && localRank > 1 && incomingRank <= 1) return;
+
       _lastStateStr = raw;
       gameState = parsed;
       if (gameState.gameId) {
@@ -836,7 +846,11 @@ function attachSync() {
               applyState(JSON.stringify(data.w8State));
           }
           if (data && data.w8Action && myRole === 'teacher') {
-              processAction(data.w8Action);
+              const a = data.w8Action;
+              if (a && a.ts && a.ts !== _lastActionTs) {
+                  _lastActionTs = a.ts; // ★ 先設，防止 poll 重複觸發
+                  processAction(a);
+              }
           }
       });
     }
@@ -1014,6 +1028,12 @@ window.addEventListener('message', e => {
     if (!incoming?.teams) return;
     const str = JSON.stringify(incoming);
     if (str === _lastStateStr) return;
+    // ★ 防舊狀態覆蓋
+    const phaseOrder = { intro:0, waiting_roll:1, rolled:2, land_reveal:3,
+                         event:4, challenge:4, answering:4, revealing:4, done:5 };
+    const localRank    = phaseOrder[gameState?.phase] ?? 0;
+    const incomingRank = phaseOrder[incoming.phase]   ?? 0;
+    if (localRank > 1 && incomingRank <= 1) return;
     _lastStateStr = str;
     gameState = incoming;
     if (!boardPos?.length) boardPos = getBoardLayout();
