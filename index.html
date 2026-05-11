@@ -983,48 +983,32 @@ let _allRoomsFirstSnap = false; // 是否已收到第一次快照
 function startAllRoomsListener() {
     if (!isFirebase || !db) return;
     if (allRoomsUnsubscribe) { allRoomsUnsubscribe(); allRoomsUnsubscribe = null; }
-    // ★ 不監聽整個 collection（高消耗），改為一次性讀取可見房間
-    // 只在學生進入加入頁時執行一次性查詢
-    _fetchRoomsOnce();
-}
-
-// ★ 一次性讀取房間（不持續監聽 collection，大幅降低讀取次數）
-let _lastFetchTime = 0;
-async function _fetchRoomsOnce() {
-    if (!isFirebase || !db || !fsGetDoc) return;
-    const now = Date.now();
-    if (now - _lastFetchTime < 10000) return; // 10秒內不重複讀取
-    _lastFetchTime = now;
-    try {
-        // 只讀取 localStorage 中已知的房間碼
-        const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-        const codes = Object.keys(local);
-        // 若有 pendingRestore，加入要恢復的房間碼
-        if (window._pendingRestore?.roomCode) codes.push(window._pendingRestore.roomCode);
-        if (codes.length === 0) {
-            if (window._pendingRestore) tryRestoreSession();
-            return;
-        }
-        // 每個已知房間各讀一次（不讀整個 collection）
-        const snapPromises = [...new Set(codes)].map(code =>
-            fsGetDoc(fsDoc(db, 'rooms', code)).catch(() => null)
-        );
-        const snaps = await Promise.all(snapPromises);
-        snaps.forEach(snap => {
-            if (!snap || !snap.exists || !snap.exists()) return;
-            const data = snap.data();
-            window._allRoomsCache[snap.id] = data;
-            local[snap.id] = data;
+    const colRef = fsCollection(db, 'rooms');
+    allRoomsUnsubscribe = fsOnSnap(colRef, (snapshot) => {
+        const now = Date.now();
+        const newCache = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.createdAt && (now - data.createdAt) > 2 * 60 * 60 * 1000) {
+                if (isFirebaseAuthComplete) fsDelete(fsDoc(db, 'rooms', doc.id)).catch(()=>{});
+            } else {
+                newCache[doc.id] = data;
+            }
         });
-        localStorage.setItem('playroom_rooms', JSON.stringify(local));
-    } catch(e) {}
-    if (window._pendingRestore) tryRestoreSession();
-    // 重新渲染房間列表
-    const p = window.state?.perspective;
-    const pData = p && window.pStates?.[p];
-    if (pData?.screen === 'screen-join' && pData.joinStep === 1) {
-        window.renderRoomList();
-    }
+        window._allRoomsCache = newCache;
+        const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
+        let changed = false;
+        Object.keys(local).forEach(id => {
+            if (!newCache[id]) { delete local[id]; changed = true; }
+        });
+        if (changed) localStorage.setItem('playroom_rooms', JSON.stringify(local));
+        if (window._pendingRestore) tryRestoreSession();
+        const p = window.state && window.state.perspective;
+        const pData = p && window.pStates && window.pStates[p];
+        if (pData && pData.screen === 'screen-join' && pData.joinStep === 1) {
+            window.renderRoomList();
+        }
+    }, err => console.error('All rooms sync error:', err));
 }
 
 // ── 監聽單一房間（遊戲中即時同步）──
