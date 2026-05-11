@@ -943,25 +943,16 @@ window.getRooms = function() {
     return JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
 };
 
-let _saveRoomsTimer = null;
 window.saveRooms = function(r) {
     const myCode = window.state && window.state.roomCode;
     if (!myCode || !r[myCode]) return;
-    // 更新記憶體快取和 localStorage（立即）
     window._allRoomsCache[myCode] = r[myCode];
     const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
     local[myCode] = r[myCode];
     localStorage.setItem('playroom_rooms', JSON.stringify(local));
-    // ★ Firebase 寫入節流：500ms 內多次 saveRooms 合併為一次
     if (isFirebase && db && isFirebaseAuthComplete) {
-        clearTimeout(_saveRoomsTimer);
-        _saveRoomsTimer = setTimeout(() => {
-            const latestData = window._allRoomsCache[myCode];
-            if (latestData) {
-                fsSet(fsDoc(db, 'rooms', myCode), latestData)
-                    .catch(e => console.error("Firebase Save Error:", e));
-            }
-        }, 500);
+        fsSet(fsDoc(db, 'rooms', myCode), r[myCode])
+            .catch(e => console.error("Firebase Save Error:", e));
     }
 };
 
@@ -3564,17 +3555,6 @@ function selectRoom(code, num) {
 function verifyRoomPassword() {
     if (document.getElementById('room-pw-input').value === window.state.tempRoomCode) {
         window.state.roomCode = window.state.tempRoomCode;
-        // ★ 加入前先確保該房間資料在快取中
-        if (isFirebase && db && fsGetDoc && !window._allRoomsCache[window.state.roomCode]) {
-            fsGetDoc(fsDoc(db, 'rooms', window.state.roomCode)).then(snap => {
-                if (snap.exists()) {
-                    window._allRoomsCache[snap.id] = snap.data();
-                    const local = JSON.parse(localStorage.getItem('playroom_rooms') || '{}');
-                    local[snap.id] = snap.data();
-                    localStorage.setItem('playroom_rooms', JSON.stringify(local));
-                }
-            }).catch(()=>{});
-        }
         startSyncListener(); // 學生加入後開始監聽 Firebase
         const room = window.getRooms()[window.state.roomCode];
         if(!room || !room.open) { window.showToast('⚠️ 房間已關閉'); return; }
