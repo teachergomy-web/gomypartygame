@@ -819,6 +819,16 @@ function attachSync() {
       const parsed = JSON.parse(raw);
       if (!parsed?.teams) return;
 
+      // ★ 精準 phase 保護：學生剛按擲骰（local=rolled），
+      //   若收到「同一輪」的 waiting_roll → 舊狀態，擋掉
+      //   若收到「不同輪」（currentTurn 改變）→ 新回合，允許
+      if (myRole === 'student' &&
+          parsed.phase === 'waiting_roll' &&
+          gameState?.phase === 'rolled' &&
+          String(parsed.currentTurn) === String(gameState?.currentTurn)) {
+        return;
+      }
+
       _lastStateStr = raw;
       gameState = parsed;
       if (gameState.gameId) {
@@ -1018,6 +1028,12 @@ window.addEventListener('message', e => {
     if (!incoming?.teams) return;
     const str = JSON.stringify(incoming);
     if (str === _lastStateStr) return;
+    // ★ 精準 phase 保護（同 applyState）
+    if (incoming.phase === 'waiting_roll' &&
+        gameState?.phase === 'rolled' &&
+        String(incoming.currentTurn) === String(gameState?.currentTurn)) {
+      return;
+    }
     _lastStateStr = str;
     gameState = incoming;
     if (!boardPos?.length) boardPos = getBoardLayout();
