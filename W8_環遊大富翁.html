@@ -533,23 +533,20 @@ const LUCKY = LUCKY_DATA.map(([title, amt]) => ({
   title, desc: `+$${amt}`, fx: (tid, gs) => updateTeam(tid, { score: (Number(gs.teams[tid].score) || 0) + amt })
 }));
 
-// ★ 特殊幸運卡：獲得新腳踏車（加入第二顆骰子）
+// 腳踏車卡：下一回合單次雙骰子
 LUCKY.push({
-  title: '獲得新腳踏車',
-  desc: '🚲 下一回合起可使用兩顆骰子擲骰！',
+  title: '獲得腳踏車',
+  desc: '🚲 下一回合使用兩顆骰子擲骰！',
   fx: (tid, gs) => {
     const team = gs.teams[String(tid)] || gs.teams[tid];
     if (!team) return;
-    if (team.extraDice) {
-      // 已有雙骰子：改給獎金
+    if (team.nextTurnExtraDice) {
       updateTeam(tid, { score: (Number(team.score) || 0) + 500 });
       showToast('🚲 已有腳踏車！獲得補償金 +$500');
       return;
     }
-    const curPos = Number(team.position || 0);
-    // bikeStartPos：記錄獲得時的位置，走完一圈（回到或超過此位置）才可被抽到摔車卡
-    updateTeam(tid, { extraDice: true, bikeStartPos: curPos, bikeActiveLap: false });
-    showToast('🚲 獲得腳踏車！下回合起用兩顆骰子！');
+    updateTeam(tid, { nextTurnExtraDice: true });
+    showToast('🚲 獲得腳踏車！下回合使用兩顆骰子！');
   }
 });
 
@@ -567,16 +564,7 @@ const BAD = BAD_DATA.map(([title, amt]) => ({
   title, desc: `-$${amt}`, fx: (tid, gs) => updateTeam(tid, { score: Math.max(0, (Number(gs.teams[tid].score) || 0) - amt) })
 }));
 
-// ★ 特殊突發卡：腳踏車摔壞了（移除第二顆骰子）
-// 不加入一般 BAD 陣列，doBAD 時特別判斷是否可抽
-const BAD_BIKE = {
-  title: '腳踏車摔壞了',
-  desc: '💔 損失一顆骰子，回到單骰子模式！',
-  fx: (tid, gs) => {
-    updateTeam(tid, { extraDice: false, bikeStartPos: null, bikeActiveLap: false });
-    showToast('🚲💔 腳踏車摔壞了！回到單骰子！');
-  }
-};
+// BAD_BIKE 已移除
 
 // ══════════════════════════════
 // 特殊任務挑戰卡（老師裁判制）
@@ -1204,7 +1192,7 @@ function makeInit() {
 
   const teams = {};
   TEAMS.forEach(t => {
-    teams[t.id] = { id: t.id, position: 0, score: 3000, extraDice: false, skipTurn: false, bikeStartPos: null, bikeActiveLap: false };
+    teams[t.id] = { id: t.id, position: 0, score: 3000, nextTurnExtraDice: false, skipTurn: false };
   });
 
   const playOrder = [...TEAMS].sort((a, b) => a.id - b.id).map(t => t.id);
@@ -1623,10 +1611,7 @@ function renderTeacher() {
     if (!t) return;
     const row = document.createElement('div');
     row.className = 'score-row' + ((team.id === gs.currentTurn && gs.phase !== 'intro') ? ' active' : '');
-    const bikeTag = team.extraDice
-      ? `<span title="${team.bikeActiveLap ? '雙骰子（可被摔車）' : '雙骰子（尚未完成一圈）'}"
-          style="font-size:.75rem;margin-left:4px;">${team.bikeActiveLap ? '🚲' : '🚲🔒'}</span>`
-      : '';
+    const bikeTag = '';
     row.innerHTML = `
       <span class="sc-icon">${t.icon}</span>
       <span class="sc-name" style="color:${t.color}">${t.name}${bikeTag}</span>
@@ -1649,8 +1634,7 @@ function renderStudent() {
   const myTD = gs?.teams?.[myTeamId] || gs?.teams?.[String(myTeamId)];
   const scoreEl = document.getElementById('my-score');
   if (scoreEl) {
-    const bikeIcon = myTD?.extraDice ? ' 🚲' : '';
-    scoreEl.innerHTML = `$<span style="margin-left: 2px;">${Number(myTD?.score) || 0}</span>${bikeIcon}`;
+    scoreEl.innerHTML = `$<span style="margin-left: 2px;">${Number(myTD?.score) || 0}</span>`;
   }
 
   if (!gs || !gs.teams) {
@@ -2051,8 +2035,10 @@ function rollDice() {
   }
 
   const d1 = Math.ceil(Math.random() * 6);
-  const d2 = team.extraDice ? Math.ceil(Math.random() * 6) : null;
+  const d2 = team.nextTurnExtraDice ? Math.ceil(Math.random() * 6) : null;
   const total = d1 + (d2 || 0);
+  // ★ 雙骰子用完即清除
+  if (team.nextTurnExtraDice) updateTeam(myTeamId, { nextTurnExtraDice: false });
   
   const action = { type: 'W8_ROLL', teamId: myTeamId, gameId: gameState.gameId, diceResult: { d1, d2, total }, ts: Date.now() };
 
@@ -2096,11 +2082,8 @@ function movePiece() {
     if (curPos === 0) {
         // ★ 先加分，再 broadcast（確保學生收到含 +500 的狀態）
         if (_t) _t.score = (Number(_t.score) || 0) + 500;
-        if (_t && _t.extraDice && !_t.bikeActiveLap) {
-            _t.bikeActiveLap = true;
-        }
         if (myRole === 'teacher') {
-            updateTeam(tid, { score: _t.score, bikeActiveLap: _t.bikeActiveLap });
+            updateTeam(tid, { score: _t.score });
         }
         broadcast();
         renderPieces();
@@ -2108,9 +2091,7 @@ function movePiece() {
         if (myRole === 'teacher') {
             showToast('🏁 經過起點！+$500');
             showPop('+$500', 'var(--green)');
-            if (_t && _t.extraDice && _t.bikeActiveLap) {
-                setTimeout(() => showToast('🚲 腳踏車走完一圈！現在有可能遇到突發事件！'), 800);
-            }
+
         }
         if (step < steps) {
             setTimeout(moveStep, 800);
@@ -2207,16 +2188,7 @@ function doLucky(tid) {
   showToast(`🍀 ${ev.title}`); showPop('+', 'var(--green)');
 }
 function doBad(tid) {
-  const team = gameState.teams[String(tid)] || gameState.teams[tid] || {};
-
-  // ★ 若該組持有雙骰子且已完成一圈 → 將摔車卡加入本次抽卡池（約 1/5 機率）
-  const canBike = team.extraDice && team.bikeActiveLap;
   const pool = [...BAD];
-  if (canBike) {
-    // 加入摔車卡（重複 4 次讓概率約 4/（BAD.length+4） ≈ 1/5）
-    for (let i = 0; i < 4; i++) pool.push(BAD_BIKE);
-  }
-
   const ev = pool[Math.floor(Math.random() * pool.length)];
   ev.fx(tid, gameState);
   updateState({ phase: 'event', event: { type: 'bad', title: ev.title, desc: ev.desc } });
