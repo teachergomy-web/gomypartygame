@@ -2111,6 +2111,8 @@ function tcStartGame() {
             TC.scores = {};
             r.scores = {};
             r.baseScores = {}; // 第一關，基底分數歸零
+            // ★ 修復問題2：新遊戲開始時也清除 Firebase 端的舊分數，避免重開房間後殘留
+            r.finalScores = {};
         } else {
             // 是下一關，將目前成績備份為 baseScores
             r.baseScores = JSON.parse(JSON.stringify(r.scores || {}));
@@ -2674,7 +2676,8 @@ function tcLaunchStudentIfNeeded() {
                         isTeacher: isTeacher2,
                         state: isW5 ? w5state : w3state,
                         players: r2.players || window.state.players || [],
-                        rejoinScore  // ★ 重連時帶入現有分數，讓遊戲繼續累計
+                        rejoinScore,   // ★ 重連時帶入現有分數，讓遊戲繼續累計
+                        rejoinLevel: level  // ★ 修復問題1：明確傳入關卡，避免從 LV1 重開
                     }, '*');
                 }
             } catch(e) {}
@@ -2746,6 +2749,13 @@ function tcSettleGame() {
     const isW7 = window.state.selectedGame === 6;
     const rooms = window.getRooms();
     const room  = rooms[window.state.roomCode] || {};
+
+    // ★ 修復問題2：結算前先把 Firebase 最新分數合併進 TC.scores（最大值優先）
+    if (room.scores) {
+        for (const g in room.scores) {
+            TC.scores[g] = Math.max(TC.scores[g] || 0, room.scores[g] || 0);
+        }
+    }
 
     // ── 分數合併：取所有來源的最大值 ──
     // 來源1：TC.scores（本地記憶體，遊戲中即時更新）
@@ -3047,6 +3057,23 @@ window.addEventListener('message', (e) => {
         if (isGameover && window.state.perspective === 'teacher') {
             showToast(`🏁 ${group} 完成！累積得分：${finalScore}`);
         }
+
+        // ★ 修復問題2：學生端也直接寫入 Firebase（W1/W2），不只靠 postMessage 到老師端
+        // 當遊戲 iframe 與老師在不同裝置時，分數由學生端直接存入 Firebase
+        if (window.state.perspective !== 'teacher' && (isScore || isGameover)) {
+            const rC = window.state.roomCode;
+            const rooms2 = window.getRooms();
+            if (rC && rooms2[rC]) {
+                const base2 = rooms2[rC].baseScores || {};
+                const studentFinalScore = (base2[group] || 0) + score;
+                if (!rooms2[rC].scores) rooms2[rC].scores = {};
+                const prevStudent = rooms2[rC].scores[group] || 0;
+                if (studentFinalScore > prevStudent) {
+                    rooms2[rC].scores[group] = studentFinalScore;
+                    window.saveRooms(rooms2);
+                }
+            }
+        }
     }
     
     // W3：老師 iframe 廣播棋局狀態 → 存入 Firebase → 推送給所有學生
@@ -3180,19 +3207,22 @@ setInterval(() => {
     const r = rooms[window.state.roomCode];
     if (!r) return;
 
-    // 老師端透過輪詢從 shared rooms 讀取所有學生即時同步的最新分數
+    // ★ 修復問題2：老師端透過輪詢從 shared rooms 讀取所有學生即時同步的最新分數
+    // 取 TC.scores 與 Firebase scores 的最大值，確保不會因為訊息順序問題漏掉高分
     if (r.scores) {
         let scoreChanged = false;
         for (let g in r.scores) {
-            if (TC.scores[g] !== r.scores[g]) {
-                TC.scores[g] = r.scores[g];
+            const firebaseScore = r.scores[g] || 0;
+            const localScore = TC.scores[g] || 0;
+            if (firebaseScore > localScore) {
+                TC.scores[g] = firebaseScore;
                 scoreChanged = true;
                 
-                // 如果目前是老師端，只針對有變動的項目觸發跳動特效
+                // 老師端：針對有變動的項目觸發跳動特效
                 if (window.state.perspective === 'teacher' && window.pStates['teacher'].screen === 'screen-teacher-console') {
                     const el = document.getElementById('tc-score-' + g.replace(/\s/g,''));
                     if (el) {
-                        el.textContent = r.scores[g];
+                        el.textContent = firebaseScore;
                         el.style.transform = 'scale(1.4)';
                         setTimeout(() => { if(el) el.style.transform = 'scale(1)'; }, 250);
                     }
@@ -4117,6 +4147,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window._pendingRestore && window._pendingRestore.roomCode) {
         const loading = document.getElementById('restore-loading');
         if (loading) loading.style.display = 'flex';
+        // ★ 修復問題4：15秒後強制解除 loading，防止永遠卡住
+        setTimeout(() => {
+            if (window._pendingRestore) {
+                window._pendingRestore = null;
+                sessionStorage.removeItem('game_session');
+            }
+            const ld = document.getElementById('restore-loading');
+            if (ld && ld.style.display !== 'none') {
+                ld.style.display = 'none';
+                showToast('⚠️ 重連逾時，請重新加入房間');
+            }
+        }, 15000);
     }
 
     // ── 測試工具：URL 參數自動加入 ──

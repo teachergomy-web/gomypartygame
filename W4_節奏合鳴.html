@@ -2836,7 +2836,11 @@
                 if (gameState.timeLeft > 0) {
                     gameState.active = true;
                     gameState.lastFrameTime = performance.now();
-                    requestAnimationFrame(gameLoop);
+                    // ★ 修復：防止 loop 重複啟動（PLATFORM_RESUME 可能被多次觸發）
+                    if (!_loopRunning) {
+                        _loopRunning = true;
+                        requestAnimationFrame(gameLoop);
+                    }
                     // ★ 繼續時接續播放（不從頭）
                     if (!_bgmStopped) {
                         if (_bgmAudio) { _bgmAudio.play().catch(() => {}); }

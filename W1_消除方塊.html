@@ -440,6 +440,8 @@ let state = {
     spawnTimer: 0, spawnCount: 0,
     entities: [], particles: [], seed: 1234
 };
+// 防止 gameLoop 重複執行（重連時避免速度疊加）
+let gameLoopRunning = false;
 
 const GRAVITY = 0.1;
 const APEX_THRESHOLD = 1.8;
@@ -470,14 +472,16 @@ function startGame(lvl) {
     document.getElementById('level-select-menu').classList.add('hidden');
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('ui-header').classList.remove('hidden');
-    state.active = true;
+    // 停止舊的 loop（重連保護）
+    state.active = false;
+    gameLoopRunning = false;
     // 平台模式重連時 score 已由 PLATFORM_START 設好，不在這裡歸零
     if (!window.IS_PLATFORM || state.score === undefined) state.score = 0;
     state.spawnCount = 0;
     resize();
     setupLevel(lvl);
-    state.lastFrameTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    state.active = true;
+    safeStartLoop();
 }
 
 function startNextLevel() {
@@ -675,8 +679,8 @@ function drawMarioBg(){
 
 // ===== GAME LOOP =====
 function gameLoop(now){
-    if(!state.active) return;
-    if(state.paused) return;
+    if(!state.active){ gameLoopRunning=false; return; }
+    if(state.paused){ gameLoopRunning=false; return; }
     const dt=now-state.lastFrameTime;
     state.lastFrameTime=now;
 
@@ -805,7 +809,17 @@ function gameLoop(now){
     requestAnimationFrame(gameLoop);
 }
 
+// 安全啟動 gameLoop，避免重複執行
+function safeStartLoop() {
+    if (!gameLoopRunning) {
+        gameLoopRunning = true;
+        state.lastFrameTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+}
+
 function endGame(){
+    gameLoopRunning = false;
     const finalScore=state.score;
     document.getElementById('final-score').innerText=finalScore;
     let stars='⭐';
@@ -869,6 +883,13 @@ function reportScore() {
     }, '*');
 }
 
+// 定期同步分數（每3秒），防止分數掉包
+setInterval(() => {
+    if (state.active && !state.paused) {
+        reportScore();
+    }
+}, 3000);
+
 // 接收平台指令
 
 // ── W1 音效 ──
@@ -877,6 +898,7 @@ function reportScore() {
   function ac() {
     if (!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
     if (_ac.state==='suspended') _ac.resume();
+    window._audioCtx = _ac; // 暴露給 PLATFORM_RESUME 使用
     return _ac;
   }
   // 點擊普通方塊：短促高頻叮
@@ -920,9 +942,11 @@ window.addEventListener('message', (e) => {
         case 'PLATFORM_START':
             if (e.data.group) window.GROUP_ID = e.data.group;
             window.IS_PLATFORM = true;
-            // ★ 重連時從上次分數繼續（而非歸零）
+            // ★ 重連時從上次分數與關卡繼續
             if (e.data.rejoinScore > 0) state.score = e.data.rejoinScore;
-            startGame(e.data.level || 1);
+            // 重連：恢復到離開前的關卡（而非從 LV1 開始）
+            const resumeLevel = e.data.rejoinLevel || e.data.level || 1;
+            startGame(resumeLevel);
             break;
         case 'PLATFORM_PAUSE':
             state.paused = true;
@@ -932,8 +956,11 @@ window.addEventListener('message', (e) => {
             if (state.paused) {
                 state.paused = false;
                 document.getElementById('pause-overlay').style.display = 'none';
-                state.lastFrameTime = performance.now();
-                requestAnimationFrame(gameLoop);
+                // 修復：resume AudioContext（暫停後音樂無法播放的問題）
+                if (window._audioCtx && window._audioCtx.state === 'suspended') {
+                    window._audioCtx.resume();
+                }
+                safeStartLoop();
             }
             break;
         case 'PLATFORM_RESET':
@@ -953,6 +980,18 @@ window.addEventListener('message', (e) => {
 
 // 通知平台遊戲已準備好
 window.parent.postMessage({ type: 'W1_READY' }, '*');
+
+// 修復問題4：重新整理後卡在重連畫面
+// 若平台 10 秒內沒回應 PLATFORM_START，自動進入 standalone 模式
+let platformStartReceived = false;
+window.addEventListener('message', (e) => { if(e.data && e.data.type==='PLATFORM_START') platformStartReceived=true; }, {once:true});
+setTimeout(() => {
+    if (!platformStartReceived && window.IS_PLATFORM) {
+        // 平台沒有回應，重置為獨立模式，讓畫面可操作
+        window.IS_PLATFORM = false;
+        document.getElementById('level-select-menu').classList.remove('hidden');
+    }
+}, 10000);
 
 // ── 自動開始（讀取 URL 參數，預設第1關）──
 (function(){
