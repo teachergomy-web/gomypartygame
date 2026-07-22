@@ -1605,8 +1605,13 @@
         }
 
         const bpmNow = (TRACK_DATA[gameState.level] || {bpm:120}).bpm;
-        // 速度依 BPM 線性對應：60BPM → 4px/frame，185BPM → 12px/frame
-        const speed = 4 + (bpmNow - 60) / (185 - 60) * 8;
+        // 速度依 BPM 線性對應：60BPM → 4px/frame，185BPM → 12px/frame（以 60fps 為基準）
+        // ★ 修正：原本是「每一次畫面更新」就移動固定像素，沒有依實際經過時間(dt)換算。
+        //   在 90Hz / 120Hz 的手機、平板上，requestAnimationFrame 觸發次數是 60fps 的
+        //   1.5~2 倍，導致玩法1的方塊掉落速度也跟著變成 1.5~2 倍快 → 玩家還沒看清楚
+        //   方塊就已經掉到接近判定線，感覺像是「從畫面中間突然冒出來」、可反應時間變短。
+        //   這裡把 speed 換算成「每秒像素」，並用 dt 縮放，讓掉落速度不受畫面更新率影響。
+        const speed = (4 + (bpmNow - 60) / (185 - 60) * 8) * (dt / (1000 / 60));
 
         // 各模式有自己的軌道背景繪製（Mode1黑塊/Mode2透視/Mode3縮圈）
 
@@ -2412,13 +2417,39 @@
                 const p = _bgmAudio.play();
                 if (p && p.catch) {
                     p.catch(() => {
-                        // ★ play() 被擋：等 500ms 重試一次
-                        setTimeout(() => {
-                            if (_bgmAudio && !_bgmStopped) _bgmAudio.play().catch(() => {});
-                        }, 500);
+                        // ★ play() 被瀏覽器自動播放政策擋下（沒有真正的使用者手勢）。
+                        //   500ms 後單次重試，但如果那時仍然沒有手勢，一樣會失敗，
+                        //   之後就再也不會重試 → 這就是「只有第一組（第一個真的有點過畫面的裝置）
+                        //   才有音樂」的原因：其他組的裝置若在遊戲自動由老師端啟動時
+                        //   還沒被使用者摸過，BGM 就永久卡死在靜音狀態。
+                        //   修正：改成持續監聽使用者的第一次觸碰/點擊，只要抓到手勢就重播。
+                        _armBgmRetryOnGesture();
                     });
                 }
             } catch(e) {}
+        }
+
+        // ★ 修正：BGM 被瀏覽器擋下時，持續等待「任何一次」使用者觸碰/點擊來重試播放，
+        //   而不是只在最初 500ms 內試一次。監聽器成功播放後才移除自己。
+        let _bgmGestureArmed = false;
+        function _armBgmRetryOnGesture() {
+            if (_bgmGestureArmed) return;
+            _bgmGestureArmed = true;
+            const retry = () => {
+                if (_bgmStopped || !_bgmAudio || musicMuted) { return; }
+                const rp = _bgmAudio.play();
+                if (rp && rp.then) {
+                    rp.then(() => {
+                        document.removeEventListener('touchstart', retry, true);
+                        document.removeEventListener('mousedown', retry, true);
+                        document.removeEventListener('click', retry, true);
+                        _bgmGestureArmed = false;
+                    }).catch(() => { /* 還是沒手勢，繼續等下一次 */ });
+                }
+            };
+            document.addEventListener('touchstart', retry, true);
+            document.addEventListener('mousedown', retry, true);
+            document.addEventListener('click', retry, true);
         }
 
         // ★ 先確保 iOS 音效已解鎖，再播放
@@ -2836,11 +2867,7 @@
                 if (gameState.timeLeft > 0) {
                     gameState.active = true;
                     gameState.lastFrameTime = performance.now();
-                    // ★ 修復：防止 loop 重複啟動（PLATFORM_RESUME 可能被多次觸發）
-                    if (!_loopRunning) {
-                        _loopRunning = true;
-                        requestAnimationFrame(gameLoop);
-                    }
+                    requestAnimationFrame(gameLoop);
                     // ★ 繼續時接續播放（不從頭）
                     if (!_bgmStopped) {
                         if (_bgmAudio) { _bgmAudio.play().catch(() => {}); }
